@@ -332,12 +332,14 @@ def _analyze_files(
                     f"{mark} {attempt.summary[:90]} ({_age(attempt.timestamp)})"
                 )
             if count > 3:
-                details.append(f"  ... and {count - 3} more (pjm search --failed-only)")
+                details.append(f"  ... and {count - 3} more{_hidden_lessons_hint(failed_attempts[:-3])}")
+            partial_count = count - failed_count
+            partly = f", {partial_count} only partly worked" if partial_count else ""
             warnings.append({
                 "file": file_path,
                 "severity": severity,
                 "type": "failed_attempts",
-                "title": f"What already failed here ({count} attempt{'s' if count != 1 else ''}):",
+                "title": f"What already failed here ({count} attempt{'s' if count != 1 else ''}{partly}):",
                 "details": details,
             })
 
@@ -438,6 +440,13 @@ def _analyze_files(
             })
 
     return warnings
+
+
+def _hidden_lessons_hint(hidden: list[Event]) -> str:
+    issue_ids = list(dict.fromkeys(e.issue_id for e in reversed(hidden) if e.issue_id))
+    if not issue_ids:
+        return " (pjm search --failed-only)"
+    return ", from " + ", ".join(f"#{i}" for i in issue_ids) + " (get_issue(issue_id))"
 
 
 def _events_for_file(

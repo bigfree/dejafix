@@ -34,6 +34,7 @@ import io
 import os
 import re
 import sys
+from collections import defaultdict
 from pathlib import Path
 from typing import Annotated, Callable, Optional
 
@@ -346,12 +347,10 @@ def precheck_file(
     expensive re-debugging cycles.
 
     Read-only; does not modify memory."""
-    root = _root_for(project)
-    return _precheck_report(file_path, read_events(root), root)
+    return _precheck_report([file_path], _root_for(project))
 
 
-def _precheck_report(file_path: str, events: list[Event], root: Path) -> str:
-    from projectmem.commands.precheck import _analyze_files
+def _precheck_block(file_path: str, warnings: list[dict], root: Path) -> str:
     from projectmem.staleness import is_memory_path
     # "No warnings. Safe to modify." would contradict the instructions above:
     # memory files are written by projectmem, never edited by hand.
@@ -361,7 +360,6 @@ def _precheck_report(file_path: str, events: list[Event], root: Path) -> str:
             "from the event log, so do not edit it; record the change with "
             "add_note / add_decision / log_issue / record_fix instead."
         )
-    warnings = _analyze_files([file_path], events, root=root)
     if not warnings:
         return f"{file_path}: no warnings. Safe to modify."
     lines = [f"projectmem precheck: {file_path}"]
@@ -370,6 +368,19 @@ def _precheck_report(file_path: str, events: list[Event], root: Path) -> str:
         for detail in w.get("details", []):
             lines.append(f"    - {detail}")
     return "\n".join(lines)
+
+
+def _precheck_report(file_paths: list[str], root: Path) -> str:
+    from projectmem.commands import precheck
+    from projectmem.staleness import project_relative
+
+    by_file: dict[str, list[dict]] = defaultdict(list)
+    for warning in precheck._analyze_files(file_paths, read_events(root), root=root):
+        by_file[warning["file"]].append(warning)
+    return "\n\n".join(
+        _precheck_block(path, by_file.get(project_relative(path.strip(), root), []), root)
+        for path in file_paths
+    )
 
 
 @mcp.tool()
@@ -387,9 +398,7 @@ def precheck_files(
     change touches more than one file.
 
     Read-only; does not modify memory."""
-    root = _root_for(project)
-    events = read_events(root)
-    return "\n\n".join(_precheck_report(path, events, root) for path in file_paths)
+    return _precheck_report(file_paths, _root_for(project))
 
 
 @mcp.tool()
