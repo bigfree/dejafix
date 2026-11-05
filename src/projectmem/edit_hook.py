@@ -6,8 +6,10 @@ import posixpath
 import re
 import stat
 import sys
+import time
 from pathlib import Path
 
+LOG_ENV = "PJM_EDIT_HOOK_LOG"
 EVENTS_PATH = Path(".projectmem") / "events.jsonl"
 WORKTREE_SEGMENT = re.compile(r"/\.claude/worktrees/[^/]+/")
 LINE_SUFFIX = re.compile(r":\d+(?::\d+)?$")
@@ -301,13 +303,45 @@ def run(payload: dict[str, object]) -> str:
     })
 
 
-def main() -> None:
+def call_record(payload: dict[str, object], output: str, elapsed_ms: float, failure: str) -> dict[str, object]:
+    return {
+        "at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+        "event": text_of(payload, "hook_event_name"),
+        "tool": text_of(payload, "tool_name"),
+        "session": text_of(payload, "session_id"),
+        "agent": text_of(payload, "agent_id"),
+        "cwd": text_of(payload, "cwd"),
+        "files": len(edited_paths(payload.get("tool_input"))),
+        "reported": output.count("projectmem lessons for "),
+        "chars": len(output),
+        "ms": round(elapsed_ms, 1),
+        "error": failure,
+    }
+
+
+def append_log(log_path: str, record: dict[str, object]) -> None:
     try:
-        output = run(hook_payload(sys.stdin.buffer.read()))
-    except Exception:  # noqa: BLE001
+        with open(log_path, "a", encoding="utf-8") as out:
+            out.write(json.dumps(record) + "\n")
+    except (OSError, ValueError):
         return
+
+
+def main() -> None:
+    started = time.perf_counter()
+    payload: dict[str, object] = {}
+    output = ""
+    failure = ""
+    try:
+        payload = hook_payload(sys.stdin.buffer.read())
+        output = run(payload)
+    except Exception as error:  # noqa: BLE001
+        failure = f"{type(error).__name__}: {error}"[:300]
     if output:
         sys.stdout.write(output + "\n")
+    log_path = os.environ.get(LOG_ENV, "")
+    if log_path:
+        append_log(log_path, call_record(payload, output, (time.perf_counter() - started) * 1000, failure))
 
 
 if __name__ == "__main__":

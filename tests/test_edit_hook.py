@@ -460,3 +460,69 @@ def test_unusable_temp_dir_falls_back_to_showing_lessons(
     assert hook(edit)
     assert hook(edit)
     assert hook({"session_id": "s1", "hook_event_name": "PostCompact"}) == ""
+
+
+def read_log(log_file: Path) -> list[dict[str, object]]:
+    return [json.loads(line) for line in log_file.read_text().splitlines()]
+
+
+def test_call_log_records_each_call_without_lesson_text(
+    project: Path, temp_root: Path, tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
+) -> None:
+    log_file = tmp_path / "calls.jsonl"
+    monkeypatch.setenv(edit_hook.LOG_ENV, str(log_file))
+
+    run_main(json.dumps(codex_patch(project, "*** Update File: src/a.py", "*** Update File: src/b.py")).encode(),
+             monkeypatch, capsys)
+    run_main(json.dumps({"session_id": "s1", "hook_event_name": "PostCompact"}).encode(), monkeypatch, capsys)
+
+    first, second = read_log(log_file)
+    assert {key: first[key] for key in ("tool", "session", "cwd", "files", "reported", "error")} == {
+        "tool": "apply_patch", "session": "s1", "cwd": str(project), "files": 2, "reported": 1, "error": "",
+    }
+    assert first["chars"] > 0
+    assert isinstance(first["ms"], float)
+    assert "token refresh race" not in log_file.read_text()
+    assert (second["event"], second["files"], second["reported"]) == ("PostCompact", 0, 0)
+
+
+@pytest.mark.skipif(not hasattr(os, "geteuid") or os.geteuid() == 0, reason="needs POSIX permissions")
+def test_call_log_records_the_error_the_hook_swallowed(
+    project: Path, temp_root: Path, tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
+) -> None:
+    log_file = tmp_path / "calls.jsonl"
+    monkeypatch.setenv(edit_hook.LOG_ENV, str(log_file))
+    events_file = project / ".projectmem" / "events.jsonl"
+    events_file.chmod(0)
+    try:
+        out = run_main(json.dumps(claude_edit(project / "src" / "a.py")).encode(), monkeypatch, capsys)
+    finally:
+        events_file.chmod(0o644)
+
+    assert out == ""
+    assert str(read_log(log_file)[0]["error"]).startswith("PermissionError: ")
+
+
+def test_unwritable_call_log_is_ignored(
+    project: Path, temp_root: Path, tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setenv(edit_hook.LOG_ENV, str(tmp_path / "missing-dir" / "calls.jsonl"))
+
+    out = run_main(json.dumps(claude_edit(project / "src" / "a.py")).encode(), monkeypatch, capsys)
+
+    assert "#0001 token refresh race" in out
+
+
+def test_no_call_log_without_the_variable(
+    project: Path, temp_root: Path, tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.delenv(edit_hook.LOG_ENV, raising=False)
+    monkeypatch.chdir(tmp_path)
+
+    run_main(json.dumps(claude_edit(project / "src" / "a.py")).encode(), monkeypatch, capsys)
+
+    assert sorted(path.name for path in tmp_path.iterdir()) == ["repo", "tmp"]
