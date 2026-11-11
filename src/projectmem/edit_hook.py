@@ -60,7 +60,8 @@ class ProjectMemory:
             kind = lesson_kind(event, closed, retired)
             if kind:
                 files = self.files_of(event) or issue_files.get(text_of(event, "issue_id"), set())
-                self.candidates.append((kind, event, files, text_of(event, "summary")))
+                mention_text = "" if kind == "decision" and files else text_of(event, "summary")
+                self.candidates.append((kind, event, files, mention_text))
 
     @staticmethod
     def read_events(events_file: Path) -> list[Event]:
@@ -93,8 +94,8 @@ class ProjectMemory:
     def lessons(self, relative: str) -> dict[str, list[Event]]:
         mentioned = mention_pattern(relative)
         found: dict[str, list[Event]] = {"issue": [], "attempt": [], "decision": []}
-        for kind, event, files, summary in self.candidates:
-            if relative in files or (relative in summary and mentioned.search(summary)):
+        for kind, event, files, mention_text in self.candidates:
+            if relative in files or (relative in mention_text and mentioned.search(mention_text)):
                 found[kind].append(event)
         return found
 

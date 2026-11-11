@@ -272,6 +272,20 @@ def test_summary_mention_counts_only_whole_paths(project: Path, hook: Hook) -> N
     assert "pins the schema" not in context
 
 
+def test_decision_with_its_own_files_ignores_passing_mentions(project: Path, hook: Hook) -> None:
+    write_events(
+        project,
+        {"type": "decision", "id": "d10", "summary": "release age is one day; note it in src/b.py",
+         "location": "bunfig.toml"},
+        {"type": "decision", "id": "d11", "summary": "src/b.py stays free of side effects"},
+    )
+
+    context = hook(claude_edit(project / "src" / "b.py"))
+
+    assert "stays free of side effects" in context
+    assert "release age" not in context
+
+
 @pytest.mark.parametrize("spelling", ["src\\b.py", "./src/../src/b.py", "src/b.py:3:7", "{root}/src/b.py"])
 def test_event_paths_in_other_spellings_still_match(project: Path, hook: Hook, spelling: str) -> None:
     write_events(project, {"type": "decision", "id": "d7", "summary": "spelled differently",
