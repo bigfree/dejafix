@@ -31,6 +31,7 @@ path = "tests/golden/main.rs"
 dejafix-core = { workspace = true, features = ["testing"] }
 jiff.workspace = true
 regex.workspace = true
+serde_json.workspace = true
 tempfile.workspace = true
 
 [lints]

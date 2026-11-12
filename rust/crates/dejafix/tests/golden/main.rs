@@ -1,4 +1,6 @@
+mod corpus;
 mod harness;
+mod m1;
 mod normalize;
 mod types;
 

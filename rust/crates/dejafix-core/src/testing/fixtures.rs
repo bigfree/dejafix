@@ -5,8 +5,8 @@ use std::path::Path;
 use jiff::Timestamp;
 use serde_json::{Map, Value, json};
 
-use super::json::write_python_json;
 use super::types::{FixtureError, FixtureState, SplitMix64};
+use crate::core::json::write_python_json;
 
 pub const FIXTURE_SIZES: [usize; 3] = [100, 3_000, 30_000];
 pub const FIXTURE_SEED: u64 = 0x00de_7afa_0000_0001;
@@ -65,6 +65,7 @@ pub fn write_project(root: &Path, events: usize, seed: u64) -> Result<(), Fixtur
             path: log.clone(),
             source,
         })?;
+        out.write_all(b"\n").map_err(at(&log))?;
     }
     out.flush().map_err(at(&log))
 }

@@ -10,7 +10,7 @@ Regenerate the id list with
 table in step with it: a new Python test adds a row, a removed one drops its
 row.
 
-Rows: 508.
+Rows: 510.
 
 | Milestone | Tests |
 |---|---|
@@ -19,7 +19,7 @@ Rows: 508.
 | M3 | 149 |
 | M4 | 56 |
 | M5 | 17 |
-| M6 | 10 |
+| M6 | 12 |
 | out of scope | 61 |
 
 | Python test | Milestone | Scope | Ported |
@@ -37,6 +37,7 @@ Rows: 508.
 | `tests/test_agent_guidance.py::test_every_call_shown_uses_the_tools_real_arguments[TUTORIAL.md]` | M6 | user documentation is rewritten for 1.0 | |
 | `tests/test_agent_guidance.py::test_every_call_shown_uses_the_tools_real_arguments[llms.txt]` | M6 | user documentation is rewritten for 1.0 | |
 | `tests/test_agent_guidance.py::test_every_call_shown_uses_the_tools_real_arguments[docs/2026-11-12-rust-m0-plan.md]` | M6 | user documentation is rewritten for 1.0 | |
+| `tests/test_agent_guidance.py::test_every_call_shown_uses_the_tools_real_arguments[docs/2026-11-12-rust-m1-plan.md]` | M6 | user documentation is rewritten for 1.0 | |
 | `tests/test_agent_guidance.py::test_every_call_shown_uses_the_tools_real_arguments[docs/2026-11-12-rust-rewrite-design.md]` | M6 | user documentation is rewritten for 1.0 | |
 | `tests/test_agent_guidance.py::test_every_call_shown_passes_the_tools_required_arguments[AI_INSTRUCTIONS.md (get_instructions)]` | M2 | agent guidance surfaces | |
 | `tests/test_agent_guidance.py::test_every_call_shown_passes_the_tools_required_arguments[CLAUDE.md bridge]` | M2 | agent guidance surfaces | |
@@ -45,6 +46,7 @@ Rows: 508.
 | `tests/test_agent_guidance.py::test_every_call_shown_passes_the_tools_required_arguments[TUTORIAL.md]` | M6 | user documentation is rewritten for 1.0 | |
 | `tests/test_agent_guidance.py::test_every_call_shown_passes_the_tools_required_arguments[llms.txt]` | M6 | user documentation is rewritten for 1.0 | |
 | `tests/test_agent_guidance.py::test_every_call_shown_passes_the_tools_required_arguments[docs/2026-11-12-rust-m0-plan.md]` | M6 | user documentation is rewritten for 1.0 | |
+| `tests/test_agent_guidance.py::test_every_call_shown_passes_the_tools_required_arguments[docs/2026-11-12-rust-m1-plan.md]` | M6 | user documentation is rewritten for 1.0 | |
 | `tests/test_agent_guidance.py::test_every_call_shown_passes_the_tools_required_arguments[docs/2026-11-12-rust-rewrite-design.md]` | M6 | user documentation is rewritten for 1.0 | |
 | `tests/test_agent_guidance.py::test_precheck_file_is_shown_on_every_runtime_surface` | M4 | MCP tools and instructions | |
 | `tests/test_agent_guidance.py::test_the_call_scanner_reads_names_not_values` | M2 | agent guidance surfaces | |
@@ -192,7 +194,7 @@ Rows: 508.
 | `tests/test_global_mcp.py::test_windows_paths_survive_migration` | M2 | project registry and `djf project` | |
 | `tests/test_global_mcp.py::test_absolute_check_is_used_rather_than_a_slash_test` | M2 | project registry and `djf project` | |
 | `tests/test_global_mcp.py::test_a_utf8_bom_does_not_empty_the_registry` | M2 | project registry and `djf project` | |
-| `tests/test_global_mcp.py::test_a_utf8_bom_does_not_break_the_event_log` | M1 | UTF-8 BOM in events.jsonl | |
+| `tests/test_global_mcp.py::test_a_utf8_bom_does_not_break_the_event_log` | M1 | UTF-8 BOM in events.jsonl | `crates/dejafix-core/src/core/log/tests.rs::a_utf8_bom_does_not_break_the_event_log` |
 | `tests/test_global_mcp.py::test_scan_finds_projects_the_registry_never_knew_about` | M2 | project registry and `djf project` | |
 | `tests/test_global_mcp.py::test_scan_is_idempotent` | M2 | `djf doctor` | |
 | `tests/test_global_mcp.py::test_scan_accepts_several_roots` | M2 | `djf doctor` | |
@@ -263,24 +265,24 @@ Rows: 508.
 | `tests/test_instructions_refresh.py::test_a_refresh_with_no_global_block_adds_none` | M2 | AI_INSTRUCTIONS.md template version 3 | |
 | `tests/test_instructions_refresh.py::test_initialize_alone_never_rewrites_the_file` | M2 | AI_INSTRUCTIONS.md template version 3 | |
 | `tests/test_instructions_refresh.py::test_a_template_change_comes_with_a_version_bump` | M2 | AI_INSTRUCTIONS.md template version 3 | |
-| `tests/test_location_parsing.py::test_location_to_file[src/foo.py-src/foo.py]` | M1 | location and path normalisation | |
-| `tests/test_location_parsing.py::test_location_to_file[src/foo.py:42-src/foo.py]` | M1 | location and path normalisation | |
-| `tests/test_location_parsing.py::test_location_to_file[src/foo.py:42:7-src/foo.py]` | M1 | location and path normalisation | |
-| `tests/test_location_parsing.py::test_location_to_file[foo.py-foo.py]` | M1 | location and path normalisation | |
-| `tests/test_location_parsing.py::test_location_to_file[deep/nested/path/mod.ts:1-deep/nested/path/mod.ts]` | M1 | location and path normalisation | |
-| `tests/test_location_parsing.py::test_location_to_file[C:\\src\\foo.py-C:\\src\\foo.py]` | M1 | location and path normalisation | |
-| `tests/test_location_parsing.py::test_location_to_file[C:\\src\\foo.py:42-C:\\src\\foo.py]` | M1 | location and path normalisation | |
-| `tests/test_location_parsing.py::test_location_to_file[D:/repo/app.tsx:9-D:/repo/app.tsx]` | M1 | location and path normalisation | |
-| `tests/test_location_parsing.py::test_location_to_file[src\\windows\\rel.py:3-src\\windows\\rel.py]` | M1 | location and path normalisation | |
-| `tests/test_location_parsing.py::test_location_to_file[AuthService.validate-None]` | M1 | location and path normalisation | |
-| `tests/test_location_parsing.py::test_location_to_file[SomeClass-None]` | M1 | location and path normalisation | |
-| `tests/test_location_parsing.py::test_location_to_file[-None]` | M1 | location and path normalisation | |
-| `tests/test_location_parsing.py::test_location_to_file[None-None]` | M1 | location and path normalisation | |
-| `tests/test_location_parsing.py::test_location_to_file[   -None]` | M1 | location and path normalisation | |
-| `tests/test_location_parsing.py::test_a_bare_path_counts_the_same_as_one_with_a_line_number` | M1 | location and path normalisation | |
-| `tests/test_location_parsing.py::test_a_windows_path_is_not_counted_as_a_file_called_c` | M1 | location and path normalisation | |
-| `tests/test_location_parsing.py::test_a_method_location_is_not_a_file` | M1 | location and path normalisation | |
-| `tests/test_location_parsing.py::test_the_same_file_by_two_spellings_counts_once` | M1 | location and path normalisation | |
+| `tests/test_location_parsing.py::test_location_to_file[src/foo.py-src/foo.py]` | M1 | location and path normalisation | `crates/dejafix-core/src/core/path/tests.rs::location_to_file_cases` |
+| `tests/test_location_parsing.py::test_location_to_file[src/foo.py:42-src/foo.py]` | M1 | location and path normalisation | `crates/dejafix-core/src/core/path/tests.rs::location_to_file_cases` |
+| `tests/test_location_parsing.py::test_location_to_file[src/foo.py:42:7-src/foo.py]` | M1 | location and path normalisation | `crates/dejafix-core/src/core/path/tests.rs::location_to_file_cases` |
+| `tests/test_location_parsing.py::test_location_to_file[foo.py-foo.py]` | M1 | location and path normalisation | `crates/dejafix-core/src/core/path/tests.rs::location_to_file_cases` |
+| `tests/test_location_parsing.py::test_location_to_file[deep/nested/path/mod.ts:1-deep/nested/path/mod.ts]` | M1 | location and path normalisation | `crates/dejafix-core/src/core/path/tests.rs::location_to_file_cases` |
+| `tests/test_location_parsing.py::test_location_to_file[C:\\src\\foo.py-C:\\src\\foo.py]` | M1 | location and path normalisation | `crates/dejafix-core/src/core/path/tests.rs::location_to_file_cases` |
+| `tests/test_location_parsing.py::test_location_to_file[C:\\src\\foo.py:42-C:\\src\\foo.py]` | M1 | location and path normalisation | `crates/dejafix-core/src/core/path/tests.rs::location_to_file_cases` |
+| `tests/test_location_parsing.py::test_location_to_file[D:/repo/app.tsx:9-D:/repo/app.tsx]` | M1 | location and path normalisation | `crates/dejafix-core/src/core/path/tests.rs::location_to_file_cases` |
+| `tests/test_location_parsing.py::test_location_to_file[src\\windows\\rel.py:3-src\\windows\\rel.py]` | M1 | location and path normalisation | `crates/dejafix-core/src/core/path/tests.rs::location_to_file_cases` |
+| `tests/test_location_parsing.py::test_location_to_file[AuthService.validate-None]` | M1 | location and path normalisation | `crates/dejafix-core/src/core/path/tests.rs::location_to_file_cases` |
+| `tests/test_location_parsing.py::test_location_to_file[SomeClass-None]` | M1 | location and path normalisation | `crates/dejafix-core/src/core/path/tests.rs::location_to_file_cases` |
+| `tests/test_location_parsing.py::test_location_to_file[-None]` | M1 | location and path normalisation | `crates/dejafix-core/src/core/path/tests.rs::location_to_file_cases` |
+| `tests/test_location_parsing.py::test_location_to_file[None-None]` | M1 | location and path normalisation | `crates/dejafix-core/src/core/path/tests.rs::location_to_file_cases (`None` is `Option::None` at the call site)` |
+| `tests/test_location_parsing.py::test_location_to_file[   -None]` | M1 | location and path normalisation | `crates/dejafix-core/src/core/path/tests.rs::location_to_file_cases` |
+| `tests/test_location_parsing.py::test_a_bare_path_counts_the_same_as_one_with_a_line_number` | M1 | location and path normalisation | `crates/dejafix-core/src/core/path/tests.rs::a_bare_path_counts_the_same_as_one_with_a_line_number (score half: M4 `get_score`)` |
+| `tests/test_location_parsing.py::test_a_windows_path_is_not_counted_as_a_file_called_c` | M1 | location and path normalisation | `crates/dejafix-core/src/core/path/tests.rs::a_windows_path_is_not_counted_as_a_file_called_c (score half: M4 `get_score`)` |
+| `tests/test_location_parsing.py::test_a_method_location_is_not_a_file` | M1 | location and path normalisation | `crates/dejafix-core/src/core/path/tests.rs::a_method_location_is_not_a_file (score half: M4 `get_score`)` |
+| `tests/test_location_parsing.py::test_the_same_file_by_two_spellings_counts_once` | M1 | location and path normalisation | `crates/dejafix-core/src/core/path/tests.rs::the_same_file_by_two_spellings_counts_once (score half: M4 `get_score`)` |
 | `tests/test_location_parsing.py::test_global_dir_follows_dejafix_home` | M2 | global memory follows DEJAFIX_HOME | |
 | `tests/test_location_parsing.py::test_global_dir_falls_back_to_home_without_the_env_var` | M2 | global memory follows DEJAFIX_HOME | |
 | `tests/test_location_parsing.py::test_appending_an_event_stays_inside_an_isolated_home` | M2 | global memory follows DEJAFIX_HOME | |
@@ -321,9 +323,9 @@ Rows: 508.
 | `tests/test_migrate.py::test_a_symlinked_memory_folder_is_left_alone` | M5 | `djf migrate` | |
 | `tests/test_migrate.py::test_unregistered_home_data_is_not_deleted` | M5 | `djf migrate` | |
 | `tests/test_migrate.py::test_a_folder_named_projectmem_is_not_a_stale_config` | M5 | `djf migrate` | |
-| `tests/test_models.py::test_an_event_without_an_id_gets_the_same_id_on_every_read` | M1 | event model and stable ids | |
-| `tests/test_models.py::test_events_without_ids_but_different_content_get_different_ids` | M1 | event model and stable ids | |
-| `tests/test_models.py::test_a_stored_id_is_kept` | M1 | event model and stable ids | |
+| `tests/test_models.py::test_an_event_without_an_id_gets_the_same_id_on_every_read` | M1 | event model and stable ids | `crates/dejafix-core/src/core/event/tests.rs::an_event_without_an_id_gets_the_same_id_on_every_read` |
+| `tests/test_models.py::test_events_without_ids_but_different_content_get_different_ids` | M1 | event model and stable ids | `crates/dejafix-core/src/core/event/tests.rs::events_without_ids_but_different_content_get_different_ids` |
+| `tests/test_models.py::test_a_stored_id_is_kept` | M1 | event model and stable ids | `crates/dejafix-core/src/core/event/tests.rs::a_stored_id_is_kept` |
 | `tests/test_plan.py::test_init_creates_plan_md` | M2 | plan.md and `djf plan` | |
 | `tests/test_plan.py::test_plan_md_is_committed_not_gitignored` | M2 | plan.md and `djf plan` | |
 | `tests/test_plan.py::test_djf_plan_add_appends_to_ideas` | M2 | plan.md and `djf plan` | |
@@ -457,11 +459,11 @@ Rows: 508.
 | `tests/test_v014_features.py::test_supersede_hides_old_decision_from_summary` | M2 | supersede, brief, search | |
 | `tests/test_v014_features.py::test_supersede_accepts_unique_prefix` | M2 | supersede, brief, search | |
 | `tests/test_v014_features.py::test_supersede_bad_ref_fails_without_writing` | M2 | supersede, brief, search | |
-| `tests/test_v014_features.py::test_resolve_event_ref_ambiguous_and_missing` | M1 | event reference and location parsing | |
+| `tests/test_v014_features.py::test_resolve_event_ref_ambiguous_and_missing` | M1 | event reference and location parsing | `crates/dejafix-core/src/core/log/tests.rs::resolve_event_ref_ambiguous_and_missing` |
 | `tests/test_v014_features.py::test_search_tags_superseded` | M2 | supersede, brief, search | |
 | `tests/test_v014_features.py::test_stale_flags_decision_after_commits` | M3 | precheck, staleness and snooze | |
 | `tests/test_v014_features.py::test_stale_flags_missing_file_and_skips_superseded` | M3 | precheck, staleness and snooze | |
-| `tests/test_v014_features.py::test_location_file_ignores_non_paths` | M1 | event reference and location parsing | |
+| `tests/test_v014_features.py::test_location_file_ignores_non_paths` | M1 | event reference and location parsing | `crates/dejafix-core/src/core/path/tests.rs::location_file_ignores_non_paths` |
 | `tests/test_v014_features.py::test_parse_snooze_duration` | M3 | precheck, staleness and snooze | |
 | `tests/test_v014_features.py::test_snooze_silences_and_unsnooze_restores` | M3 | precheck, staleness and snooze | |
 | `tests/test_v014_features.py::test_expired_snooze_self_cleans` | M3 | precheck, staleness and snooze | |

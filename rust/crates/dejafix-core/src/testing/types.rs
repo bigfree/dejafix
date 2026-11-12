@@ -19,7 +19,8 @@ pub enum FixtureError {
     Time(#[from] jiff::Error),
 }
 
-pub(crate) struct PythonJsonFormatter;
+#[derive(Debug, Clone, Copy, Default)]
+pub struct NoResolve;
 
 pub(crate) struct SplitMix64 {
     pub(crate) state: u64,

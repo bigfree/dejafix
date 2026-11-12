@@ -29,3 +29,5 @@ pub struct Normalizer {
     pub(crate) today: String,
     pub(crate) ids: HashMap<String, usize>,
 }
+
+pub struct Random(pub(crate) u64);

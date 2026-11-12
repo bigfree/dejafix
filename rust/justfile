@@ -24,7 +24,7 @@ fixtures dir="target/fixtures":
     cargo run -p dejafix-core --features testing --example gen-fixtures -- {{dir}}
 
 bench:
-    @echo "bench: no benchmarks before M2 (summary.md budget)"
+    cargo bench -p dejafix-core --features testing --bench load
 
 smoke:
     @echo "smoke: no installable binary before M3"

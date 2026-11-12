@@ -10,11 +10,14 @@ license = "MIT"
 publish = false
 
 [workspace.dependencies]
+criterion = "=0.8.2"
 dejafix-core = { path = "crates/dejafix-core" }
 jiff = "=0.2.43"
+proptest = "=1.12.0"
 regex = "=1.13.1"
 serde = "=1.0.229"
-serde_json = "=1.0.154"
+serde_json = { version = "=1.0.154", features = ["float_roundtrip", "raw_value"] }
+sha1 = "=0.11.0"
 tempfile = "=3.27.0"
 thiserror = "=2.0.21"
 

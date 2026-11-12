@@ -3,8 +3,9 @@ use std::io::{self, Write};
 use serde::Serialize;
 use serde_json::Value;
 use serde_json::ser::{Formatter, Serializer};
+use serde_json::value::RawValue;
 
-use super::types::PythonJsonFormatter;
+use super::types::{PythonJsonFormatter, Sorted};
 
 impl Formatter for PythonJsonFormatter {
     fn begin_array_value<W: ?Sized + Write>(
@@ -70,13 +71,63 @@ impl Formatter for PythonJsonFormatter {
     }
 }
 
-pub(crate) fn write_python_json<W: Write>(
+pub(crate) fn write_python_json<W: Write, T: Serialize + ?Sized>(
+    writer: &mut W,
+    value: &T,
+) -> Result<(), serde_json::Error> {
+    value.serialize(&mut Serializer::with_formatter(writer, PythonJsonFormatter))
+}
+
+pub(crate) fn write_canonical<W: Write>(
     writer: &mut W,
     value: &Value,
 ) -> Result<(), serde_json::Error> {
-    value.serialize(&mut Serializer::with_formatter(
-        &mut *writer,
-        PythonJsonFormatter,
-    ))?;
-    writer.write_all(b"\n").map_err(serde_json::Error::io)
+    write_python_json(writer, &Sorted(value))
+}
+
+pub(crate) fn is_dropped_by_to_dict(raw: &RawValue) -> bool {
+    let text = raw.get();
+    match text.as_bytes().first() {
+        Some(b'n' | b'f') => true,
+        Some(b'[') => is_empty_container(text),
+        Some(b'-' | b'0'..=b'9') => is_zero(text),
+        _ => false,
+    }
+}
+
+pub(crate) fn is_python_truthy(raw: &RawValue) -> bool {
+    let text = raw.get();
+    match text.as_bytes().first() {
+        Some(b'n' | b'f') => false,
+        Some(b'[' | b'{') => !is_empty_container(text),
+        Some(b'"') => text != "\"\"",
+        Some(b'-' | b'0'..=b'9') => !is_zero(text),
+        _ => true,
+    }
+}
+
+fn is_empty_container(text: &str) -> bool {
+    text.get(1..)
+        .unwrap_or_default()
+        .trim_start_matches([' ', '\t', '\n', '\r'])
+        .len()
+        == 1
+}
+
+fn is_zero(text: &str) -> bool {
+    serde_json::from_str::<f64>(text).is_ok_and(|number| number == 0.0)
+}
+
+impl Serialize for Sorted<'_> {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self.0 {
+            Value::Array(items) => serializer.collect_seq(items.iter().map(Sorted)),
+            Value::Object(map) => {
+                let mut entries: Vec<_> = map.iter().collect();
+                entries.sort_unstable_by(|left, right| left.0.cmp(right.0));
+                serializer.collect_map(entries.into_iter().map(|(key, value)| (key, Sorted(value))))
+            }
+            scalar => scalar.serialize(serializer),
+        }
+    }
 }
