@@ -163,3 +163,12 @@ Append new entries at the end, one heading each, with this template:
 - Gain: a secret never appears in dejafix's own output.
 - Compatibility: stdout differs from Python only when a secret was redacted.
 - Status: proposed
+
+## List staged files without a git process
+
+- Found: 2026-11-12, M3, `rust/crates/dejafix-core/src/wiring/hooks/precheck.rs`
+- Today: a staged precheck starts `git diff --cached` to list the staged files and only then starts the history queries, so two git start-ups run in series (about 9.5 ms for the first alone); the whole process takes about 26 ms median against the 30 ms budget.
+- Proposal: read the staged paths from `.git/index` in-process (the `gix` crate, or a small index parser covering index versions 2–4 and split index), compare with `HEAD`'s tree, and start the history queries at once.
+- Gain: about 9 ms less per pre-commit run, which would bring precheck near the original 20 ms target.
+- Compatibility: none in output; a new dependency or an index parser to maintain, and edge cases (sparse checkout, split index, `core.fsmonitor`) to test against git.
+- Status: proposed

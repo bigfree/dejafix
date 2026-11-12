@@ -254,8 +254,13 @@ Deliberate differences:
    |---|---|---|
    | edit hook, whole process | 47 ms | ≤ 10 ms |
    | MCP `precheck_file`, warm cache | 58 ms | ≤ 5 ms |
-   | `djf precheck`, whole process | 170 ms | ≤ 20 ms |
+   | `djf precheck`, whole process | 170 ms | ≤ 30 ms |
    | `summary.md` regeneration | 530 ms | ≤ 30 ms |
+
+   The `djf precheck` budget was 20 ms. The user raised it to 30 ms on
+   2026-11-12 after M3 measured about 26 ms median: the staged path needs two
+   git processes in series (the staged list, then the history of those files),
+   and their start-up alone takes most of the time.
 
 7. Platforms: `just verify` runs locally on macOS. The release workflow runs
    `cargo nextest` on macOS, Linux and Windows before building anything and
