@@ -18,22 +18,22 @@ from pathlib import Path
 import pytest
 
 from conftest import set_fake_home
-from projectmem.commands import init as init_module
-from projectmem.commands.init import (
+from dejafix.commands import init as init_module
+from dejafix.commands.init import (
     _detect_main_folders,
     _extract_entry_points,
     _extract_project_description,
     _populate_project_map_from_stack,
     _print_mcp_config,
 )
-from projectmem.storage import initialize
+from dejafix.storage import initialize
 
 
 # ── helpers ─────────────────────────────────────────────────────────────
 
 
 def _make_repo(tmp_path: Path) -> Path:
-    """Create a fresh project + initialized .projectmem/ for tests."""
+    """Create a fresh project + initialized .dejafix/ for tests."""
     repo = tmp_path / "demo"
     repo.mkdir()
     initialize(repo)
@@ -45,7 +45,7 @@ def _make_repo(tmp_path: Path) -> Path:
 
 def test_stack_detect_does_nothing_when_no_manifests(tmp_path: Path) -> None:
     repo = _make_repo(tmp_path)
-    pmap = repo / ".projectmem" / "PROJECT_MAP.md"
+    pmap = repo / ".dejafix" / "PROJECT_MAP.md"
     before = pmap.read_text(encoding="utf-8")
     _populate_project_map_from_stack(repo)
     assert pmap.read_text(encoding="utf-8") == before
@@ -68,7 +68,7 @@ def test_stack_detect_pyproject_populates_map(tmp_path: Path) -> None:
 
     _populate_project_map_from_stack(repo)
 
-    map_text = (repo / ".projectmem" / "PROJECT_MAP.md").read_text(encoding="utf-8")
+    map_text = (repo / ".dejafix" / "PROJECT_MAP.md").read_text(encoding="utf-8")
     assert "auto-detected" in map_text
     assert "A demo CLI built with Typer and pydantic." in map_text
     assert "fastapi" in map_text
@@ -91,7 +91,7 @@ def test_stack_detect_package_json_populates_map(tmp_path: Path) -> None:
 
     _populate_project_map_from_stack(repo)
 
-    map_text = (repo / ".projectmem" / "PROJECT_MAP.md").read_text(encoding="utf-8")
+    map_text = (repo / ".dejafix" / "PROJECT_MAP.md").read_text(encoding="utf-8")
     assert "A tiny Node app" in map_text
     assert "react" in map_text or "nextjs" in map_text
     assert "`npm run start`" in map_text
@@ -100,7 +100,7 @@ def test_stack_detect_package_json_populates_map(tmp_path: Path) -> None:
 def test_stack_detect_never_overwrites_user_edited_map(tmp_path: Path) -> None:
     """If PROJECT_MAP no longer says 'Status: not created yet', leave it alone."""
     repo = _make_repo(tmp_path)
-    pmap = repo / ".projectmem" / "PROJECT_MAP.md"
+    pmap = repo / ".dejafix" / "PROJECT_MAP.md"
     custom = "# My Custom Project Map\n\nStatus: hand-written\n\nKeep this!"
     pmap.write_text(custom, encoding="utf-8")
     (repo / "pyproject.toml").write_text(
@@ -116,7 +116,7 @@ def test_stack_detect_handles_corrupt_manifest(tmp_path: Path) -> None:
     """Corrupt JSON / TOML must not raise — placeholder stays untouched."""
     repo = _make_repo(tmp_path)
     (repo / "package.json").write_text("not valid {{{", encoding="utf-8")
-    pmap = repo / ".projectmem" / "PROJECT_MAP.md"
+    pmap = repo / ".dejafix" / "PROJECT_MAP.md"
     before = pmap.read_text(encoding="utf-8")
     # Should not raise.
     _populate_project_map_from_stack(repo)
@@ -211,10 +211,10 @@ def test_print_mcp_config_contains_expected_pieces(
     _print_mcp_config(tmp_path / "myproj")
     out = capsys.readouterr().out
     assert '"mcpServers"' in out
-    assert '"projectmem"' in out
-    assert '"-m", "projectmem.mcp_server"' in out
+    assert '"dejafix"' in out
+    assert '"-m", "dejafix.mcp_server"' in out
     assert '"--root"' not in out  # not in the JSON block
-    assert "pjm project use myproj" in out
+    assert "djf project use myproj" in out
     # All 4 client paths should be mentioned.
     assert "Claude Desktop" in out
     assert "Cursor" in out
@@ -256,7 +256,7 @@ def test_init_warns_when_a_client_config_still_pins_one_repo(
     home = tmp_path / "home"
     (home / ".cursor").mkdir(parents=True)
     (home / ".cursor" / "mcp.json").write_text(
-        '{"mcpServers":{"projectmem":{"args":["-m","projectmem.mcp_server",'
+        '{"mcpServers":{"dejafix":{"args":["-m","dejafix.mcp_server",'
         '"--root","/old/repo"]}}}',
         encoding="utf-8",
     )
@@ -265,7 +265,7 @@ def test_init_warns_when_a_client_config_still_pins_one_repo(
     _print_mcp_config(tmp_path / "myproj")
     out = capsys.readouterr().out
 
-    assert "still pins projectmem to one repo" in out
+    assert "still pins dejafix to one repo" in out
     assert "Cursor" in out
     assert str(home / ".cursor" / "mcp.json") in out
     # the file is reported, never modified
@@ -280,8 +280,8 @@ def test_init_detects_a_pin_set_through_the_environment(
     cfg = home / "Library/Application Support/Claude"
     cfg.mkdir(parents=True)
     (cfg / "claude_desktop_config.json").write_text(
-        '{"mcpServers":{"projectmem":{"command":"python","args":["-m",'
-        '"projectmem.mcp_server"],"env":{"PROJECTMEM_ROOT":"/old/repo"}}}}',
+        '{"mcpServers":{"dejafix":{"command":"python","args":["-m",'
+        '"dejafix.mcp_server"],"env":{"DEJAFIX_ROOT":"/old/repo"}}}}',
         encoding="utf-8",
     )
     set_fake_home(monkeypatch, str(home))
@@ -289,7 +289,7 @@ def test_init_detects_a_pin_set_through_the_environment(
     _print_mcp_config(tmp_path / "myproj")
     out = capsys.readouterr().out
 
-    assert "still pins projectmem to one repo" in out
+    assert "still pins dejafix to one repo" in out
     assert "Claude Desktop" in out
 
 
@@ -302,8 +302,8 @@ def test_init_prints_the_codex_toml_form(
     _print_mcp_config(tmp_path / "myproj")
     out = capsys.readouterr().out
 
-    assert "[mcp_servers.projectmem]" in out
-    assert 'args = ["-m", "projectmem.mcp_server"]' in out
+    assert "[mcp_servers.dejafix]" in out
+    assert 'args = ["-m", "dejafix.mcp_server"]' in out
 
 
 def test_linux_client_paths_are_scanned_and_xdg_is_honoured(
@@ -314,7 +314,7 @@ def test_linux_client_paths_are_scanned_and_xdg_is_honoured(
     xdg = tmp_path / "elsewhere"
     (xdg / "Claude").mkdir(parents=True)
     (xdg / "Claude" / "claude_desktop_config.json").write_text(
-        '{"mcpServers":{"projectmem":{"args":["-m","projectmem.mcp_server",'
+        '{"mcpServers":{"dejafix":{"args":["-m","dejafix.mcp_server",'
         '"--root","/old/repo"]}}}',
         encoding="utf-8",
     )
@@ -324,7 +324,7 @@ def test_linux_client_paths_are_scanned_and_xdg_is_honoured(
     _print_mcp_config(tmp_path / "myproj")
     out = capsys.readouterr().out
 
-    assert "still pins projectmem to one repo" in out
+    assert "still pins dejafix to one repo" in out
     assert str(xdg / "Claude" / "claude_desktop_config.json") in out
 
 

@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import pytest
 
-from projectmem import mcp_server
-from projectmem.models import Event
-from projectmem.storage import RECORD_CHARS, append_event, initialize, read_events
+from dejafix import mcp_server
+from dejafix.models import Event
+from dejafix.storage import RECORD_CHARS, append_event, initialize, read_events
 
 LONG_TEXT = "gotcha: " + " ".join(f"word{i}" for i in range(120))
 

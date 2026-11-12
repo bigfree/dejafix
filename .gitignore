@@ -1,9 +1,9 @@
-# ── projectmem runtime + private files ─────────────────────────
-# This is the projectmem source repo itself — we keep our own
-# .projectmem/ folder fully private (internal scratch notes).
-# Consumers of projectmem get a different default (team memory
+# ── dejafix runtime + private files ─────────────────────────
+# This is the dejafix source repo itself — we keep our own
+# .dejafix/ folder fully private (internal scratch notes).
+# Consumers of dejafix get a different default (team memory
 # via git), see storage.py ensure_gitignore_entry().
-.projectmem/
+.dejafix/
 
 # Local mcp-publisher CLI binary downloaded for releasing to the
 # official MCP Registry. ~20MB Go binary — must NOT ship in sdist.
@@ -82,7 +82,7 @@ TODO.md
 # ── Sensitive / private (do not push) ──────────────────────────
 report/
 docs/
-PROJECTMEM_PLAN.md
+DEJAFIX_PLAN.md
 *PLAN*.md
 *plan*.md
 .worktrees/

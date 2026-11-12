@@ -13,9 +13,9 @@ from typing import Any
 import pytest
 
 from conftest import set_fake_home
-from projectmem.models import Event
-from projectmem.storage import append_event, initialize
-from projectmem.summary import regenerate_summary
+from dejafix.models import Event
+from dejafix.storage import append_event, initialize
+from dejafix.summary import regenerate_summary
 
 
 def _completed(args: list[str], stdout: str = "") -> subprocess.CompletedProcess[str]:
@@ -25,8 +25,8 @@ def _completed(args: list[str], stdout: str = "") -> subprocess.CompletedProcess
 def test_git_helpers_detach_stdin_and_keep_timeouts(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    from projectmem import storage, staleness
-    from projectmem.commands import context, precheck
+    from dejafix import storage, staleness
+    from dejafix.commands import context, precheck
 
     calls: list[dict[str, Any]] = []
 
@@ -104,7 +104,7 @@ def _call_mcp_tool(
 ) -> dict[str, Any]:
     repo_root = Path(__file__).resolve().parents[1]
     proc = subprocess.Popen(
-        [sys.executable, "-m", "projectmem.mcp_server", "--root", str(project)],
+        [sys.executable, "-m", "dejafix.mcp_server", "--root", str(project)],
         cwd=project,
         env=_mcp_env(repo_root, tmp_path),
         stdin=subprocess.PIPE,
@@ -155,7 +155,7 @@ def _call_mcp_tool(
                 "params": {
                     "protocolVersion": "2024-11-05",
                     "capabilities": {},
-                    "clientInfo": {"name": "projectmem-test", "version": "0"},
+                    "clientInfo": {"name": "dejafix-test", "version": "0"},
                 },
             }
         )
@@ -214,13 +214,13 @@ def test_mcp_stdio_precheck_file_returns_with_git_backed_analysis(
 def test_mcp_precheck_file_names_a_memory_file_instead_of_clearing_it(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """"no warnings. Safe to modify." on `.projectmem/summary.md` contradicted
+    """"no warnings. Safe to modify." on `.dejafix/summary.md` contradicted
     the instructions the same server hands out: memory files are regenerated
     from the log and are never edited by hand."""
     project = _make_git_project(tmp_path, monkeypatch)
 
     response = _call_mcp_tool(
-        project, tmp_path, "precheck_file", {"file_path": ".projectmem/summary.md"},
+        project, tmp_path, "precheck_file", {"file_path": ".dejafix/summary.md"},
     )
 
     assert response["result"]["isError"] is False
@@ -243,17 +243,17 @@ def test_mcp_stdio_add_note_returns_and_writes_event(
 
     assert response["result"]["isError"] is False
     assert "Recorded note" in _tool_text(response)
-    events_text = (project / ".projectmem" / "events.jsonl").read_text(
+    events_text = (project / ".dejafix" / "events.jsonl").read_text(
         encoding="utf-8"
     )
     assert "MCP smoke note from pytest" in events_text
 
 
 def test_mcp_server_instantiation():
-    from projectmem.mcp_server import mcp
+    from dejafix.mcp_server import mcp
 
     assert mcp is not None
-    assert mcp.name == "projectmem"
+    assert mcp.name == "dejafix"
 
 
 def test_server_builds_when_fastmcp_is_gone(monkeypatch, tmp_path):
@@ -267,7 +267,7 @@ def test_server_builds_when_fastmcp_is_gone(monkeypatch, tmp_path):
     import sys
     import types
 
-    from projectmem import mcp_server as installed
+    from dejafix import mcp_server as installed
 
     class _StubServer:
         def __init__(self, name=None, instructions=None, **kwargs):
@@ -291,13 +291,13 @@ def test_server_builds_when_fastmcp_is_gone(monkeypatch, tmp_path):
     monkeypatch.setitem(sys.modules, "mcp.server.fastmcp", None)
 
     spec = importlib.util.spec_from_file_location(
-        "projectmem._mcp_server_v2_probe", installed.__file__
+        "dejafix._mcp_server_v2_probe", installed.__file__
     )
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
 
     assert isinstance(module.mcp, _StubServer)
-    assert module.mcp.name == "projectmem"
+    assert module.mcp.name == "dejafix"
     # 17 memory tools + list_projects / current_project for global routing
     assert len(module.mcp.tools) == 19
     assert "list_projects" in module.mcp.tools
@@ -377,7 +377,7 @@ def test_mcp_get_issue_accepts_unpadded_ids_and_rejects_globs(
 def test_mcp_get_issue_finds_backfilled_legacy_ids(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """`pjm init` backfill writes ids like `legacy_f436`, which `pjm fix`
+    """`djf init` backfill writes ids like `legacy_f436`, which `djf fix`
     accepts; a digits-only check made get_issue refuse them."""
     project = _make_git_project(tmp_path, monkeypatch)
     append_event(

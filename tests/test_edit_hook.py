@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from projectmem import edit_hook
+from dejafix import edit_hook
 
 ISSUE = {"type": "issue", "issue_id": "0001", "summary": "token refresh race", "location": "src/a.py:12"}
 FAILED = {
@@ -27,7 +27,7 @@ Hook = Callable[[dict[str, object]], str]
 
 
 def write_events(root: Path, *events: dict[str, object]) -> None:
-    events_file = root / ".projectmem" / "events.jsonl"
+    events_file = root / ".dejafix" / "events.jsonl"
     events_file.parent.mkdir(parents=True, exist_ok=True)
     with events_file.open("a", encoding="utf-8") as out:
         out.writelines(json.dumps(event) + "\n" for event in events)
@@ -115,7 +115,7 @@ def test_claude_code_edit_gets_issue_attempt_and_decision(project: Path, hook: H
     context = hook(claude_edit(project / "src" / "a.py"))
 
     assert context.splitlines() == [
-        "projectmem lessons for src/a.py:",
+        "dejafix lessons for src/a.py:",
         "  Open issues on this file:",
         "    - #0001 token refresh race",
         "  Earlier attempts (1 failed, 0 partial), newest first:",
@@ -128,7 +128,7 @@ def test_claude_code_edit_gets_issue_attempt_and_decision(project: Path, hook: H
 def test_codex_patch_paths_resolve_against_cwd(project: Path, hook: Hook) -> None:
     context = hook(codex_patch(project, "*** Update File: src/a.py"))
 
-    assert context.startswith("projectmem lessons for src/a.py:")
+    assert context.startswith("dejafix lessons for src/a.py:")
 
 
 def test_codex_patch_reports_each_file_with_lessons(project: Path, hook: Hook) -> None:
@@ -210,7 +210,7 @@ def test_without_session_id_every_edit_gets_lessons(project: Path, hook: Hook) -
 
 @pytest.mark.skipif(not hasattr(os, "getuid"), reason="ownership checks are POSIX only")
 def test_shared_dedup_directory_is_not_trusted(project: Path, temp_root: Path, hook: Hook) -> None:
-    shared = temp_root / f"pjm-edit-hook-{os.getuid()}"
+    shared = temp_root / f"djf-edit-hook-{os.getuid()}"
     shared.mkdir()
     shared.chmod(0o777)
     edit = claude_edit(project / "src" / "a.py")
@@ -224,7 +224,7 @@ def test_shared_dedup_directory_is_not_trusted(project: Path, temp_root: Path, h
 def test_symlinked_dedup_directory_is_not_followed(project: Path, temp_root: Path, tmp_path: Path, hook: Hook) -> None:
     target = tmp_path / "elsewhere"
     target.mkdir(mode=0o700)
-    (temp_root / f"pjm-edit-hook-{os.getuid()}").symlink_to(target)
+    (temp_root / f"djf-edit-hook-{os.getuid()}").symlink_to(target)
     edit = claude_edit(project / "src" / "a.py")
 
     assert hook(edit)
@@ -251,10 +251,10 @@ def test_worktree_with_its_own_memory_falls_back_to_it(tmp_path: Path, hook: Hoo
     assert "#0001 token refresh race" in context
 
 
-@pytest.mark.parametrize("edited", [".projectmem/events.jsonl", ".claude/settings.json"])
+@pytest.mark.parametrize("edited", [".dejafix/events.jsonl", ".claude/settings.json"])
 def test_memory_and_agent_files_are_skipped(project: Path, hook: Hook, edited: str) -> None:
     write_events(project, {"type": "decision", "id": "d9", "summary": "keep config tidy",
-                           "files": [".projectmem/events.jsonl", ".claude/settings.json"]})
+                           "files": [".dejafix/events.jsonl", ".claude/settings.json"]})
 
     assert hook(claude_edit(project / edited)) == ""
 
@@ -368,7 +368,7 @@ def test_injected_issue_id_does_not_reach_context(project: Path, hook: Hook) -> 
 
 
 def test_undecodable_and_broken_event_lines_are_skipped(project: Path, hook: Hook) -> None:
-    with (project / ".projectmem" / "events.jsonl").open("ab") as out:
+    with (project / ".dejafix" / "events.jsonl").open("ab") as out:
         out.write(b'{"type": "note", "summary": "\xff\xfe"}\n{broken\n[1, 2]\n')
 
     assert "#0001 token refresh race" in hook(claude_edit(project / "src" / "a.py"))
@@ -382,7 +382,7 @@ def test_absolute_event_path_outside_the_project_is_ignored(project: Path, tmp_p
 
 
 def test_broken_dedup_storage_still_shows_lessons(project: Path, temp_root: Path, hook: Hook) -> None:
-    session_dir = temp_root / f"pjm-edit-hook-{os.getuid() if hasattr(os, 'getuid') else 'user'}" / "s1"
+    session_dir = temp_root / f"djf-edit-hook-{os.getuid() if hasattr(os, 'getuid') else 'user'}" / "s1"
     session_dir.mkdir(parents=True, mode=0o700)
     session_dir.parent.chmod(0o700)
     (session_dir / "main").write_text("a file where a directory belongs")
@@ -399,7 +399,7 @@ def test_compaction_without_dedup_state_is_a_no_op(hook: Hook, session: str) -> 
 
 @pytest.mark.skipif(not hasattr(os, "getuid"), reason="ownership checks are POSIX only")
 def test_compaction_never_clears_a_shared_directory(project: Path, temp_root: Path, hook: Hook) -> None:
-    shared = temp_root / f"pjm-edit-hook-{os.getuid()}"
+    shared = temp_root / f"djf-edit-hook-{os.getuid()}"
     (shared / "s1").mkdir(parents=True)
     shared.chmod(0o777)
 
@@ -440,7 +440,7 @@ def test_main_is_silent_on_malformed_input(
 def test_main_is_silent_when_the_log_is_unreadable(
     project: Path, temp_root: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
 ) -> None:
-    events_file = project / ".projectmem" / "events.jsonl"
+    events_file = project / ".dejafix" / "events.jsonl"
     events_file.chmod(0)
     try:
         out = run_main(json.dumps(claude_edit(project / "src" / "a.py")).encode(), monkeypatch, capsys)
@@ -452,7 +452,7 @@ def test_main_is_silent_when_the_log_is_unreadable(
 
 def test_module_entry_point_runs_as_a_hook(project: Path, temp_root: Path) -> None:
     result = subprocess.run(
-        [sys.executable, "-m", "projectmem.edit_hook"],
+        [sys.executable, "-m", "dejafix.edit_hook"],
         input=json.dumps(claude_edit(project / "src" / "a.py")).encode(),
         capture_output=True, check=True,
         env={**os.environ, "TMPDIR": str(temp_root), "TEMP": str(temp_root), "TMP": str(temp_root),
@@ -508,7 +508,7 @@ def test_call_log_records_the_error_the_hook_swallowed(
 ) -> None:
     log_file = tmp_path / "calls.jsonl"
     monkeypatch.setenv(edit_hook.LOG_ENV, str(log_file))
-    events_file = project / ".projectmem" / "events.jsonl"
+    events_file = project / ".dejafix" / "events.jsonl"
     events_file.chmod(0)
     try:
         out = run_main(json.dumps(claude_edit(project / "src" / "a.py")).encode(), monkeypatch, capsys)

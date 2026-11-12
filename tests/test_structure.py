@@ -1,6 +1,6 @@
 """Tests for the code-structure extractor (structure.py)."""
-from projectmem.structure import build_structure, write_structure
-from projectmem.storage import initialize
+from dejafix.structure import build_structure, write_structure
+from dejafix.storage import initialize
 
 
 def _make_project(root):
@@ -48,7 +48,7 @@ def test_write_structure_writes_gitignored_cache(tmp_path, monkeypatch):
     assert out.exists() and out.name == "structure.json"
     assert data["stats"]["relationships"] >= 2
     # structure.json is a derived cache — must be gitignored
-    assert ".projectmem/structure.json" in (tmp_path / ".gitignore").read_text(encoding="utf-8")
+    assert ".dejafix/structure.json" in (tmp_path / ".gitignore").read_text(encoding="utf-8")
 
 
 def test_extractor_never_touches_events(tmp_path, monkeypatch):
@@ -56,7 +56,7 @@ def test_extractor_never_touches_events(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     _make_project(tmp_path)
     initialize(tmp_path)
-    events_before = (tmp_path / ".projectmem" / "events.jsonl").read_text(encoding="utf-8")
+    events_before = (tmp_path / ".dejafix" / "events.jsonl").read_text(encoding="utf-8")
     write_structure(tmp_path)
-    events_after = (tmp_path / ".projectmem" / "events.jsonl").read_text(encoding="utf-8")
+    events_after = (tmp_path / ".dejafix" / "events.jsonl").read_text(encoding="utf-8")
     assert events_before == events_after

@@ -3,10 +3,10 @@ requires = ["hatchling>=1.18,<1.27"]
 build-backend = "hatchling.build"
 
 [project]
-name = "projectmem"
-version = "0.3.5"
+name = "dejafix"
+version = "0.4.0"
 description = "Coding agent memory — local-first memory and judgment for AI coding agents. One MCP server for every project; warns before repeating failed fixes."
-authors = [{ name = "Ripon Chandra Malo" }]
+authors = [{ name = "dejafix contributors" }, { name = "Ripon Chandra Malo" }]
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.10"
@@ -48,21 +48,21 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://projectmem.dev"
-Repository = "https://github.com/riponcm/projectmem"
-Documentation = "https://projectmem.dev/guide"
-Changelog = "https://projectmem.dev/changelog"
-Issues = "https://github.com/riponcm/projectmem/issues"
+Homepage = "https://github.com/bigfree/dejafix"
+Repository = "https://github.com/bigfree/dejafix"
+Documentation = "https://github.com/bigfree/dejafix#readme"
+Changelog = "https://github.com/bigfree/dejafix/blob/main/CHANGELOG.md"
+Issues = "https://github.com/bigfree/dejafix/issues"
 Paper = "https://arxiv.org/abs/2606.12329"
 
 [project.scripts]
-projectmem = "projectmem.cli:main"
-pjm = "projectmem.cli:main"
-pjm-mcp = "projectmem.mcp_server:main"
-pjm-edit-hook = "projectmem.edit_hook:main"
+dejafix = "dejafix.cli:main"
+djf = "dejafix.cli:main"
+djf-mcp = "dejafix.mcp_server:main"
+djf-edit-hook = "dejafix.edit_hook:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/projectmem"]
+packages = ["src/dejafix"]
 
 [tool.hatch.build.targets.sdist]
 # An allowlist, not a denylist: hatch otherwise packs every file git does not

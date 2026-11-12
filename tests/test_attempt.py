@@ -1,4 +1,4 @@
-"""`pjm attempt` / `pjm fix` must never write against an issue that does not exist.
+"""`djf attempt` / `djf fix` must never write against an issue that does not exist.
 
 An attempt appended to a mistyped id left an issue group with no `issue`
 event, and the next summary rebuild raised StopIteration — so every later
@@ -8,8 +8,8 @@ from __future__ import annotations
 
 from typer.testing import CliRunner
 
-from projectmem.cli import app
-from projectmem.storage import read_events
+from dejafix.cli import app
+from dejafix.storage import read_events
 
 
 def test_attempt_on_an_unknown_issue_is_refused(tmp_path, monkeypatch):
@@ -43,7 +43,7 @@ def test_a_stale_current_issue_marker_is_ignored(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     runner = CliRunner()
     runner.invoke(app, ["init"], catch_exceptions=False)
-    (tmp_path / ".projectmem" / ".current_issue").write_text("0042", encoding="utf-8")
+    (tmp_path / ".dejafix" / ".current_issue").write_text("0042", encoding="utf-8")
 
     result = runner.invoke(app, ["attempt", "--failed", "no real issue yet"])
 
@@ -56,13 +56,13 @@ def test_a_stale_current_issue_marker_is_ignored(tmp_path, monkeypatch):
 
 def test_fix_ignores_and_clears_a_stale_marker(tmp_path, monkeypatch):
     """The marker guard has to cover `fix` too: a marker naming a missing
-    issue used to be consumed by the next `pjm fix`, recording a fix for an
+    issue used to be consumed by the next `djf fix`, recording a fix for an
     issue that never existed while the real open issue stayed open."""
     monkeypatch.chdir(tmp_path)
     runner = CliRunner()
     runner.invoke(app, ["init"], catch_exceptions=False)
     runner.invoke(app, ["log", "real issue"], catch_exceptions=False)
-    marker = tmp_path / ".projectmem" / ".current_issue"
+    marker = tmp_path / ".dejafix" / ".current_issue"
     marker.write_text("0777", encoding="utf-8")
 
     result = runner.invoke(app, ["fix", "fixed the real one"])

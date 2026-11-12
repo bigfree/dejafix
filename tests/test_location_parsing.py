@@ -15,8 +15,8 @@ from __future__ import annotations
 
 import pytest
 
-from projectmem.commands.score import calculate_score
-from projectmem.models import location_to_file
+from dejafix.commands.score import calculate_score
+from dejafix.models import location_to_file
 
 
 @pytest.mark.parametrize(
@@ -71,42 +71,42 @@ def test_the_same_file_by_two_spellings_counts_once():
     assert result["components"]["files_with_gotchas"] == 1
 
 
-# ── global memory honours $PROJECTMEM_HOME ──────────────────────────────────
+# ── global memory honours $DEJAFIX_HOME ──────────────────────────────────
 
-def test_global_dir_follows_projectmem_home(tmp_path, monkeypatch):
+def test_global_dir_follows_dejafix_home(tmp_path, monkeypatch):
     """It used to read a constant fixed at import from Path.home().
 
     append_event() auto-promotes library mentions into the global store, so a
-    test running under an isolated $PROJECTMEM_HOME still wrote invented
-    gotchas into the developer's real ~/.projectmem/global/.
+    test running under an isolated $DEJAFIX_HOME still wrote invented
+    gotchas into the developer's real ~/.dejafix/global/.
     """
-    from projectmem import global_memory
+    from dejafix import global_memory
 
-    monkeypatch.setenv("PROJECTMEM_HOME", str(tmp_path / "iso"))
+    monkeypatch.setenv("DEJAFIX_HOME", str(tmp_path / "iso"))
     assert global_memory.global_dir() == tmp_path / "iso" / "global"
 
 
 def test_global_dir_falls_back_to_home_without_the_env_var(tmp_path, monkeypatch):
     from pathlib import Path
 
-    from projectmem import global_memory
+    from dejafix import global_memory
 
-    monkeypatch.delenv("PROJECTMEM_HOME", raising=False)
+    monkeypatch.delenv("DEJAFIX_HOME", raising=False)
     monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path / "h"))
-    assert global_memory.global_dir() == tmp_path / "h" / ".projectmem" / "global"
+    assert global_memory.global_dir() == tmp_path / "h" / ".dejafix" / "global"
 
 
 def test_appending_an_event_stays_inside_an_isolated_home(tmp_path, monkeypatch):
     """The whole point: isolating the registry must isolate the gotchas too."""
     from pathlib import Path
 
-    from projectmem.models import Event
-    from projectmem.storage import append_event, initialize
+    from dejafix.models import Event
+    from dejafix.storage import append_event, initialize
 
     iso = tmp_path / "iso"
-    monkeypatch.setenv("PROJECTMEM_HOME", str(iso))
+    monkeypatch.setenv("DEJAFIX_HOME", str(iso))
     real_home = tmp_path / "real-home"
-    (real_home / ".projectmem" / "global").mkdir(parents=True)
+    (real_home / ".dejafix" / "global").mkdir(parents=True)
     monkeypatch.setattr(Path, "home", classmethod(lambda cls: real_home))
 
     project = tmp_path / "proj"
@@ -115,5 +115,5 @@ def test_appending_an_event_stays_inside_an_isolated_home(tmp_path, monkeypatch)
     append_event(Event(type="note", summary="stripe needs an idempotency key"),
                  root=project)
 
-    leaked = list((real_home / ".projectmem" / "global").iterdir())
+    leaked = list((real_home / ".dejafix" / "global").iterdir())
     assert leaked == [], f"wrote into the real global store: {leaked}"

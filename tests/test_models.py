@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from projectmem.models import Event
+from dejafix.models import Event
 
 
 def test_an_event_without_an_id_gets_the_same_id_on_every_read():

@@ -1,9 +1,9 @@
 """Auto-capture must tag a commit with the code it touched, not with memory.
 
-#20: `location` was `files[0]`. git lists changed paths sorted, `.projectmem/`
+#20: `location` was `files[0]`. git lists changed paths sorted, `.dejafix/`
 sorts ahead of most paths because of the leading dot, and summary.md is
 regenerated on every event — so most commits were located at
-`.projectmem/summary.md`. The staleness check then counted every later commit
+`.dejafix/summary.md`. The staleness check then counted every later commit
 to summary.md against them and flagged nearly all as possibly stale.
 
 0.3.4: `files[0]` after that filter was still git's first path, which is the
@@ -16,8 +16,8 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-from projectmem.commands.auto_capture import _capture_commit
-from projectmem.storage import initialize, read_events
+from dejafix.commands.auto_capture import _capture_commit
+from dejafix.storage import initialize, read_events
 
 
 def _git(root: Path, *args: str) -> None:
@@ -43,10 +43,10 @@ def _commit(root: Path, message: str, files: dict[str, str]) -> None:
     _git(root, "commit", "-q", "-m", message)
 
 
-def test_location_skips_projectmem_files(tmp_path):
+def test_location_skips_dejafix_files(tmp_path):
     root = _repo(tmp_path)
     _commit(root, "fix: guard the login submit", {
-        ".projectmem/summary.md": "# regenerated\n",
+        ".dejafix/summary.md": "# regenerated\n",
         "src/login.py": "print('login')\n",
     })
 
@@ -56,14 +56,14 @@ def test_location_skips_projectmem_files(tmp_path):
     assert event.type == "fix"
     assert event.location == "src/login.py"
     # Only the location moves; the event still records every file it touched.
-    assert ".projectmem/summary.md" in event.files
+    assert ".dejafix/summary.md" in event.files
 
 
 def test_a_memory_only_commit_has_no_location(tmp_path):
     """Nothing to point at is better than pointing at summary.md."""
     root = _repo(tmp_path)
     _commit(root, "fix: tidy the summary", {
-        ".projectmem/summary.md": "# regenerated\n",
+        ".dejafix/summary.md": "# regenerated\n",
     })
 
     _capture_commit(root)
@@ -253,7 +253,7 @@ def test_memory_files_come_last_so_the_cap_keeps_the_code(tmp_path):
     """Twelve memory files sort ahead of `src/`; `files[:10]` used to hold
     only them, so the location was not even in the event's file list."""
     root = _repo(tmp_path)
-    files = {f".projectmem/issues/{i:04d}-x.md": "x\n" for i in range(12)}
+    files = {f".dejafix/issues/{i:04d}-x.md": "x\n" for i in range(12)}
     files["src/app.py"] = "x\n"
     _commit(root, "fix: lots of issues and one file", files)
 

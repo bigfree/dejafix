@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typer.testing import CliRunner
 
-from projectmem.cli import app
+from dejafix.cli import app
 
 
 def test_search_finds_matching_events(tmp_path, monkeypatch):

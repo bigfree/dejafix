@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 from typer.testing import CliRunner
 
-from projectmem.cli import app
+from dejafix.cli import app
 
 
 def test_summary_and_issue_file_are_regenerated(tmp_path, monkeypatch):
@@ -28,10 +28,10 @@ def test_summary_and_issue_file_are_regenerated(tmp_path, monkeypatch):
         catch_exceptions=False,
     )
 
-    summary = (tmp_path / ".projectmem" / "summary.md").read_text(encoding="utf-8")
-    issue_files = list((tmp_path / ".projectmem" / "issues").glob("0001-*.md"))
+    summary = (tmp_path / ".dejafix" / "summary.md").read_text(encoding="utf-8")
+    issue_files = list((tmp_path / ".dejafix" / "issues").glob("0001-*.md"))
 
-    assert "# projectmem" in summary
+    assert "# dejafix" in summary
     assert "[DONE] #0001 login redirect loop" in summary
     assert "Keep redirect handling in one middleware" in summary
     assert "`auth/redirect.py`" in summary
@@ -46,7 +46,7 @@ def test_regenerate_preserves_project_purpose(tmp_path, monkeypatch):
     runner = CliRunner()
 
     runner.invoke(app, ["init"], catch_exceptions=False)
-    summary_path = tmp_path / ".projectmem" / "summary.md"
+    summary_path = tmp_path / ".dejafix" / "summary.md"
     summary = summary_path.read_text(encoding="utf-8")
     summary_path.write_text(
         summary.replace(
@@ -76,7 +76,7 @@ def test_project_purpose_auto_syncs_from_project_map(tmp_path, monkeypatch):
     # Simulate the Setup Mode flow: AI writes a real Project purpose into
     # PROJECT_MAP.md (allowed — PROJECT_MAP.md is hand-editable) but
     # summary.md still has the init placeholder.
-    map_path = tmp_path / ".projectmem" / "PROJECT_MAP.md"
+    map_path = tmp_path / ".dejafix" / "PROJECT_MAP.md"
     map_path.write_text(
         "# Project Map - test\n\n"
         "Status: created\n\n"
@@ -94,7 +94,7 @@ def test_project_purpose_auto_syncs_from_project_map(tmp_path, monkeypatch):
     )
     assert result.exit_code == 0
 
-    summary = (tmp_path / ".projectmem" / "summary.md").read_text(encoding="utf-8")
+    summary = (tmp_path / ".dejafix" / "summary.md").read_text(encoding="utf-8")
 
     # Real Project purpose from PROJECT_MAP.md now in summary.md
     assert "neural network framework for academic research" in summary
@@ -113,7 +113,7 @@ def test_project_purpose_falls_back_when_project_map_is_placeholder(tmp_path, mo
 
     runner.invoke(app, ["note", "first note"], catch_exceptions=False)
 
-    summary = (tmp_path / ".projectmem" / "summary.md").read_text(encoding="utf-8")
+    summary = (tmp_path / ".dejafix" / "summary.md").read_text(encoding="utf-8")
     # Should remain placeholder — neither file has real Project purpose yet
     assert "Replace this placeholder" in summary
     assert "first note" in summary
@@ -121,7 +121,7 @@ def test_project_purpose_falls_back_when_project_map_is_placeholder(tmp_path, mo
 
 def _issue_events(count: int, *, fixed: bool = False, first: int = 1):
     """N synthetic issues with ids first..first+count-1, optionally each fixed."""
-    from projectmem.models import Event
+    from dejafix.models import Event
 
     events = []
     for i in range(first, first + count):
@@ -144,7 +144,7 @@ def test_recent_issues_capped_at_ten(tmp_path):
     """Issue #19: Recent issues listed every issue ever logged (22 in the
     reporter's project), while Notes is capped at the latest 10. Fixed issues
     are capped at the 10 most recent so the summary stays a scannable snapshot."""
-    from projectmem.summary import build_summary
+    from dejafix.summary import build_summary
 
     summary = build_summary(_issue_events(12, fixed=True), tmp_path)
     lines = _recent_issue_lines(summary)
@@ -160,7 +160,7 @@ def test_recent_issues_capped_at_ten(tmp_path):
 
 
 def test_recent_issues_under_ten_all_listed(tmp_path):
-    from projectmem.summary import build_summary
+    from dejafix.summary import build_summary
 
     summary = build_summary(_issue_events(3), tmp_path)
     lines = _recent_issue_lines(summary)
@@ -174,7 +174,7 @@ def test_recent_issues_under_ten_all_listed(tmp_path):
 def test_an_old_open_issue_is_never_capped_away(tmp_path):
     """The cap must not hide what is still broken: #0001 is open and older
     than twelve fixed issues, and it is the line the next session needs."""
-    from projectmem.summary import build_summary
+    from dejafix.summary import build_summary
 
     events = _issue_events(1) + _issue_events(12, fixed=True, first=2)
     lines = _recent_issue_lines(build_summary(events, tmp_path))
@@ -184,7 +184,7 @@ def test_an_old_open_issue_is_never_capped_away(tmp_path):
 
 
 def test_many_open_issues_are_all_listed(tmp_path):
-    from projectmem.summary import build_summary
+    from dejafix.summary import build_summary
 
     lines = _recent_issue_lines(build_summary(_issue_events(15), tmp_path))
 
@@ -194,7 +194,7 @@ def test_many_open_issues_are_all_listed(tmp_path):
 def test_a_large_open_backlog_is_named_not_dropped(tmp_path):
     """Real projects reach 30–40 open issues. Past 20 they are listed by id
     on one line: still visible, but they cannot regrow the summary."""
-    from projectmem.summary import build_summary
+    from dejafix.summary import build_summary
 
     summary = build_summary(_issue_events(41), tmp_path)
     lines = _recent_issue_lines(summary)
@@ -211,7 +211,7 @@ def test_a_large_open_backlog_is_named_not_dropped(tmp_path):
 def test_issue_ids_past_9999_order_numerically(tmp_path):
     """As strings "10000" < "9999", so the cap would have kept the old ids
     and dropped the newest ones."""
-    from projectmem.summary import build_summary
+    from dejafix.summary import build_summary
 
     events = _issue_events(12, fixed=True, first=9995)  # 9995..10006
     lines = _recent_issue_lines(build_summary(events, tmp_path))
@@ -222,8 +222,8 @@ def test_issue_ids_past_9999_order_numerically(tmp_path):
 
 
 def test_decisions_capped_at_newest_fifteen(tmp_path):
-    from projectmem.models import Event
-    from projectmem.summary import build_summary
+    from dejafix.models import Event
+    from dejafix.summary import build_summary
 
     events = [Event(type="decision", summary=f"decision {i:02d}") for i in range(1, 21)]
     section = _section(build_summary(events, tmp_path), "Decisions")
@@ -240,8 +240,8 @@ def test_an_orphan_attempt_does_not_crash_the_summary(tmp_path):
     """An attempt whose issue event is missing (a typo id from an older
     version, or a hand-edited log) used to raise StopIteration on every
     rebuild, which broke every later write."""
-    from projectmem.models import Event
-    from projectmem.summary import build_summary
+    from dejafix.models import Event
+    from dejafix.summary import build_summary
 
     events = _issue_events(1) + [
         Event(type="attempt", summary="tried x", issue_id="0099", outcome="failed")
@@ -260,8 +260,8 @@ def test_an_orphan_attempt_does_not_crash_the_summary(tmp_path):
 def test_a_fixed_issue_is_listed_by_its_title_alone(
     tmp_path, issue_location, fix_location, shown
 ):
-    from projectmem.models import Event
-    from projectmem.summary import build_summary
+    from dejafix.models import Event
+    from dejafix.summary import build_summary
 
     events = [
         Event(type="issue", summary="login redirect loop", issue_id="0001",
@@ -281,9 +281,9 @@ def test_a_fixed_issue_is_listed_by_its_title_alone(
 
 
 def test_long_records_are_clipped_but_keep_their_location(tmp_path):
-    from projectmem.models import Event
-    from projectmem.storage import RECORD_CHARS
-    from projectmem.summary import build_summary
+    from dejafix.models import Event
+    from dejafix.storage import RECORD_CHARS
+    from dejafix.summary import build_summary
 
     long_text = "the collector drops its websocket " * 30
     events = [
@@ -310,9 +310,9 @@ def test_long_records_are_clipped_but_keep_their_location(tmp_path):
 
 
 def test_a_long_path_is_not_clipped_down_to_the_word_before_it(tmp_path):
-    from projectmem.models import Event
-    from projectmem.storage import RECORD_CHARS
-    from projectmem.summary import build_summary
+    from dejafix.models import Event
+    from dejafix.storage import RECORD_CHARS
+    from dejafix.summary import build_summary
 
     path = "src/" + "generated/" * 40 + "client.py"
     events = [Event(type="note", summary=f"see {path}")]
@@ -324,8 +324,8 @@ def test_a_long_path_is_not_clipped_down_to_the_word_before_it(tmp_path):
 
 
 def test_a_multi_line_record_stays_on_one_summary_line(tmp_path):
-    from projectmem.models import Event
-    from projectmem.summary import build_summary
+    from dejafix.models import Event
+    from dejafix.summary import build_summary
 
     events = [Event(type="note", summary="  first line\n## not a heading\n\tthird  ",
                     location="a.py\n## not a heading either")]
@@ -338,8 +338,8 @@ def test_a_multi_line_record_stays_on_one_summary_line(tmp_path):
 def test_a_blank_location_falls_back_to_the_fixs(tmp_path) -> None:
     """A whitespace-only location rendered as ` []` and, being truthy,
     hid the fix's location on the one-line DONE entry."""
-    from projectmem.models import Event
-    from projectmem.summary import build_summary
+    from dejafix.models import Event
+    from dejafix.summary import build_summary
 
     events = [
         Event(type="issue", summary="blank location", issue_id="0001", location="   "),
@@ -355,8 +355,8 @@ def _listed_key_files(summary: str) -> list[str]:
 
 
 def test_key_files_ignore_version_numbers_and_identifiers(tmp_path):
-    from projectmem.models import Event
-    from projectmem.summary import build_summary
+    from dejafix.models import Event
+    from dejafix.summary import build_summary
 
     events = [Event(type="note", summary="bumped to 7.x and 23.1.2 via ts.readConfigFile")]
 
@@ -364,8 +364,8 @@ def test_key_files_ignore_version_numbers_and_identifiers(tmp_path):
 
 
 def test_key_files_keep_root_level_files_mentioned_in_text(tmp_path):
-    from projectmem.models import Event
-    from projectmem.summary import build_summary
+    from dejafix.models import Event
+    from dejafix.summary import build_summary
 
     events = [Event(type="note", summary="pinned the version in pyproject.toml")]
 
@@ -373,8 +373,8 @@ def test_key_files_keep_root_level_files_mentioned_in_text(tmp_path):
 
 
 def test_key_files_include_locations_that_name_a_file(tmp_path):
-    from projectmem.models import Event
-    from projectmem.summary import build_summary
+    from dejafix.models import Event
+    from dejafix.summary import build_summary
 
     events = [
         Event(type="note", summary="gotcha: truncates at 72 bytes", location="bcrypt"),
@@ -386,8 +386,8 @@ def test_key_files_include_locations_that_name_a_file(tmp_path):
 
 
 def test_key_files_merge_line_suffixes_into_one_file(tmp_path):
-    from projectmem.models import Event
-    from projectmem.summary import build_summary
+    from dejafix.models import Event
+    from dejafix.summary import build_summary
 
     events = [
         Event(type="note", summary="one", location="src/auth.py:42"),
@@ -398,14 +398,14 @@ def test_key_files_merge_line_suffixes_into_one_file(tmp_path):
 
 
 def test_key_files_rank_by_event_count_and_skip_memory_files(tmp_path):
-    from projectmem.models import Event
-    from projectmem.summary import build_summary
+    from dejafix.models import Event
+    from dejafix.summary import build_summary
 
     events = [
         Event(type="note", summary="one", location="src/rare.py"),
         Event(type="note", summary="two", location="src/busy.py"),
         Event(type="note", summary="three", files=["src/busy.py"]),
-        Event(type="note", summary="four", location=".projectmem/summary.md"),
+        Event(type="note", summary="four", location=".dejafix/summary.md"),
     ]
 
     assert _listed_key_files(build_summary(events, tmp_path)) == [

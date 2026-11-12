@@ -5,7 +5,7 @@ import re
 
 from typer.testing import CliRunner
 
-from projectmem.cli import app
+from dejafix.cli import app
 
 
 def test_log_attempt_and_fix_write_events(tmp_path, monkeypatch):
@@ -25,7 +25,7 @@ def test_log_attempt_and_fix_write_events(tmp_path, monkeypatch):
         catch_exceptions=False,
     )
 
-    lines = (tmp_path / ".projectmem" / "events.jsonl").read_text(
+    lines = (tmp_path / ".dejafix" / "events.jsonl").read_text(
         encoding="utf-8"
     ).splitlines()
     events = [json.loads(line) for line in lines]
@@ -54,12 +54,12 @@ def test_fix_issue_closes_target_without_clearing_newer_active_issue(
     assert result.exit_code == 0
     assert "Fixed issue #0001" in result.stdout
     assert (
-        tmp_path / ".projectmem" / ".current_issue"
+        tmp_path / ".dejafix" / ".current_issue"
     ).read_text(encoding="utf-8") == "0002"
 
     events = [
         json.loads(line)
-        for line in (tmp_path / ".projectmem" / "events.jsonl")
+        for line in (tmp_path / ".dejafix" / "events.jsonl")
         .read_text(encoding="utf-8")
         .splitlines()
     ]
@@ -78,7 +78,7 @@ def test_plain_fix_still_closes_active_issue(tmp_path, monkeypatch):
 
     assert result.exit_code == 0
     assert "Fixed issue #0001" in result.stdout
-    assert not (tmp_path / ".projectmem" / ".current_issue").exists()
+    assert not (tmp_path / ".dejafix" / ".current_issue").exists()
 
 
 def test_fix_issue_rejects_unknown_issue(tmp_path, monkeypatch):
@@ -103,7 +103,7 @@ def test_mcp_record_fix_accepts_target_issue_id(tmp_path, monkeypatch):
     runner.invoke(app, ["log", "old issue"], catch_exceptions=False)
     runner.invoke(app, ["log", "new issue"], catch_exceptions=False)
 
-    from projectmem.mcp_server import record_fix
+    from dejafix.mcp_server import record_fix
 
     result = record_fix("fixed old issue through MCP", issue_id="1")
 
@@ -112,11 +112,11 @@ def test_mcp_record_fix_accepts_target_issue_id(tmp_path, monkeypatch):
     assert result.startswith("Fixed issue #0001 → ")
     assert re.fullmatch(r"Fixed issue #0001 → \S+", result)
     assert (
-        tmp_path / ".projectmem" / ".current_issue"
+        tmp_path / ".dejafix" / ".current_issue"
     ).read_text(encoding="utf-8") == "0002"
 
     last = json.loads(
-        (tmp_path / ".projectmem" / "events.jsonl")
+        (tmp_path / ".dejafix" / "events.jsonl")
         .read_text(encoding="utf-8")
         .splitlines()[-1]
     )
@@ -135,7 +135,7 @@ def test_attempt_without_open_issue_fails(tmp_path, monkeypatch):
     assert result.exception is not None
     # Message changed in the v0.0.6 polish-pass (L-008 + L-027a): a markerless
     # attempt with no recent open issue now errors with guidance to either
-    # `pjm log` first, pass `--issue`, or rerun with `--auto-issue`.
+    # `djf log` first, pass `--issue`, or rerun with `--auto-issue`.
     assert "No active issue" in str(result.exception)
 
 
@@ -152,7 +152,7 @@ def test_attempt_auto_issue_creates_parent(tmp_path, monkeypatch):
     )
     assert result.exit_code == 0
 
-    lines = (tmp_path / ".projectmem" / "events.jsonl").read_text(
+    lines = (tmp_path / ".dejafix" / "events.jsonl").read_text(
         encoding="utf-8"
     ).splitlines()
     events = [json.loads(line) for line in lines]
@@ -163,7 +163,7 @@ def test_attempt_auto_issue_creates_parent(tmp_path, monkeypatch):
 
 
 def test_attempt_after_fix_does_not_misattribute(tmp_path, monkeypatch):
-    """L-027a regression: a `pjm attempt` after closing issue #1 must not
+    """L-027a regression: a `djf attempt` after closing issue #1 must not
     silently re-attach to an older open issue. This used to corrupt the
     event log by attaching unrelated attempts to whichever issue
     happened to still be open."""
@@ -184,7 +184,7 @@ def test_attempt_after_fix_does_not_misattribute(tmp_path, monkeypatch):
     )
     assert result.exit_code == 0
     last = json.loads(
-        (tmp_path / ".projectmem" / "events.jsonl")
+        (tmp_path / ".dejafix" / "events.jsonl")
         .read_text(encoding="utf-8")
         .splitlines()[-1]
     )

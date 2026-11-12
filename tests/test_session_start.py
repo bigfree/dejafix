@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from projectmem.storage import (
+from dejafix.storage import (
     ai_instructions_path,
     initialize,
     plan_path,
@@ -35,7 +35,7 @@ def _project(tmp_path):
 
 
 def test_start_session_contains_rules_summary_and_active_plan(tmp_path):
-    from projectmem.session_start import build_session_start
+    from dejafix.session_start import build_session_start
 
     text = build_session_start(_project(tmp_path))
 
@@ -47,7 +47,7 @@ def test_start_session_contains_rules_summary_and_active_plan(tmp_path):
 
 
 def test_start_session_omits_ideas_shipped_and_someday(tmp_path):
-    from projectmem.session_start import build_session_start
+    from dejafix.session_start import build_session_start
 
     text = build_session_start(_project(tmp_path))
 
@@ -57,7 +57,7 @@ def test_start_session_omits_ideas_shipped_and_someday(tmp_path):
 
 
 def test_start_session_tolerates_missing_files(tmp_path):
-    from projectmem.session_start import build_session_start
+    from dejafix.session_start import build_session_start
 
     initialize(tmp_path)
     plan_path(tmp_path).unlink(missing_ok=True)
@@ -66,7 +66,7 @@ def test_start_session_tolerates_missing_files(tmp_path):
 
 
 def test_server_instructions_name_start_session_and_allow_parallel_calls():
-    from projectmem.mcp_server import mcp
+    from dejafix.mcp_server import mcp
 
     instructions = mcp.instructions or ""
 
@@ -76,7 +76,7 @@ def test_server_instructions_name_start_session_and_allow_parallel_calls():
 
 
 def test_start_session_keeps_custom_plan_headings(tmp_path):
-    from projectmem.session_start import build_session_start
+    from dejafix.session_start import build_session_start
 
     _project(tmp_path)
     plan_path(tmp_path).write_text(
@@ -91,7 +91,7 @@ def test_start_session_keeps_custom_plan_headings(tmp_path):
 
 
 def test_start_session_reads_a_plan_that_starts_with_a_heading(tmp_path):
-    from projectmem.session_start import build_session_start
+    from dejafix.session_start import build_session_start
 
     _project(tmp_path)
     plan_path(tmp_path).write_text("## Active plans\n- [ ] first item\n", encoding="utf-8")
@@ -100,7 +100,7 @@ def test_start_session_reads_a_plan_that_starts_with_a_heading(tmp_path):
 
 
 def test_start_session_survives_an_empty_trailing_heading(tmp_path):
-    from projectmem.session_start import build_session_start
+    from dejafix.session_start import build_session_start
 
     _project(tmp_path)
     plan_path(tmp_path).write_text("# demo\n## \n## Next\n- review\n", encoding="utf-8")
@@ -109,7 +109,7 @@ def test_start_session_survives_an_empty_trailing_heading(tmp_path):
 
 
 def test_start_session_says_the_session_start_reads_are_done(tmp_path):
-    from projectmem.session_start import build_session_start
+    from dejafix.session_start import build_session_start
 
     text = build_session_start(_project(tmp_path))
 
@@ -118,8 +118,8 @@ def test_start_session_says_the_session_start_reads_are_done(tmp_path):
 
 
 def test_start_session_includes_a_placeholder_map_for_setup_mode(tmp_path):
-    from projectmem.session_start import build_session_start
-    from projectmem.storage import project_map_path
+    from dejafix.session_start import build_session_start
+    from dejafix.storage import project_map_path
 
     _project(tmp_path)
     project_map_path(tmp_path).write_text(
@@ -130,8 +130,8 @@ def test_start_session_includes_a_placeholder_map_for_setup_mode(tmp_path):
 
 
 def test_start_session_leaves_out_a_real_map(tmp_path):
-    from projectmem.session_start import build_session_start
-    from projectmem.storage import project_map_path
+    from dejafix.session_start import build_session_start
+    from dejafix.storage import project_map_path
 
     _project(tmp_path)
     project_map_path(tmp_path).write_text(

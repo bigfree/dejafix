@@ -7,10 +7,10 @@ import sys
 
 import pytest
 
-from projectmem.models import Event
-from projectmem.storage import (
+from dejafix.models import Event
+from dejafix.storage import (
     OPEN_ISSUES_LISTED,
-    ProjectMemError,
+    DejafixError,
     initialize,
     open_issue_ids,
     sole_open_issue,
@@ -40,7 +40,7 @@ def test_sole_open_issue_is_none_without_open_issues():
 
 
 def test_sole_open_issue_refuses_and_lists_every_open_issue():
-    with pytest.raises(ProjectMemError, match=r"issue_id.*#0002, #0001"):
+    with pytest.raises(DejafixError, match=r"issue_id.*#0002, #0001"):
         sole_open_issue([_issue("0001"), _issue("0002")])
 
 
@@ -48,7 +48,7 @@ def test_refusal_caps_the_listing():
     count = OPEN_ISSUES_LISTED + 3
     events = [_issue(f"{i:04d}") for i in range(1, count + 1)]
 
-    with pytest.raises(ProjectMemError, match="and 3 more"):
+    with pytest.raises(DejafixError, match="and 3 more"):
         sole_open_issue(events)
 
 
@@ -57,10 +57,10 @@ def _client_params(root):
 
     return StdioServerParameters(
         command=sys.executable,
-        args=["-m", "projectmem.mcp_server"],
+        args=["-m", "dejafix.mcp_server"],
         env={
-            "PROJECTMEM_ROOT": str(root),
-            "PROJECTMEM_HOME": os.environ["PROJECTMEM_HOME"],
+            "DEJAFIX_ROOT": str(root),
+            "DEJAFIX_HOME": os.environ["DEJAFIX_HOME"],
         },
     )
 

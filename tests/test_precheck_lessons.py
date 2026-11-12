@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from projectmem.commands.precheck import _analyze_files
-from projectmem.models import Event
-from projectmem.storage import initialize
+from dejafix.commands.precheck import _analyze_files
+from dejafix.models import Event
+from dejafix.storage import initialize
 
 
 def _project(tmp_path):
@@ -109,8 +109,8 @@ def test_overflow_names_the_issues_of_hidden_lessons(tmp_path):
 
 
 def test_precheck_files_analyzes_all_paths_in_one_pass(tmp_path, monkeypatch):
-    from projectmem import mcp_server
-    from projectmem.commands import precheck
+    from dejafix import mcp_server
+    from dejafix.commands import precheck
 
     root = _project(tmp_path)
     (root / "src" / "db.py").write_text("x = 1\n", encoding="utf-8")

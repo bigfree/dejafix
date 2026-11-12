@@ -3,15 +3,15 @@
 initialize() writes the file only when it is missing, so every project made
 by an older release kept that release's guidance — including call shapes that
 were later corrected (precheck_file(path), #18) — and get_instructions() served
-it. `pjm init` now refreshes a file whose version marker is absent or old, and
+it. `djf init` now refreshes a file whose version marker is absent or old, and
 leaves a current one alone so user edits survive.
 """
 from __future__ import annotations
 
 from conftest import set_fake_home
 
-from projectmem.commands.init import run as init_run
-from projectmem.storage import (
+from dejafix.commands.init import run as init_run
+from dejafix.storage import (
     AI_INSTRUCTIONS_FILE,
     INSTRUCTIONS_BACKUP_FILE,
     INSTRUCTIONS_VERSION,
@@ -22,7 +22,7 @@ from projectmem.storage import (
 )
 
 STALE = (
-    "# projectmem AI Instructions\n\n"
+    "# dejafix AI Instructions\n\n"
     "Call `precheck_file(path)` before editing.\n\n"
     "## Global Memory — Inherited Knowledge\n\n"
     "### Library Gotchas\n\n"
@@ -34,7 +34,7 @@ STALE = (
 
 def _project(tmp_path, monkeypatch):
     set_fake_home(monkeypatch, tmp_path / "home")
-    monkeypatch.setenv("PROJECTMEM_HOME", str(tmp_path / "pm"))
+    monkeypatch.setenv("DEJAFIX_HOME", str(tmp_path / "pm"))
     project = tmp_path / "app"
     project.mkdir()
     monkeypatch.chdir(project)
@@ -50,7 +50,7 @@ def test_a_fresh_init_writes_the_current_file_without_a_backup(tmp_path, monkeyp
     project = _project(tmp_path, monkeypatch)
     init_run(root=project)
 
-    mem = project / ".projectmem"
+    mem = project / ".dejafix"
     assert instructions_version((mem / AI_INSTRUCTIONS_FILE).read_text(encoding="utf-8")) == INSTRUCTIONS_VERSION
     assert not (mem / INSTRUCTIONS_BACKUP_FILE).exists()
     assert "Refreshed" not in capsys.readouterr().out
@@ -61,7 +61,7 @@ def test_init_refreshes_a_stale_file_keeping_a_backup_and_the_global_block(
 ):
     project = _project(tmp_path, monkeypatch)
     initialize(project)
-    mem = project / ".projectmem"
+    mem = project / ".dejafix"
     (mem / AI_INSTRUCTIONS_FILE).write_text(STALE, encoding="utf-8")
 
     init_run(root=project, no_global=True)
@@ -76,15 +76,15 @@ def test_init_refreshes_a_stale_file_keeping_a_backup_and_the_global_block(
     assert text.index("Global Memory") < text.index("## Rules summary")
     # the old copy is kept for anyone who had edited it
     assert (mem / INSTRUCTIONS_BACKUP_FILE).read_text(encoding="utf-8") == STALE
-    assert "Refreshed .projectmem/AI_INSTRUCTIONS.md" in capsys.readouterr().out
+    assert "Refreshed .dejafix/AI_INSTRUCTIONS.md" in capsys.readouterr().out
     # the backup is a local safety copy, not team knowledge to commit
-    assert ".projectmem/AI_INSTRUCTIONS.md.bak" in (project / ".gitignore").read_text()
+    assert ".dejafix/AI_INSTRUCTIONS.md.bak" in (project / ".gitignore").read_text()
 
 
 def test_init_leaves_a_current_file_with_user_edits_untouched(tmp_path, monkeypatch, capsys):
     project = _project(tmp_path, monkeypatch)
     initialize(project)
-    path = project / ".projectmem" / AI_INSTRUCTIONS_FILE
+    path = project / ".dejafix" / AI_INSTRUCTIONS_FILE
     edited = path.read_text(encoding="utf-8") + "\n## House rules\n\nAlways squash.\n"
     path.write_text(edited, encoding="utf-8")
 
@@ -97,9 +97,9 @@ def test_init_leaves_a_current_file_with_user_edits_untouched(tmp_path, monkeypa
 
 def test_an_older_numbered_marker_is_refreshed_too(tmp_path):
     initialize(tmp_path)
-    path = tmp_path / ".projectmem" / AI_INSTRUCTIONS_FILE
+    path = tmp_path / ".dejafix" / AI_INSTRUCTIONS_FILE
     path.write_text(
-        "<!-- projectmem-instructions: 0 -->\nold\n", encoding="utf-8"
+        "<!-- dejafix-instructions: 0 -->\nold\n", encoding="utf-8"
     )
     assert refresh_ai_instructions(tmp_path) is True
     assert instructions_version(path.read_text(encoding="utf-8")) == INSTRUCTIONS_VERSION
@@ -107,16 +107,16 @@ def test_an_older_numbered_marker_is_refreshed_too(tmp_path):
 
 def test_a_refresh_with_no_global_block_adds_none(tmp_path):
     initialize(tmp_path)
-    path = tmp_path / ".projectmem" / AI_INSTRUCTIONS_FILE
+    path = tmp_path / ".dejafix" / AI_INSTRUCTIONS_FILE
     path.write_text("old, no marker\n", encoding="utf-8")
     refresh_ai_instructions(tmp_path)
     assert "Global Memory" not in path.read_text(encoding="utf-8")
 
 
 def test_initialize_alone_never_rewrites_the_file(tmp_path):
-    """Only `pjm init` refreshes; any other caller of initialize() must not."""
+    """Only `djf init` refreshes; any other caller of initialize() must not."""
     initialize(tmp_path)
-    path = tmp_path / ".projectmem" / AI_INSTRUCTIONS_FILE
+    path = tmp_path / ".dejafix" / AI_INSTRUCTIONS_FILE
     path.write_text(STALE, encoding="utf-8")
     initialize(tmp_path)
     assert path.read_text(encoding="utf-8") == STALE
@@ -130,13 +130,14 @@ def test_initialize_alone_never_rewrites_the_file(tmp_path):
 _TEMPLATE_FINGERPRINTS = {
     1: "e699906caeddbf8a",
     2: "78650ecb093907ef",
+    3: "8548fc46fc396de5",
 }
 
 
 def test_a_template_change_comes_with_a_version_bump():
     import hashlib
 
-    from projectmem.storage import INSTRUCTIONS_VERSION, ai_instructions
+    from dejafix.storage import INSTRUCTIONS_VERSION, ai_instructions
 
     digest = hashlib.sha256(ai_instructions().encode()).hexdigest()[:16]
     assert _TEMPLATE_FINGERPRINTS.get(INSTRUCTIONS_VERSION) == digest, (
