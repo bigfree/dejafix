@@ -9,3 +9,9 @@ pub struct Stack {
 }
 
 pub type Entry = Map<String, Value>;
+
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Relevant<'e> {
+    pub patterns: Vec<&'e Entry>,
+    pub gotchas: Vec<&'e Entry>,
+}

@@ -28,13 +28,23 @@ fn git(dir: &Path, args: &[&str]) -> Result<(), Box<dyn Error>> {
 
 impl Repo {
     pub fn new() -> Result<Self, Box<dyn Error>> {
+        let repo = Self::bare()?;
+        fs::create_dir_all(repo.root.join(".dejafix/issues"))?;
+        fs::write(repo.root.join(".dejafix/config.toml"), "recent_days = 30\n")?;
+        fs::write(repo.root.join(".dejafix/events.jsonl"), "")?;
+        Ok(repo)
+    }
+
+    pub fn bare() -> Result<Self, Box<dyn Error>> {
+        Self::bare_named("repo")
+    }
+
+    pub fn bare_named(name: &str) -> Result<Self, Box<dyn Error>> {
         let dir = tempfile::tempdir()?;
-        let root = fs::canonicalize(dir.path())?.join("repo");
+        let root = fs::canonicalize(dir.path())?.join(name);
         let home = root.with_file_name("home");
-        fs::create_dir_all(root.join(".dejafix/issues"))?;
+        fs::create_dir_all(&root)?;
         fs::create_dir_all(&home)?;
-        fs::write(root.join(".dejafix/config.toml"), "recent_days = 30\n")?;
-        fs::write(root.join(".dejafix/events.jsonl"), "")?;
         fs::write(root.join("README.md"), "x\n")?;
         git(&root, &["init", "-q"])?;
         git(&root, &["add", "README.md"])?;
@@ -44,6 +54,14 @@ impl Repo {
             root,
             home,
         })
+    }
+
+    pub fn registry(&self) -> PathBuf {
+        self.home.join(".dejafix")
+    }
+
+    pub fn read(&self, relative: &str) -> Result<String, Box<dyn Error>> {
+        Ok(fs::read_to_string(self.root.join(relative))?)
     }
 
     pub fn djf_in(&self, cwd: &Path, args: &[&str]) -> assert_cmd::Command {

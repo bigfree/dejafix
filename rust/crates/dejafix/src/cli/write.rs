@@ -44,7 +44,7 @@ pub fn command(arguments: Commands) -> Option<Command> {
             supersedes,
         },
         Commands::Note { text, at } => Command::Note { text, location: at },
-        Commands::Show | Commands::Search { .. } | Commands::Regenerate => return None,
+        _ => return None,
     })
 }
 

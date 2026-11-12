@@ -1,5 +1,6 @@
 use std::env;
 use std::ffi::OsString;
+use std::io::IsTerminal;
 use std::path::PathBuf;
 
 use super::types::Config;
@@ -22,8 +23,13 @@ impl Config {
         });
         Ok(Self {
             cwd,
+            home,
             dejafix_home,
+            xdg_config_home: non_empty("XDG_CONFIG_HOME").map(PathBuf::from),
+            appdata: non_empty("APPDATA").map(PathBuf::from),
+            local_appdata: non_empty("LOCALAPPDATA").map(PathBuf::from),
             redact,
+            color: std::io::stdout().is_terminal(),
             zone: jiff::tz::TimeZone::system(),
         })
     }

@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use crate::adapters::fs::{MemoryDir, StoreError};
 use crate::core::path::PathContext;
+use crate::core::registry::{ProjectRecord, RegistryError};
 use crate::core::time::Clock;
 use crate::core::write::{ValidationError, WriteOutcome};
 
@@ -38,4 +39,83 @@ pub enum WiringError {
     Validation(#[from] ValidationError),
     #[error(transparent)]
     Store(#[from] StoreError),
+    #[error(transparent)]
+    Registry(#[from] RegistryError),
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct InitOptions {
+    pub claude_md: bool,
+    pub stack_detect: bool,
+    pub global: bool,
+    pub global_tags: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BridgeOutcome {
+    Created,
+    Appended,
+    Refreshed,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Inherited {
+    pub tags: Vec<String>,
+    pub gotchas: usize,
+    pub patterns: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InitReport {
+    pub mem_dir: PathBuf,
+    pub refreshed_instructions: bool,
+    pub bridges: Vec<(&'static str, BridgeOutcome)>,
+    pub project_map: Option<String>,
+    pub inherited: Option<Inherited>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MemoryFile {
+    Instructions,
+    ProjectMap,
+    Plan,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RegistryOp {
+    List,
+    Use(Option<String>),
+    Remove(String),
+    Alias {
+        identifier: String,
+        alias: String,
+    },
+    Tag {
+        identifier: String,
+        tag: String,
+        remove: bool,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ListedProject {
+    pub record: ProjectRecord,
+    pub has_memory: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RegistryReply {
+    Listed {
+        active: Option<String>,
+        projects: Vec<ListedProject>,
+    },
+    Activated(Option<ProjectRecord>),
+    Removed(ProjectRecord),
+    Aliased(ProjectRecord),
+    Tagged(ProjectRecord),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UpgradeNotice {
+    pub version: String,
 }

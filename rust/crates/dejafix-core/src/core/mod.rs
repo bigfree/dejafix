@@ -4,6 +4,8 @@ pub(crate) mod json;
 pub mod log;
 pub mod path;
 pub mod redact;
+pub mod registry;
+pub mod scaffold;
 pub mod search;
 pub mod summary;
 pub(crate) mod text;

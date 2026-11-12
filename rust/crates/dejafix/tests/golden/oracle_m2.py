@@ -8,6 +8,10 @@
 ``stack ROOT...``  ``detect_stack`` of each root as sorted JSON.
 ``promote``   ``auto_promote_event`` per stdin ``[summary, type, outcome, libraries]``.
 ``word``      ranges ``start-end`` (hex) of code points where ``isalnum()`` or ``_``.
+``templates`` the instruction template, initial files and bridges as one JSON object.
+``splice``    ``[extract, splice]`` per stdin ``[content, block]``.
+``inherit``   the inherited block per stdin ``[stack, filter_tags, patterns, gotchas]``.
+``manifest ROOT...``  ``[description, entry_points, main_folders]`` of each root.
 """
 
 import json
@@ -117,7 +121,53 @@ def promote() -> None:
         print(json.dumps(entry["library"] if entry else None))
 
 
-COMMANDS = {"stack": stack, "promote": promote, "summary": summary, "purpose": purpose, "redact": redact_lines, "casefold": casefold, "word": word, "dumps": dumps}
+def templates() -> None:
+    from pathlib import Path
+
+    from dejafix.commands.init import _claude_md_bridge
+    from dejafix.storage import ai_instructions, initial_plan, initial_project_map, initial_summary
+
+    root = Path("/x/demo")
+    print(json.dumps({
+        "instructions": ai_instructions(),
+        "summary": initial_summary(root),
+        "map": initial_project_map(root),
+        "plan": initial_plan(root),
+        "bridge": _claude_md_bridge("demo"),
+        "anonymous": _claude_md_bridge(None),
+    }))
+
+
+def splice() -> None:
+    from dejafix.storage import extract_global_memory_block, splice_global_memory_block
+
+    for line in stdin_lines():
+        content, block = json.loads(line)
+        print(json.dumps([extract_global_memory_block(content), splice_global_memory_block(content, block)]))
+
+
+def inherit() -> None:
+    from dejafix import global_memory
+
+    for line in stdin_lines():
+        stack, filter_tags, patterns, gotchas = json.loads(line)
+        global_memory.read_patterns = lambda: patterns
+        global_memory.read_gotchas = lambda: gotchas
+        relevant = global_memory.get_relevant_entries(stack, filter_tags=filter_tags)
+        print(json.dumps(global_memory.build_inherited_instructions(relevant)))
+
+
+def manifest(*roots: str) -> None:
+    from pathlib import Path
+
+    from dejafix.commands.init import _detect_main_folders, _extract_entry_points, _extract_project_description
+
+    for root in roots:
+        path = Path(root)
+        print(json.dumps([_extract_project_description(path), _extract_entry_points(path), _detect_main_folders(path)]))
+
+
+COMMANDS = {"templates": templates, "splice": splice, "inherit": inherit, "manifest": manifest, "stack": stack, "promote": promote, "summary": summary, "purpose": purpose, "redact": redact_lines, "casefold": casefold, "word": word, "dumps": dumps}
 
 if __name__ == "__main__":
     COMMANDS[sys.argv[1]](*sys.argv[2:])

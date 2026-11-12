@@ -26,7 +26,6 @@ fn canonical_key_files(text: &str) -> String {
 }
 
 const EMPTY_SUMMARY: &str = "Event summary cannot be empty";
-const NOTICE_STATE: &str = "home/.dejafix/projects.meta.json";
 
 pub fn canonical(mut run: Run) -> Run {
     for step in &mut run.steps {
@@ -35,7 +34,6 @@ pub fn canonical(mut run: Run) -> Run {
             step.stderr = format!("Error: {EMPTY_SUMMARY}\n");
         }
     }
-    run.files.remove(NOTICE_STATE);
     for text in run.files.values_mut() {
         *text = canonical_key_files(text);
     }

@@ -129,6 +129,12 @@ impl GlobalStore {
     }
 
     #[must_use]
+    pub fn has_entries(&self) -> bool {
+        let _ = self.ensure();
+        self.path(PATTERNS_FILE).exists() || self.path(GOTCHAS_FILE).exists()
+    }
+
+    #[must_use]
     pub fn gotchas(&self) -> Option<Vec<Entry>> {
         self.entries(GOTCHAS_FILE)
     }

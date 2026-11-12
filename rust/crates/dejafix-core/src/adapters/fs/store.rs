@@ -63,6 +63,25 @@ pub fn read_optional_text(path: &Path) -> Result<Option<String>, StoreError> {
     }
 }
 
+fn points_outside(path: &Path, root: &Path) -> bool {
+    let is_link =
+        fs::symlink_metadata(path).is_ok_and(|metadata| metadata.file_type().is_symlink());
+    if !is_link {
+        return false;
+    }
+    match (fs::canonicalize(path), fs::canonicalize(root)) {
+        (Ok(target), Ok(root)) => !target.starts_with(root),
+        _ => true,
+    }
+}
+
+pub fn read_text_within(path: &Path, root: &Path) -> Result<Option<String>, StoreError> {
+    if points_outside(path, root) {
+        return Ok(None);
+    }
+    read_optional_text(path)
+}
+
 #[must_use]
 pub fn project_name(root: &Path) -> String {
     root.file_name()

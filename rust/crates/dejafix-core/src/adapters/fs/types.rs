@@ -55,3 +55,9 @@ pub struct LockedLog {
 pub struct GlobalStore {
     pub dir: PathBuf,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RegistryFiles {
+    pub list: PathBuf,
+    pub meta: PathBuf,
+}

@@ -2,6 +2,7 @@ mod corpus;
 mod harness;
 mod m1;
 mod m2;
+mod m2b;
 mod normalize;
 mod scenario;
 mod types;
@@ -75,7 +76,13 @@ fn rust_runs_on_a_fixture_copy_without_touching_it() -> TestResult {
     let untouched = run(Implementation::Rust, dir.path(), &[])?;
     let searched = run(Implementation::Rust, dir.path(), &[&["search", "anything"]])?;
     assert_eq!(searched.steps.first().and_then(|step| step.code), Some(0));
-    assert_eq!(diff(&untouched, &searched), ["step count 0 != 1"]);
+    assert_eq!(
+        diff(&untouched, &searched),
+        [
+            "step count 0 != 1",
+            "home/.dejafix/projects.meta.json: only on the right"
+        ]
+    );
     Ok(())
 }
 

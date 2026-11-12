@@ -10,28 +10,28 @@ Regenerate the id list with
 table in step with it: a new Python test adds a row, a removed one drops its
 row.
 
-Rows: 512.
+Rows: 514.
 
 | Milestone | Tests |
 |---|---|
 | M1 | 24 |
-| M2 | 187 |
+| M2 | 185 |
 | M3 | 149 |
-| M4 | 59 |
+| M4 | 60 |
 | M5 | 17 |
-| M6 | 14 |
-| out of scope | 62 |
+| M6 | 16 |
+| out of scope | 63 |
 
 | Python test | Milestone | Scope | Ported |
 |---|---|---|---|
-| `tests/test_agent_guidance.py::test_the_bridge_names_the_project` | M2 | agent guidance surfaces | |
-| `tests/test_agent_guidance.py::test_the_bridge_is_still_valid_without_a_name` | M2 | agent guidance surfaces | |
-| `tests/test_agent_guidance.py::test_init_writes_the_registered_name_into_claude_md` | M2 | agent guidance surfaces | |
-| `tests/test_agent_guidance.py::test_supersedes_is_documented_on_every_surface[AI_INSTRUCTIONS.md (get_instructions)-ai_instructions]` | M2 | agent guidance surfaces | |
-| `tests/test_agent_guidance.py::test_supersedes_is_documented_on_every_surface[CLAUDE.md bridge-<lambda>]` | M2 | agent guidance surfaces | |
+| `tests/test_agent_guidance.py::test_the_bridge_names_the_project` | M2 | agent guidance surfaces | `crates/dejafix-core/src/core/scaffold/tests.rs::the_bridge_names_the_project` |
+| `tests/test_agent_guidance.py::test_the_bridge_is_still_valid_without_a_name` | M2 | agent guidance surfaces | `crates/dejafix-core/src/core/scaffold/tests.rs::the_bridge_is_still_valid_without_a_name` |
+| `tests/test_agent_guidance.py::test_init_writes_the_registered_name_into_claude_md` | M2 | agent guidance surfaces | `crates/dejafix/tests/cli/guidance.rs::init_writes_the_registered_name_into_claude_md` |
+| `tests/test_agent_guidance.py::test_supersedes_is_documented_on_every_surface[AI_INSTRUCTIONS.md (get_instructions)-ai_instructions]` | M2 | agent guidance surfaces | `crates/dejafix-core/src/core/scaffold/tests.rs::the_instructions_state_record_lengths_and_supersedes` |
+| `tests/test_agent_guidance.py::test_supersedes_is_documented_on_every_surface[CLAUDE.md bridge-<lambda>]` | M2 | agent guidance surfaces | `crates/dejafix-core/src/core/scaffold/tests.rs::the_bridge_is_still_valid_without_a_name` |
 | `tests/test_agent_guidance.py::test_supersedes_is_documented_on_every_surface[MCP instructions= field-_mcp_instructions]` | M4 | MCP server `instructions` | |
-| `tests/test_agent_guidance.py::test_every_call_shown_uses_the_tools_real_arguments[AI_INSTRUCTIONS.md (get_instructions)]` | M2 | agent guidance surfaces | |
-| `tests/test_agent_guidance.py::test_every_call_shown_uses_the_tools_real_arguments[CLAUDE.md bridge]` | M2 | agent guidance surfaces | |
+| `tests/test_agent_guidance.py::test_every_call_shown_uses_the_tools_real_arguments[AI_INSTRUCTIONS.md (get_instructions)]` | M2 | agent guidance surfaces | `crates/dejafix/tests/golden/m2b.rs::templates_match_python` |
+| `tests/test_agent_guidance.py::test_every_call_shown_uses_the_tools_real_arguments[CLAUDE.md bridge]` | M2 | agent guidance surfaces | `crates/dejafix/tests/golden/m2b.rs::templates_match_python` |
 | `tests/test_agent_guidance.py::test_every_call_shown_uses_the_tools_real_arguments[MCP instructions= field]` | M4 | MCP server `instructions` | |
 | `tests/test_agent_guidance.py::test_every_call_shown_uses_the_tools_real_arguments[README.md]` | M6 | user documentation is rewritten for 1.0 | |
 | `tests/test_agent_guidance.py::test_every_call_shown_uses_the_tools_real_arguments[TUTORIAL.md]` | M6 | user documentation is rewritten for 1.0 | |
@@ -40,8 +40,9 @@ Rows: 512.
 | `tests/test_agent_guidance.py::test_every_call_shown_uses_the_tools_real_arguments[docs/2026-11-12-rust-m1-plan.md]` | M6 | user documentation is rewritten for 1.0 | |
 | `tests/test_agent_guidance.py::test_every_call_shown_uses_the_tools_real_arguments[docs/2026-11-12-rust-m2-plan.md]` | M6 | user documentation is rewritten for 1.0 | |
 | `tests/test_agent_guidance.py::test_every_call_shown_uses_the_tools_real_arguments[docs/2026-11-12-rust-rewrite-design.md]` | M6 | user documentation is rewritten for 1.0 | |
-| `tests/test_agent_guidance.py::test_every_call_shown_passes_the_tools_required_arguments[AI_INSTRUCTIONS.md (get_instructions)]` | M2 | agent guidance surfaces | |
-| `tests/test_agent_guidance.py::test_every_call_shown_passes_the_tools_required_arguments[CLAUDE.md bridge]` | M2 | agent guidance surfaces | |
+| `tests/test_agent_guidance.py::test_every_call_shown_uses_the_tools_real_arguments[docs/improvements.md]` | M6 | user documentation is rewritten for 1.0 | |
+| `tests/test_agent_guidance.py::test_every_call_shown_passes_the_tools_required_arguments[AI_INSTRUCTIONS.md (get_instructions)]` | M2 | agent guidance surfaces | `crates/dejafix/tests/golden/m2b.rs::templates_match_python` |
+| `tests/test_agent_guidance.py::test_every_call_shown_passes_the_tools_required_arguments[CLAUDE.md bridge]` | M2 | agent guidance surfaces | `crates/dejafix/tests/golden/m2b.rs::templates_match_python` |
 | `tests/test_agent_guidance.py::test_every_call_shown_passes_the_tools_required_arguments[MCP instructions= field]` | M4 | MCP server `instructions` | |
 | `tests/test_agent_guidance.py::test_every_call_shown_passes_the_tools_required_arguments[README.md]` | M6 | user documentation is rewritten for 1.0 | |
 | `tests/test_agent_guidance.py::test_every_call_shown_passes_the_tools_required_arguments[TUTORIAL.md]` | M6 | user documentation is rewritten for 1.0 | |
@@ -50,21 +51,22 @@ Rows: 512.
 | `tests/test_agent_guidance.py::test_every_call_shown_passes_the_tools_required_arguments[docs/2026-11-12-rust-m1-plan.md]` | M6 | user documentation is rewritten for 1.0 | |
 | `tests/test_agent_guidance.py::test_every_call_shown_passes_the_tools_required_arguments[docs/2026-11-12-rust-m2-plan.md]` | M6 | user documentation is rewritten for 1.0 | |
 | `tests/test_agent_guidance.py::test_every_call_shown_passes_the_tools_required_arguments[docs/2026-11-12-rust-rewrite-design.md]` | M6 | user documentation is rewritten for 1.0 | |
+| `tests/test_agent_guidance.py::test_every_call_shown_passes_the_tools_required_arguments[docs/improvements.md]` | M6 | user documentation is rewritten for 1.0 | |
 | `tests/test_agent_guidance.py::test_precheck_file_is_shown_on_every_runtime_surface` | M4 | MCP tools and instructions | |
-| `tests/test_agent_guidance.py::test_the_call_scanner_reads_names_not_values` | M2 | agent guidance surfaces | |
-| `tests/test_agent_guidance.py::test_supersedes_guidance_says_what_it_does_to_the_summary` | M2 | agent guidance surfaces | |
-| `tests/test_agent_guidance.py::test_instructions_state_the_record_length_the_summary_clips_at` | M2 | agent guidance surfaces | |
+| `tests/test_agent_guidance.py::test_the_call_scanner_reads_names_not_values` | out of scope | tests a helper of the Python test, not dejafix; the texts it scans are golden-equal to Python's | |
+| `tests/test_agent_guidance.py::test_supersedes_guidance_says_what_it_does_to_the_summary` | M2 | agent guidance surfaces | `crates/dejafix-core/src/core/scaffold/tests.rs::the_instructions_state_record_lengths_and_supersedes` |
+| `tests/test_agent_guidance.py::test_instructions_state_the_record_length_the_summary_clips_at` | M2 | agent guidance surfaces | `crates/dejafix-core/src/core/scaffold/tests.rs::the_instructions_state_record_lengths_and_supersedes` |
 | `tests/test_agent_guidance.py::test_every_write_tool_states_its_record_length` | M4 | MCP tools and instructions | |
 | `tests/test_agent_guidance.py::test_the_three_surfaces_agree_about_the_session_start_order` | M4 | MCP tools and instructions | |
 | `tests/test_agent_guidance.py::test_get_context_drops_a_superseded_decision` | M4 | MCP tools and instructions | |
 | `tests/test_agent_guidance.py::test_precheck_does_not_warn_from_a_retired_event` | M3 | precheck skips superseded events | |
 | `tests/test_agent_guidance.py::test_every_agent_facing_surface_filters_superseded` | M4 | MCP tools and instructions | |
-| `tests/test_agent_guidance.py::test_init_writes_the_bridge_to_both_rule_files` | M2 | agent guidance surfaces | |
-| `tests/test_agent_guidance.py::test_both_rule_files_say_exactly_the_same_thing` | M2 | agent guidance surfaces | |
-| `tests/test_agent_guidance.py::test_an_existing_agents_md_is_preserved` | M2 | agent guidance surfaces | |
-| `tests/test_agent_guidance.py::test_re_running_init_does_not_duplicate_the_block` | M2 | agent guidance surfaces | |
+| `tests/test_agent_guidance.py::test_init_writes_the_bridge_to_both_rule_files` | M2 | agent guidance surfaces | `crates/dejafix/tests/cli/guidance.rs::init_writes_the_bridge_to_both_rule_files` |
+| `tests/test_agent_guidance.py::test_both_rule_files_say_exactly_the_same_thing` | M2 | agent guidance surfaces | `crates/dejafix/tests/cli/guidance.rs::both_rule_files_say_exactly_the_same_thing` |
+| `tests/test_agent_guidance.py::test_an_existing_agents_md_is_preserved` | M2 | agent guidance surfaces | `crates/dejafix/tests/cli/guidance.rs::an_existing_agents_md_is_preserved` |
+| `tests/test_agent_guidance.py::test_re_running_init_does_not_duplicate_the_block` | M2 | agent guidance surfaces | `crates/dejafix/tests/cli/guidance.rs::re_running_init_does_not_duplicate_the_block` |
 | `tests/test_agent_guidance.py::test_list_projects_leads_with_the_active_project` | M4 | MCP tools and instructions | |
-| `tests/test_agent_guidance.py::test_instructions_do_not_tell_the_agent_to_list_projects_first` | M2 | agent guidance surfaces | |
+| `tests/test_agent_guidance.py::test_instructions_do_not_tell_the_agent_to_list_projects_first` | M4 | MCP server `instructions` | |
 | `tests/test_attempt.py::test_attempt_on_an_unknown_issue_is_refused` | M2 | write path: attempt and issue resolution | `crates/dejafix/tests/cli/write.rs::attempt_on_an_unknown_issue_is_refused_and_the_project_still_works` |
 | `tests/test_attempt.py::test_attempt_issue_id_is_normalised_like_fix` | M2 | write path: attempt and issue resolution | `crates/dejafix/tests/cli/write.rs::attempt_issue_id_is_normalised_like_fix` |
 | `tests/test_attempt.py::test_a_stale_current_issue_marker_is_ignored` | M2 | write path: attempt and issue resolution | `crates/dejafix/tests/cli/write.rs::a_stale_current_issue_marker_is_ignored` |
@@ -88,18 +90,18 @@ Rows: 512.
 | `tests/test_auto_capture.py::test_a_code_file_whose_name_starts_like_a_doc_or_manifest_is_code` | M3 | git auto-capture | |
 | `tests/test_auto_capture.py::test_explicit_build_code_files_are_still_demoted` | M3 | git auto-capture | |
 | `tests/test_auto_capture.py::test_binary_assets_do_not_beat_docs` | M3 | git auto-capture | |
-| `tests/test_client_config_discovery.py::test_a_store_installed_claude_desktop_is_discovered` | M2 | client config discovery, used by `doctor` (M2) and `migrate` (M5) | |
-| `tests/test_client_config_discovery.py::test_the_store_entry_is_labelled_distinctly` | M2 | client config discovery, used by `doctor` (M2) and `migrate` (M5) | |
-| `tests/test_client_config_discovery.py::test_appdata_is_honoured_over_the_default_under_home` | M2 | client config discovery, used by `doctor` (M2) and `migrate` (M5) | |
-| `tests/test_client_config_discovery.py::test_several_store_packages_are_all_found_in_a_stable_order` | M2 | client config discovery, used by `doctor` (M2) and `migrate` (M5) | |
-| `tests/test_client_config_discovery.py::test_no_packages_directory_is_not_an_error` | M2 | client config discovery, used by `doctor` (M2) and `migrate` (M5) | |
-| `tests/test_client_config_discovery.py::test_an_unreadable_config_is_reported_rather_than_skipped` | M2 | client config discovery, used by `doctor` (M2) and `migrate` (M5) | |
-| `tests/test_client_config_discovery.py::test_a_missing_config_says_nothing_at_all` | M2 | client config discovery, used by `doctor` (M2) and `migrate` (M5) | |
-| `tests/test_client_config_discovery.py::test_a_project_scoped_mcp_json_is_checked` | M2 | client config discovery, used by `doctor` (M2) and `migrate` (M5) | |
-| `tests/test_client_config_discovery.py::test_a_clean_project_config_is_not_flagged` | M2 | client config discovery, used by `doctor` (M2) and `migrate` (M5) | |
-| `tests/test_dashboard.py::test_register_project_is_idempotent` | M2 | project registry | |
-| `tests/test_dashboard.py::test_init_registers_the_project` | M2 | project registry | |
-| `tests/test_dashboard.py::test_registered_projects_skips_deleted_memory` | M2 | project registry | |
+| `tests/test_client_config_discovery.py::test_a_store_installed_claude_desktop_is_discovered` | M2 | client config discovery, used by `doctor` (M2) and `migrate` (M5) | `crates/dejafix-core/src/adapters/fs/scan/tests.rs::a_store_installed_claude_desktop_is_discovered` |
+| `tests/test_client_config_discovery.py::test_the_store_entry_is_labelled_distinctly` | M2 | client config discovery, used by `doctor` (M2) and `migrate` (M5) | `crates/dejafix-core/src/adapters/fs/scan/tests.rs::the_store_entry_is_labelled_distinctly` |
+| `tests/test_client_config_discovery.py::test_appdata_is_honoured_over_the_default_under_home` | M2 | client config discovery, used by `doctor` (M2) and `migrate` (M5) | `crates/dejafix-core/src/adapters/fs/scan/tests.rs::appdata_is_honoured_over_the_default_under_home` |
+| `tests/test_client_config_discovery.py::test_several_store_packages_are_all_found_in_a_stable_order` | M2 | client config discovery, used by `doctor` (M2) and `migrate` (M5) | `crates/dejafix-core/src/adapters/fs/scan/tests.rs::several_store_packages_are_all_found_in_a_stable_order` |
+| `tests/test_client_config_discovery.py::test_no_packages_directory_is_not_an_error` | M2 | client config discovery, used by `doctor` (M2) and `migrate` (M5) | `crates/dejafix-core/src/adapters/fs/scan/tests.rs::no_packages_directory_is_not_an_error` |
+| `tests/test_client_config_discovery.py::test_an_unreadable_config_is_reported_rather_than_skipped` | M2 | client config discovery, used by `doctor` (M2) and `migrate` (M5) | `crates/dejafix-core/src/adapters/fs/scan/tests.rs::an_unreadable_config_is_reported_rather_than_skipped` |
+| `tests/test_client_config_discovery.py::test_a_missing_config_says_nothing_at_all` | M2 | client config discovery, used by `doctor` (M2) and `migrate` (M5) | `crates/dejafix-core/src/adapters/fs/scan/tests.rs::a_missing_config_says_nothing_at_all` |
+| `tests/test_client_config_discovery.py::test_a_project_scoped_mcp_json_is_checked` | M2 | client config discovery, used by `doctor` (M2) and `migrate` (M5) | `crates/dejafix-core/src/adapters/fs/scan/tests.rs::a_project_scoped_mcp_json_is_checked` |
+| `tests/test_client_config_discovery.py::test_a_clean_project_config_is_not_flagged` | M2 | client config discovery, used by `doctor` (M2) and `migrate` (M5) | `crates/dejafix-core/src/adapters/fs/scan/tests.rs::a_clean_project_config_is_not_flagged` |
+| `tests/test_dashboard.py::test_register_project_is_idempotent` | M2 | project registry | `crates/dejafix/tests/cli/init.rs::registering_a_project_twice_keeps_one_entry` |
+| `tests/test_dashboard.py::test_init_registers_the_project` | M2 | project registry | `crates/dejafix/tests/cli/init.rs::init_registers_the_project` |
+| `tests/test_dashboard.py::test_registered_projects_skips_deleted_memory` | M2 | project registry | `crates/dejafix/tests/cli/project.rs::a_registered_project_whose_memory_is_gone_is_flagged` |
 | `tests/test_dashboard.py::test_dashboard_with_no_projects_exits_cleanly` | out of scope | `djf dashboard` is removed in 1.0 | |
 | `tests/test_dashboard.py::test_dashboard_generates_index_and_per_project_dashboards` | out of scope | `djf dashboard` is removed in 1.0 | |
 | `tests/test_dashboard.py::test_dashboard_back_link_injected_into_project_dashboards` | out of scope | `djf dashboard` is removed in 1.0 | |
@@ -176,9 +178,9 @@ Rows: 512.
 | `tests/test_edit_hook.py::test_call_log_records_the_error_the_hook_swallowed` | M3 | edit hook | |
 | `tests/test_edit_hook.py::test_unwritable_call_log_is_ignored` | M3 | edit hook | |
 | `tests/test_edit_hook.py::test_no_call_log_without_the_variable` | M3 | edit hook | |
-| `tests/test_global_mcp.py::test_a_0_2_x_registry_is_read_without_being_rewritten` | M2 | project registry and `djf project` | |
+| `tests/test_global_mcp.py::test_a_0_2_x_registry_is_read_without_being_rewritten` | M2 | project registry and `djf project` | `crates/dejafix-core/src/adapters/fs/tests.rs::a_0_2_x_registry_keeps_its_list_and_gains_a_sidecar` |
 | `tests/test_global_mcp.py::test_dashboard_still_reads_the_registry_after_migration` | out of scope | `djf dashboard` is removed in 1.0 | |
-| `tests/test_global_mcp.py::test_ids_do_not_collide_for_same_named_folders` | M2 | project registry and `djf project` | |
+| `tests/test_global_mcp.py::test_ids_do_not_collide_for_same_named_folders` | M2 | project registry and `djf project` | `crates/dejafix/tests/cli/project.rs::ids_do_not_collide_for_same_named_folders` |
 | `tests/test_global_mcp.py::test_unknown_project_errors_with_the_known_ones` | M4 | MCP project resolution | |
 | `tests/test_global_mcp.py::test_explicit_selection_wins` | M4 | MCP project resolution | |
 | `tests/test_global_mcp.py::test_active_project_is_used_when_no_selection` | M4 | MCP project resolution | |
@@ -186,16 +188,16 @@ Rows: 512.
 | `tests/test_global_mcp.py::test_two_usable_roots_is_an_error_not_a_coin_flip` | M4 | MCP project resolution | |
 | `tests/test_global_mcp.py::test_nothing_selected_refuses_rather_than_guessing` | M4 | MCP project resolution | |
 | `tests/test_global_mcp.py::test_pinned_root_is_a_boundary_not_a_default` | M4 | MCP project resolution | |
-| `tests/test_global_mcp.py::test_project_cli_round_trip` | M2 | project registry and `djf project` | |
-| `tests/test_global_mcp.py::test_registering_an_uninitialised_folder_is_refused` | M2 | project registry and `djf project` | |
+| `tests/test_global_mcp.py::test_project_cli_round_trip` | M2 | project registry and `djf project` | `crates/dejafix/tests/cli/project.rs::project_cli_round_trip` |
+| `tests/test_global_mcp.py::test_registering_an_uninitialised_folder_is_refused` | M2 | project registry and `djf project` | `crates/dejafix/tests/cli/project.rs::registering_an_uninitialised_folder_is_refused` |
 | `tests/test_global_mcp.py::test_one_server_writes_to_the_project_it_was_told` | M4 | MCP project resolution | |
 | `tests/test_global_mcp.py::test_write_without_a_project_fails_visibly` | M4 | MCP project resolution | |
 | `tests/test_global_mcp.py::test_a_single_registered_project_needs_no_selection` | M4 | MCP project resolution | |
-| `tests/test_global_mcp.py::test_an_older_dejafix_can_only_append_a_path` | M2 | project registry and `djf project` | |
-| `tests/test_global_mcp.py::test_a_dev_format_registry_is_converted_and_backed_up` | M2 | project registry and `djf project` | |
-| `tests/test_global_mcp.py::test_windows_paths_survive_migration` | M2 | project registry and `djf project` | |
-| `tests/test_global_mcp.py::test_absolute_check_is_used_rather_than_a_slash_test` | M2 | project registry and `djf project` | |
-| `tests/test_global_mcp.py::test_a_utf8_bom_does_not_empty_the_registry` | M2 | project registry and `djf project` | |
+| `tests/test_global_mcp.py::test_an_older_dejafix_can_only_append_a_path` | M2 | project registry and `djf project` | `crates/dejafix-core/src/core/registry/tests.rs::an_older_dejafix_can_only_append_a_path` |
+| `tests/test_global_mcp.py::test_a_dev_format_registry_is_converted_and_backed_up` | M2 | project registry and `djf project` | `crates/dejafix-core/src/adapters/fs/tests.rs::a_dev_format_registry_is_converted_and_backed_up_once` |
+| `tests/test_global_mcp.py::test_windows_paths_survive_migration` | M2 | project registry and `djf project` | `crates/dejafix-core/src/core/registry/tests.rs::junk_entries_are_dropped` |
+| `tests/test_global_mcp.py::test_absolute_check_is_used_rather_than_a_slash_test` | M2 | project registry and `djf project` | `crates/dejafix-core/src/core/registry/tests.rs::junk_entries_are_dropped` |
+| `tests/test_global_mcp.py::test_a_utf8_bom_does_not_empty_the_registry` | M2 | project registry and `djf project` | `crates/dejafix-core/src/adapters/fs/tests.rs::a_utf8_bom_and_a_corrupt_file_are_tolerated` |
 | `tests/test_global_mcp.py::test_a_utf8_bom_does_not_break_the_event_log` | M1 | UTF-8 BOM in events.jsonl | `crates/dejafix-core/src/core/log/tests.rs::a_utf8_bom_does_not_break_the_event_log` |
 | `tests/test_global_mcp.py::test_scan_finds_projects_the_registry_never_knew_about` | M2 | project registry and `djf project` | |
 | `tests/test_global_mcp.py::test_scan_is_idempotent` | M2 | `djf doctor` | |
@@ -203,13 +205,13 @@ Rows: 512.
 | `tests/test_global_mcp.py::test_package_version_matches_pyproject` | M5 | version in Cargo and the maturin wheel match | |
 | `tests/test_global_mcp.py::test_doctor_registers_what_it_finds` | M2 | `djf doctor` | |
 | `tests/test_global_mcp.py::test_doctor_prunes_entries_whose_memory_is_gone` | M2 | `djf doctor` | |
-| `tests/test_global_mcp.py::test_upgrade_notice_fires_once` | M2 | `djf doctor` | |
-| `tests/test_global_mcp.py::test_no_notice_on_a_first_ever_run` | M2 | `djf doctor` | |
+| `tests/test_global_mcp.py::test_upgrade_notice_fires_once` | M2 | `djf doctor` | `crates/dejafix/tests/cli/project.rs::the_upgrade_notice_fires_once` |
+| `tests/test_global_mcp.py::test_no_notice_on_a_first_ever_run` | M2 | `djf doctor` | `crates/dejafix/tests/cli/project.rs::no_notice_on_a_first_ever_run` |
 | `tests/test_global_mcp.py::test_default_depth_reaches_a_nested_repo_folder` | M2 | `djf doctor` | |
 | `tests/test_global_mcp.py::test_cloud_folders_are_included_by_default` | M2 | `djf doctor` | |
 | `tests/test_global_mcp.py::test_cloud_roots_are_deduped_by_what_they_resolve_to` | M2 | `djf doctor` | |
 | `tests/test_global_mcp.py::test_several_cloud_clients_are_covered` | M2 | `djf doctor` | |
-| `tests/test_global_mcp.py::test_project_lookup_is_case_insensitive` | M2 | project registry and `djf project` | |
+| `tests/test_global_mcp.py::test_project_lookup_is_case_insensitive` | M2 | project registry and `djf project` | `crates/dejafix-core/src/core/registry/tests.rs::lookup_is_case_insensitive_and_accepts_a_path` |
 | `tests/test_global_mcp.py::test_the_same_folder_reached_twice_registers_once` | M2 | project registry and `djf project` | |
 | `tests/test_global_mcp.py::test_dedupe_paths_uses_identity_not_text` | M2 | project registry and `djf project` | |
 | `tests/test_global_mcp.py::test_no_network_unless_asked` | M2 | `djf doctor` | |
@@ -236,37 +238,37 @@ Rows: 512.
 | `tests/test_hooks_path.py::test_a_users_own_lines_and_shebang_survive_a_refresh_byte_for_byte` | M3 | git hook install and binary path | |
 | `tests/test_hooks_path.py::test_a_second_install_changes_nothing_and_says_so` | M3 | git hook install and binary path | |
 | `tests/test_hooks_path.py::test_a_block_with_no_end_marker_is_left_alone_with_a_warning` | M3 | git hook install and binary path | |
-| `tests/test_init.py::test_init_creates_dejafix_files` | M2 | `djf init`, `instructions`, `map` | |
-| `tests/test_init.py::test_instructions_command_prints_ai_protocol` | M2 | `djf init`, `instructions`, `map` | |
-| `tests/test_init.py::test_map_command_prints_project_map` | M2 | `djf init`, `instructions`, `map` | |
-| `tests/test_init_ux.py::test_stack_detect_does_nothing_when_no_manifests` | M2 | `djf init` stack detection and MCP config output | |
-| `tests/test_init_ux.py::test_stack_detect_pyproject_populates_map` | M2 | `djf init` stack detection and MCP config output | |
-| `tests/test_init_ux.py::test_stack_detect_package_json_populates_map` | M2 | `djf init` stack detection and MCP config output | |
-| `tests/test_init_ux.py::test_stack_detect_never_overwrites_user_edited_map` | M2 | `djf init` stack detection and MCP config output | |
-| `tests/test_init_ux.py::test_stack_detect_handles_corrupt_manifest` | M2 | `djf init` stack detection and MCP config output | |
-| `tests/test_init_ux.py::test_extract_description_pyproject` | M2 | `djf init` stack detection and MCP config output | |
-| `tests/test_init_ux.py::test_extract_description_package_json` | M2 | `djf init` stack detection and MCP config output | |
-| `tests/test_init_ux.py::test_extract_description_returns_none_when_absent` | M2 | `djf init` stack detection and MCP config output | |
-| `tests/test_init_ux.py::test_extract_entry_points_pyproject_scripts` | M2 | `djf init` stack detection and MCP config output | |
-| `tests/test_init_ux.py::test_extract_entry_points_npm_scripts` | M2 | `djf init` stack detection and MCP config output | |
-| `tests/test_init_ux.py::test_detect_main_folders` | M2 | `djf init` stack detection and MCP config output | |
-| `tests/test_init_ux.py::test_print_mcp_config_contains_expected_pieces` | M2 | `djf init` stack detection and MCP config output | |
-| `tests/test_init_ux.py::test_print_mcp_config_single_project_still_pins_the_root` | M2 | `djf init` stack detection and MCP config output | |
-| `tests/test_init_ux.py::test_print_mcp_config_uses_absolute_python` | M2 | `djf init` stack detection and MCP config output | |
-| `tests/test_init_ux.py::test_init_warns_when_a_client_config_still_pins_one_repo` | M2 | `djf init` stack detection and MCP config output | |
-| `tests/test_init_ux.py::test_init_detects_a_pin_set_through_the_environment` | M2 | `djf init` stack detection and MCP config output | |
-| `tests/test_init_ux.py::test_init_prints_the_codex_toml_form` | M2 | `djf init` stack detection and MCP config output | |
-| `tests/test_init_ux.py::test_linux_client_paths_are_scanned_and_xdg_is_honoured` | M2 | `djf init` stack detection and MCP config output | |
-| `tests/test_init_ux.py::test_printed_locations_match_the_platform` | M2 | `djf init` stack detection and MCP config output | |
-| `tests/test_init_ux.py::test_windows_locations_use_windows_conventions` | M2 | `djf init` stack detection and MCP config output | |
-| `tests/test_instructions_refresh.py::test_the_template_carries_the_current_marker` | M2 | AI_INSTRUCTIONS.md template version 3 | |
-| `tests/test_instructions_refresh.py::test_a_fresh_init_writes_the_current_file_without_a_backup` | M2 | AI_INSTRUCTIONS.md template version 3 | |
-| `tests/test_instructions_refresh.py::test_init_refreshes_a_stale_file_keeping_a_backup_and_the_global_block` | M2 | AI_INSTRUCTIONS.md template version 3 | |
-| `tests/test_instructions_refresh.py::test_init_leaves_a_current_file_with_user_edits_untouched` | M2 | AI_INSTRUCTIONS.md template version 3 | |
-| `tests/test_instructions_refresh.py::test_an_older_numbered_marker_is_refreshed_too` | M2 | AI_INSTRUCTIONS.md template version 3 | |
-| `tests/test_instructions_refresh.py::test_a_refresh_with_no_global_block_adds_none` | M2 | AI_INSTRUCTIONS.md template version 3 | |
-| `tests/test_instructions_refresh.py::test_initialize_alone_never_rewrites_the_file` | M2 | AI_INSTRUCTIONS.md template version 3 | |
-| `tests/test_instructions_refresh.py::test_a_template_change_comes_with_a_version_bump` | M2 | AI_INSTRUCTIONS.md template version 3 | |
+| `tests/test_init.py::test_init_creates_dejafix_files` | M2 | `djf init`, `instructions`, `map` | `crates/dejafix/tests/cli/init.rs::init_creates_the_memory_files_and_gitignores_the_log` |
+| `tests/test_init.py::test_instructions_command_prints_ai_protocol` | M2 | `djf init`, `instructions`, `map` | `crates/dejafix/tests/cli/init.rs::instructions_command_prints_the_ai_protocol` |
+| `tests/test_init.py::test_map_command_prints_project_map` | M2 | `djf init`, `instructions`, `map` | `crates/dejafix/tests/cli/init.rs::map_command_prints_the_project_map` |
+| `tests/test_init_ux.py::test_stack_detect_does_nothing_when_no_manifests` | M2 | `djf init` stack detection and MCP config output | `crates/dejafix/tests/cli/init.rs::stack_detect_does_nothing_without_manifests` |
+| `tests/test_init_ux.py::test_stack_detect_pyproject_populates_map` | M2 | `djf init` stack detection and MCP config output | `crates/dejafix/tests/cli/init.rs::stack_detect_pyproject_populates_the_map` |
+| `tests/test_init_ux.py::test_stack_detect_package_json_populates_map` | M2 | `djf init` stack detection and MCP config output | `crates/dejafix/tests/cli/init.rs::stack_detect_package_json_populates_the_map` |
+| `tests/test_init_ux.py::test_stack_detect_never_overwrites_user_edited_map` | M2 | `djf init` stack detection and MCP config output | `crates/dejafix/tests/cli/init.rs::stack_detect_never_overwrites_a_user_edited_map` |
+| `tests/test_init_ux.py::test_stack_detect_handles_corrupt_manifest` | M2 | `djf init` stack detection and MCP config output | `crates/dejafix/tests/cli/init.rs::stack_detect_survives_a_corrupt_manifest` |
+| `tests/test_init_ux.py::test_extract_description_pyproject` | M2 | `djf init` stack detection and MCP config output | `crates/dejafix-core/src/adapters/fs/tests.rs::descriptions_come_from_pyproject_then_package_json_then_cargo` |
+| `tests/test_init_ux.py::test_extract_description_package_json` | M2 | `djf init` stack detection and MCP config output | `crates/dejafix-core/src/adapters/fs/tests.rs::descriptions_come_from_pyproject_then_package_json_then_cargo` |
+| `tests/test_init_ux.py::test_extract_description_returns_none_when_absent` | M2 | `djf init` stack detection and MCP config output | `crates/dejafix-core/src/adapters/fs/tests.rs::descriptions_come_from_pyproject_then_package_json_then_cargo` |
+| `tests/test_init_ux.py::test_extract_entry_points_pyproject_scripts` | M2 | `djf init` stack detection and MCP config output | `crates/dejafix-core/src/adapters/fs/tests.rs::entry_points_come_from_pyproject_scripts_and_npm_scripts` |
+| `tests/test_init_ux.py::test_extract_entry_points_npm_scripts` | M2 | `djf init` stack detection and MCP config output | `crates/dejafix-core/src/adapters/fs/tests.rs::entry_points_come_from_pyproject_scripts_and_npm_scripts` |
+| `tests/test_init_ux.py::test_detect_main_folders` | M2 | `djf init` stack detection and MCP config output | `crates/dejafix-core/src/adapters/fs/tests.rs::main_folders_skip_dependencies_and_dot_folders` |
+| `tests/test_init_ux.py::test_print_mcp_config_contains_expected_pieces` | M2 | `djf init` stack detection and MCP config output | `crates/dejafix/tests/cli/init.rs::the_mcp_block_names_the_sibling_server_and_no_root` |
+| `tests/test_init_ux.py::test_print_mcp_config_single_project_still_pins_the_root` | M2 | `djf init` stack detection and MCP config output | `crates/dejafix/tests/cli/init.rs::the_single_project_block_still_pins_the_root` |
+| `tests/test_init_ux.py::test_print_mcp_config_uses_absolute_python` | M2 | `djf init` stack detection and MCP config output | `crates/dejafix/tests/cli/init.rs::the_mcp_command_is_an_absolute_path_to_djf_mcp` |
+| `tests/test_init_ux.py::test_init_warns_when_a_client_config_still_pins_one_repo` | M2 | `djf init` stack detection and MCP config output | `crates/dejafix/tests/cli/init.rs::init_warns_when_a_client_config_still_pins_one_repo` |
+| `tests/test_init_ux.py::test_init_detects_a_pin_set_through_the_environment` | M2 | `djf init` stack detection and MCP config output | `crates/dejafix/tests/cli/init.rs::init_detects_a_pin_set_through_the_environment` |
+| `tests/test_init_ux.py::test_init_prints_the_codex_toml_form` | M2 | `djf init` stack detection and MCP config output | `crates/dejafix/tests/cli/init.rs::init_prints_the_codex_toml_form` |
+| `tests/test_init_ux.py::test_linux_client_paths_are_scanned_and_xdg_is_honoured` | M2 | `djf init` stack detection and MCP config output | `crates/dejafix/tests/cli/init.rs::linux_client_paths_are_scanned_and_xdg_is_honoured` |
+| `tests/test_init_ux.py::test_printed_locations_match_the_platform` | M2 | `djf init` stack detection and MCP config output | `crates/dejafix/src/cli/tests.rs::printed_locations_match_the_platform` |
+| `tests/test_init_ux.py::test_windows_locations_use_windows_conventions` | M2 | `djf init` stack detection and MCP config output | `crates/dejafix/src/cli/tests.rs::windows_locations_use_windows_conventions` |
+| `tests/test_instructions_refresh.py::test_the_template_carries_the_current_marker` | M2 | AI_INSTRUCTIONS.md template version 3 | `crates/dejafix-core/src/core/scaffold/tests.rs::the_template_carries_the_current_marker` |
+| `tests/test_instructions_refresh.py::test_a_fresh_init_writes_the_current_file_without_a_backup` | M2 | AI_INSTRUCTIONS.md template version 3 | `crates/dejafix/tests/cli/init.rs::a_fresh_init_writes_the_current_instructions_without_a_backup` |
+| `tests/test_instructions_refresh.py::test_init_refreshes_a_stale_file_keeping_a_backup_and_the_global_block` | M2 | AI_INSTRUCTIONS.md template version 3 | `crates/dejafix/tests/cli/init.rs::init_refreshes_a_stale_file_keeping_a_backup_and_the_global_block` |
+| `tests/test_instructions_refresh.py::test_init_leaves_a_current_file_with_user_edits_untouched` | M2 | AI_INSTRUCTIONS.md template version 3 | `crates/dejafix/tests/cli/init.rs::init_leaves_a_current_file_with_user_edits_untouched` |
+| `tests/test_instructions_refresh.py::test_an_older_numbered_marker_is_refreshed_too` | M2 | AI_INSTRUCTIONS.md template version 3 | `crates/dejafix-core/src/wiring/tests.rs::init_refreshes_an_older_marker_and_keeps_the_global_block` |
+| `tests/test_instructions_refresh.py::test_a_refresh_with_no_global_block_adds_none` | M2 | AI_INSTRUCTIONS.md template version 3 | `crates/dejafix-core/src/wiring/tests.rs::init_refreshes_an_older_marker_and_keeps_the_global_block` |
+| `tests/test_instructions_refresh.py::test_initialize_alone_never_rewrites_the_file` | M2 | AI_INSTRUCTIONS.md template version 3 | `crates/dejafix-core/src/wiring/tests.rs::a_current_instructions_file_is_never_rewritten` |
+| `tests/test_instructions_refresh.py::test_a_template_change_comes_with_a_version_bump` | M2 | AI_INSTRUCTIONS.md template version 3 | `crates/dejafix-core/src/core/scaffold/tests.rs::the_instructions_state_record_lengths_and_supersedes` |
 | `tests/test_location_parsing.py::test_location_to_file[src/foo.py-src/foo.py]` | M1 | location and path normalisation | `crates/dejafix-core/src/core/path/tests.rs::location_to_file_cases` |
 | `tests/test_location_parsing.py::test_location_to_file[src/foo.py:42-src/foo.py]` | M1 | location and path normalisation | `crates/dejafix-core/src/core/path/tests.rs::location_to_file_cases` |
 | `tests/test_location_parsing.py::test_location_to_file[src/foo.py:42:7-src/foo.py]` | M1 | location and path normalisation | `crates/dejafix-core/src/core/path/tests.rs::location_to_file_cases` |
@@ -328,10 +330,10 @@ Rows: 512.
 | `tests/test_models.py::test_an_event_without_an_id_gets_the_same_id_on_every_read` | M1 | event model and stable ids | `crates/dejafix-core/src/core/event/tests.rs::an_event_without_an_id_gets_the_same_id_on_every_read` |
 | `tests/test_models.py::test_events_without_ids_but_different_content_get_different_ids` | M1 | event model and stable ids | `crates/dejafix-core/src/core/event/tests.rs::events_without_ids_but_different_content_get_different_ids` |
 | `tests/test_models.py::test_a_stored_id_is_kept` | M1 | event model and stable ids | `crates/dejafix-core/src/core/event/tests.rs::a_stored_id_is_kept` |
-| `tests/test_plan.py::test_init_creates_plan_md` | M2 | plan.md and `djf plan` | |
-| `tests/test_plan.py::test_plan_md_is_committed_not_gitignored` | M2 | plan.md and `djf plan` | |
-| `tests/test_plan.py::test_djf_plan_add_appends_to_ideas` | M2 | plan.md and `djf plan` | |
-| `tests/test_plan.py::test_plan_add_does_not_touch_events` | M2 | plan.md and `djf plan` | |
+| `tests/test_plan.py::test_init_creates_plan_md` | M2 | plan.md and `djf plan` | `crates/dejafix/tests/cli/init.rs::init_creates_plan_md_with_the_core_sections` |
+| `tests/test_plan.py::test_plan_md_is_committed_not_gitignored` | M2 | plan.md and `djf plan` | `crates/dejafix/tests/cli/init.rs::plan_md_is_committed_not_gitignored` |
+| `tests/test_plan.py::test_djf_plan_add_appends_to_ideas` | M2 | plan.md and `djf plan` | `crates/dejafix/tests/cli/init.rs::plan_add_appends_to_the_ideas_section` |
+| `tests/test_plan.py::test_plan_add_does_not_touch_events` | M2 | plan.md and `djf plan` | `crates/dejafix/tests/cli/init.rs::plan_add_does_not_touch_events` |
 | `tests/test_plan.py::test_get_plan_mcp_reads_the_file` | M4 | MCP `get_plan` | |
 | `tests/test_precheck_lessons.py::test_attempt_without_location_inherits_its_issue_file` | M3 | precheck lessons | |
 | `tests/test_precheck_lessons.py::test_partial_attempt_is_a_lesson` | M3 | precheck lessons | |
@@ -517,15 +519,15 @@ Rows: 512.
 | `tests/test_watch.py::test_terminate_uses_terminateprocess_on_windows` | out of scope | `djf watch` is removed in 1.0 | |
 | `tests/test_watch.py::test_terminate_raises_process_lookup_for_a_missing_pid` | out of scope | `djf watch` is removed in 1.0 | |
 | `tests/test_watch.py::test_pid_alive_on_posix_reports_this_process` | out of scope | `djf watch` is removed in 1.0 | |
-| `tests/test_windows_console_encoding.py::test_init_survives_a_cp1252_console` | M2 | CLI output on a cp1252 console | |
-| `tests/test_windows_console_encoding.py::test_init_prints_the_mcp_block_on_cp1252` | M2 | CLI output on a cp1252 console | |
+| `tests/test_windows_console_encoding.py::test_init_survives_a_cp1252_console` | M2 | CLI output on a cp1252 console | `crates/dejafix/tests/cli/init.rs::init_output_is_utf8_with_its_real_characters` |
+| `tests/test_windows_console_encoding.py::test_init_prints_the_mcp_block_on_cp1252` | M2 | CLI output on a cp1252 console | `crates/dejafix/tests/cli/init.rs::init_output_is_utf8_with_its_real_characters` |
 | `tests/test_windows_console_encoding.py::test_commands_survive_a_cp1252_console[command0]` | out of scope | `djf score` is removed in 1.0 | |
 | `tests/test_windows_console_encoding.py::test_commands_survive_a_cp1252_console[command1]` | M2 | CLI output on a cp1252 console | `crates/dejafix/tests/cli/read.rs::output_is_utf8_without_replacement_characters` |
 | `tests/test_windows_console_encoding.py::test_commands_survive_a_cp1252_console[command2]` | M2 | CLI output on a cp1252 console | |
-| `tests/test_windows_console_encoding.py::test_no_replacement_characters_leak_into_cp1252_output` | M2 | CLI output on a cp1252 console | |
+| `tests/test_windows_console_encoding.py::test_no_replacement_characters_leak_into_cp1252_output` | M2 | CLI output on a cp1252 console | `crates/dejafix/tests/cli/init.rs::init_output_is_utf8_with_its_real_characters` |
 | `tests/test_windows_console_encoding.py::test_configure_stdio_tolerates_a_stream_it_cannot_reconfigure` | out of scope | Python stream wrapper; Rust writes UTF-8 through std | |
-| `tests/test_windows_console_encoding.py::test_cp1252_output_contains_no_byte_that_renders_as_a_black_diamond` | M2 | CLI output on a cp1252 console | |
-| `tests/test_windows_console_encoding.py::test_utf8_output_keeps_its_real_characters` | M2 | CLI output on a cp1252 console | |
+| `tests/test_windows_console_encoding.py::test_cp1252_output_contains_no_byte_that_renders_as_a_black_diamond` | M2 | CLI output on a cp1252 console | `crates/dejafix/tests/cli/init.rs::init_output_is_utf8_with_its_real_characters` |
+| `tests/test_windows_console_encoding.py::test_utf8_output_keeps_its_real_characters` | M2 | CLI output on a cp1252 console | `crates/dejafix/tests/cli/init.rs::init_output_is_utf8_with_its_real_characters` |
 | `tests/test_windows_console_encoding.py::test_folding_stream_still_looks_like_a_stream` | out of scope | Python stream wrapper; Rust writes UTF-8 through std | |
 | `tests/test_windows_hooks_and_context.py::test_hook_shebang_is_posix_sh_not_bash` | M3 | Windows hooks | |
 | `tests/test_windows_hooks_and_context.py::test_baked_binary_path_has_no_backslashes` | M3 | Windows hooks | |

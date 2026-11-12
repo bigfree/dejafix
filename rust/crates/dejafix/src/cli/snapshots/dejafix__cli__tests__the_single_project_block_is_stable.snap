@@ -1,0 +1,32 @@
+---
+source: crates/dejafix/src/cli/tests.rs
+expression: "block(Platform::Linux, true, &[], false)"
+---
+
+══════════════════════════════════════════════════════════════
+  MCP client configuration — this project only:
+
+    {
+      "mcpServers": {
+        "dejafix": {
+          "command": "/opt/djf/bin/djf-mcp",
+          "args": ["--root", "/work/myproj"]
+        }
+      }
+    }
+
+  Codex uses TOML, not JSON — for ~/.codex/config.toml:
+
+    [mcp_servers.dejafix]
+    command = "/opt/djf/bin/djf-mcp"
+    args = ["--root", "/work/myproj"]
+
+  Client config file locations:
+    Claude Desktop  ~/.config/Claude/claude_desktop_config.json  ($XDG_CONFIG_HOME)
+    Cursor          ~/.cursor/mcp.json  (global; per-project is <repo>/.cursor/mcp.json)
+    Antigravity     ~/.gemini/antigravity/mcp_config.json  (legacy IDE; v2 path may differ)
+    Codex (TOML!)   ~/.codex/config.toml
+    Claude Code     claude mcp add  (or ~/.claude.json)
+
+  After pasting: fully quit and restart your client (cold start).
+══════════════════════════════════════════════════════════════

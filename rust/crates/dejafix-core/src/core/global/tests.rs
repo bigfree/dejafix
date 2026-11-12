@@ -1,6 +1,9 @@
 use serde_json::json;
 
-use super::{Entry, Stack, gotcha_entry, is_gotcha_signal, promotable_set, promotion, similar};
+use super::{
+    Entry, Stack, gotcha_entry, inherited_block, is_gotcha_signal, promotable_set, promotion,
+    relevant_entries, similar,
+};
 use crate::core::event::{EventKind, Outcome};
 
 fn libs(names: &[&str]) -> Vec<String> {
@@ -196,4 +199,102 @@ fn entries_have_python_fields() {
         json!({"id": "got_000000000001", "library": "redis", "gotcha": "gotcha: redis eviction", "tags": [], "source_project": "proj", "version_range": null, "discovered": "2027-01-15T08:00:00.000001Z"})
     );
     let _ = Stack::default();
+}
+
+fn entry(value: &serde_json::Value) -> Entry {
+    value.as_object().unwrap().clone()
+}
+
+fn web_stack() -> Stack {
+    Stack {
+        tags: libs(&["javascript", "react"]),
+        libraries: libs(&["react", "vite"]),
+        ..Stack::default()
+    }
+}
+
+#[test]
+fn patterns_match_by_tag_and_gotchas_by_library() {
+    let patterns = vec![
+        entry(&json!({"pattern": "everywhere", "tags": []})),
+        entry(&json!({"pattern": "untagged"})),
+        entry(&json!({"pattern": "react only", "tags": ["react"]})),
+        entry(&json!({"pattern": "python only", "tags": ["python"]})),
+        entry(&json!({"pattern": "odd tags", "tags": [1]})),
+        entry(&json!({"pattern": "null tags", "tags": null})),
+    ];
+    let gotchas = vec![
+        entry(&json!({"library": "React", "gotcha": "a"})),
+        entry(&json!({"library": "vite", "gotcha": "b"})),
+        entry(&json!({"library": "django", "gotcha": "c"})),
+        entry(&json!({"library": 5, "gotcha": "d"})),
+        entry(&json!({"gotcha": "no library"})),
+    ];
+    let relevant = relevant_entries(&web_stack(), None, &patterns, &gotchas);
+    let names: Vec<&str> = relevant
+        .patterns
+        .iter()
+        .map(|p| p["pattern"].as_str().unwrap())
+        .collect();
+    assert_eq!(names, ["everywhere", "untagged", "react only"]);
+    let libraries: Vec<&str> = relevant
+        .gotchas
+        .iter()
+        .map(|g| g["gotcha"].as_str().unwrap())
+        .collect();
+    assert_eq!(libraries, ["a", "b"]);
+}
+
+#[test]
+fn filter_tags_replace_the_project_tags() {
+    let patterns = vec![
+        entry(&json!({"pattern": "react only", "tags": ["react"]})),
+        entry(&json!({"pattern": "python only", "tags": ["python"]})),
+        entry(&json!({"pattern": "chars", "tags": "py"})),
+        entry(&json!({"pattern": "keys", "tags": {"python": 1}})),
+    ];
+    let gotchas = vec![entry(&json!({"library": "python", "gotcha": "tag match"}))];
+    let filter = libs(&["python", "p"]);
+    let relevant = relevant_entries(&web_stack(), Some(&filter), &patterns, &gotchas);
+    let names: Vec<&str> = relevant
+        .patterns
+        .iter()
+        .map(|p| p["pattern"].as_str().unwrap())
+        .collect();
+    assert_eq!(names, ["python only", "chars", "keys"]);
+    assert_eq!(relevant.gotchas.len(), 1);
+    let unfiltered = relevant_entries(&web_stack(), Some(&[]), &patterns, &gotchas);
+    assert_eq!(unfiltered.patterns.len(), 1);
+}
+
+#[test]
+fn nothing_relevant_builds_no_block() {
+    let relevant = relevant_entries(&web_stack(), None, &[], &[]);
+    assert_eq!(inherited_block(&relevant), None);
+}
+
+#[test]
+fn the_block_renders_like_python() {
+    let patterns = vec![
+        entry(&json!({"pattern": "Prefer small PRs", "source_project": "api"})),
+        entry(&json!({"pattern": 1.5, "source_project": ""})),
+    ];
+    let gotchas = vec![
+        entry(
+            &json!({"library": "react", "gotcha": "strict mode mounts twice", "source_project": "web", "version_range": ">=18"}),
+        ),
+        entry(
+            &json!({"library": "vite", "version_range": null, "gotcha": null, "source_project": 0}),
+        ),
+        entry(&json!({"library": "vite", "gotcha": ["x"], "source_project": true})),
+    ];
+    let relevant = relevant_entries(&web_stack(), None, &patterns, &gotchas);
+    assert_eq!(
+        inherited_block(&relevant).unwrap(),
+        "## Global Memory — Inherited Knowledge\n\nThe following patterns and gotchas were inherited from your global memory\n(~/.dejafix/global/). They represent lessons learned from other projects.\n\n### Library Gotchas\n\n- **react** [>=18]: strict mode mounts twice (from web)\n- **vite**: None\n- **vite**: [\"x\"] (from True)\n\n### Cross-Project Patterns\n\n- Prefer small PRs (from api)\n- 1.5\n"
+    );
+    let only_patterns = relevant_entries(&Stack::default(), None, &patterns, &[]);
+    let block = inherited_block(&only_patterns).unwrap();
+    assert!(!block.contains("### Library Gotchas"));
+    assert!(block.ends_with("- 1.5\n"));
 }

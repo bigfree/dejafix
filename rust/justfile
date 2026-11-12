@@ -27,7 +27,28 @@ bench:
     cargo bench -p dejafix-core --features testing --bench load --bench summary
 
 smoke:
-    @echo "smoke: no installable binary before M3"
+    #!/usr/bin/env bash
+    set -euo pipefail
+    work="$(mktemp -d)"
+    trap 'rm -rf "$work"' EXIT
+    cargo install --quiet --locked --path crates/dejafix --root "$work/install"
+    for binary in djf dejafix djf-mcp djf-edit-hook; do test -x "$work/install/bin/$binary"; done
+    export PATH="$work/install/bin:$PATH" HOME="$work/home" DEJAFIX_HOME="$work/home/.dejafix"
+    mkdir -p "$work/home" "$work/repo"
+    cd "$work/repo"
+    git init -q
+    git -c user.email=smoke@example.invalid -c user.name=smoke commit -q --allow-empty -m init
+    expect() { local out; out="$("${@:2}")"; grep -q -- "$1" <<<"$out"; }
+    expect "djf-mcp" djf init --no-hooks
+    expect "^Logged issue #0001$" djf log "Smoke issue" --at src/smoke.py:1
+    expect "^Recorded failed attempt on #0001$" djf attempt "Smoke attempt" --failed
+    expect "^Fixed issue #0001$" djf fix "Smoke fix"
+    expect "\\[DONE\\] #0001 Smoke issue" djf show
+    test "$(wc -l < .dejafix/events.jsonl)" -eq 3
+    test -f .dejafix/issues/0001-smoke-issue.md
+    grep -q "dejafix bridge" CLAUDE.md AGENTS.md
+    expect "repo" djf project list
+    echo "smoke: ok"
 
 casefold:
     ../.venv/bin/python -I scripts/casefold.py > crates/dejafix-core/src/core/text/casefold_table.rs

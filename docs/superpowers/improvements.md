@@ -64,3 +64,21 @@ Append new entries at the end, one heading each, with this template:
 - Gain: no write outside the repository from repository content.
 - Compatibility: a project whose `issues/` is intentionally a symlink gets no issue files from Rust; `summary.md` and the log are unaffected.
 - Status: implemented in M2a, awaiting review
+
+## Keep unknown keys of the registry sidecar when saving
+
+- Found: 2026-11-12, M2b, `rust/crates/dejafix-core/src/core/registry/load.rs`
+- Today: `save_registry` (Python) and `meta_payload` (Rust) rebuild `projects.meta.json` from `schema_version`, `active_project` and `by_path` only. Every registration therefore drops `last_version`, and the next command re-records it; any key a newer release adds to the sidecar is lost the same way.
+- Proposal: load the sidecar as a map, replace only the three keys the registry owns, and write the rest back in place.
+- Gain: the upgrade stamp survives `djf init` and `djf project ...`, so the notice logic no longer depends on a silent re-record; a newer release's sidecar keys survive an older one.
+- Compatibility: `projects.meta.json` keeps extra keys where Python 0.4.x drops them; readers ignore unknown keys, so nothing breaks.
+- Status: proposed
+
+## Never copy a symlink's outside target into a project file
+
+- Found: 2026-11-12, M2b security review, `rust/crates/dejafix-core/src/wiring/init.rs`, `wiring/files.rs`
+- Today: Python's `djf init` and `djf plan` read `CLAUDE.md`, `AGENTS.md`, `.gitignore`, `.dejafix/AI_INSTRUCTIONS.md` and `.dejafix/plan.md` through a symlink and write the bridge, gitignore lines, global-memory block or idea back through it, so a cloned repository can make dejafix append to an arbitrary file of the user's (for example `CLAUDE.md -> ~/.aws/credentials`). The Rust write path replaces symlinks instead of following them, which on its own would copy the secret into a regular, committable file.
+- Proposal: read such a file only when it is not a symlink or its canonical target lies inside the project root; otherwise treat it as absent, so the link is replaced by a fresh file and its target is neither read nor touched. Rust M2b already does this. The same guard belongs in Python's `_ensure_bridge_file`, `ensure_gitignore_entry`, `refresh_ai_instructions`, `_inherit_global_memory` and `plan.run`.
+- Gain: a hostile repository can neither exfiltrate a local file into a commit nor modify a file outside the repository.
+- Compatibility: a rule file intentionally linked outside the repository loses its link on `djf init` (it becomes a regular file with the bridge); links inside the repository (`CLAUDE.md -> AGENTS.md`) are read as before.
+- Status: implemented in M2b, awaiting review

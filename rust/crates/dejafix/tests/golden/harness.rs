@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::types::{Implementation, Normalizer, Run, Step, StepOutput};
+use crate::types::{Arguments, Implementation, Normalizer, Run, Step, StepOutput};
 
 pub fn python(repository: &Path) -> PathBuf {
     if let Some(python) = std::env::var_os("DEJAFIX_PYTHON") {
@@ -55,33 +55,60 @@ pub fn run(
     fixture: &Path,
     steps: &[Step],
 ) -> Result<Run, Box<dyn Error>> {
+    let steps: Vec<Arguments<'_>> = steps.iter().map(|args| fixed(args)).collect();
+    run_scenario(implementation, fixture, None, &steps)
+}
+
+pub fn fixed<'a>(args: &'a [&'a str]) -> Arguments<'a> {
+    Box::new(move |_| Ok(args.iter().map(|arg| (*arg).to_owned()).collect()))
+}
+
+pub fn python_version(repository: &Path) -> Result<String, Box<dyn Error>> {
+    let init = fs::read_to_string(repository.join("src/dejafix/__init__.py"))?;
+    init.lines()
+        .find_map(|line| line.strip_prefix("__version__ = \""))
+        .and_then(|rest| rest.strip_suffix('"'))
+        .map(str::to_owned)
+        .ok_or_else(|| "no __version__ in src/dejafix/__init__.py".into())
+}
+
+pub fn run_scenario(
+    implementation: Implementation,
+    fixture: &Path,
+    home_fixture: Option<&Path>,
+    steps: &[Arguments<'_>],
+) -> Result<Run, Box<dyn Error>> {
     let since = now_iso()?;
     let temp = tempfile::tempdir()?;
     let project = temp.path().join("project");
     let home = temp.path().join("home");
     copy_tree(fixture, &project)?;
-    fs::create_dir_all(&home)?;
+    match home_fixture {
+        Some(source) => copy_tree(source, &home)?,
+        None => fs::create_dir_all(&home)?,
+    }
     let repository = repository()?;
     let source = repository.join("src");
     let interpreter = python(&repository);
-    let outputs = steps
-        .iter()
-        .map(|args| {
-            let mut command = match implementation {
-                Implementation::Python => {
-                    let mut command = isolated(&interpreter, &home, &source);
-                    command.args(["-m", "dejafix.cli"]);
-                    command
-                }
-                Implementation::Rust => isolated(env!("CARGO_BIN_EXE_djf"), &home, &source),
-            };
-            output(command.args(*args).current_dir(&project))
-        })
-        .collect::<Result<Vec<_>, _>>()?;
+    let mut outputs = Vec::with_capacity(steps.len());
+    for step in steps {
+        let args = step(&project)?;
+        let mut command = match implementation {
+            Implementation::Python => {
+                let mut command = isolated(&interpreter, &home, &source);
+                command.args(["-m", "dejafix.cli"]);
+                command
+            }
+            Implementation::Rust => isolated(env!("CARGO_BIN_EXE_djf"), &home, &source),
+        };
+        outputs.push(output(command.args(&args).current_dir(&project))?);
+    }
     let mut files = BTreeMap::new();
     snapshot(&project, "project", &mut files)?;
     snapshot(&home, "home", &mut files)?;
-    let mut normalizer = Normalizer::new(&[(&project, "<PROJECT>"), (&home, "<HOME>")], &since)?;
+    let python_version = python_version(&repository)?;
+    let mut normalizer = Normalizer::new(&[(&project, "<PROJECT>"), (&home, "<HOME>")], &since)?
+        .with_versions(&[&python_version, env!("CARGO_PKG_VERSION")])?;
     let steps = outputs
         .into_iter()
         .map(|output| StepOutput {
@@ -160,6 +187,9 @@ fn snapshot(
     for entry in fs::read_dir(root)? {
         let entry = entry?;
         let key = format!("{label}/{}", entry.file_name().to_string_lossy());
+        if key.ends_with("/.git") {
+            continue;
+        }
         if entry.file_type()?.is_dir() {
             snapshot(&entry.path(), &key, files)?;
         } else {

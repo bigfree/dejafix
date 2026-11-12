@@ -4,6 +4,9 @@ use regex::Regex;
 
 pub type Step<'a> = &'a [&'a str];
 
+pub type Arguments<'a> =
+    Box<dyn Fn(&std::path::Path) -> Result<Vec<String>, Box<dyn std::error::Error>> + 'a>;
+
 #[derive(Clone, Copy)]
 pub enum Implementation {
     Python,

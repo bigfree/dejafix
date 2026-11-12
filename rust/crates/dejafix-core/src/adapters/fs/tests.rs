@@ -1,7 +1,10 @@
 use std::fs;
 
 use super::resolve::is_network_path;
-use super::{FsResolver, StoreError, path_context, read_events_file};
+use super::{
+    FsResolver, RegistryFiles, StoreError, manifest_info, path_context, read_events_file,
+    resolve_path,
+};
 use crate::core::log::EventLog;
 use crate::core::path::{PathResolver, project_relative};
 use crate::testing::fixed_clock;
@@ -295,4 +298,250 @@ mod store {
         assert_eq!(store.gotchas(), None);
         assert!(!store.append_gotcha_if_new(|_| Some(entry.clone())).unwrap());
     }
+}
+
+fn registry_home() -> (tempfile::TempDir, RegistryFiles) {
+    let dir = tempfile::tempdir().unwrap();
+    let files = RegistryFiles::new(&dir.path().join("pm"));
+    (dir, files)
+}
+
+const NOW: &str = "2027-01-15T08:00:00Z";
+
+#[test]
+fn a_0_2_x_registry_keeps_its_list_and_gains_a_sidecar() {
+    let (_dir, files) = registry_home();
+    fs::create_dir_all(files.list.parent().unwrap()).unwrap();
+    fs::write(&files.list, "[\n \"/code/alpha\",\n \"/code/beta\"\n]").unwrap();
+    let registry = files.load(NOW).unwrap();
+    assert_eq!(registry.projects.len(), 2);
+    assert_eq!(
+        fs::read_to_string(&files.list).unwrap(),
+        "[\n \"/code/alpha\",\n \"/code/beta\"\n]\n"
+    );
+    let meta = fs::read_to_string(&files.meta).unwrap();
+    assert!(meta.starts_with("{\n \"schema_version\": 1,\n \"active_project\": null,\n \"by_path\": {\n  \"/code/alpha\": {\n   \"id\": \"alpha\","));
+    assert!(meta.ends_with("}\n"));
+    let leftovers: Vec<_> = fs::read_dir(files.list.parent().unwrap())
+        .unwrap()
+        .filter_map(Result::ok)
+        .filter(|entry| entry.file_name().to_string_lossy().starts_with(".pm-"))
+        .collect();
+    assert_eq!(leftovers.len(), 0);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mode = fs::metadata(&files.meta).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode, 0o600);
+    }
+}
+
+#[test]
+fn a_utf8_bom_and_a_corrupt_file_are_tolerated() {
+    let (_dir, files) = registry_home();
+    fs::create_dir_all(files.list.parent().unwrap()).unwrap();
+    fs::write(&files.list, b"\xef\xbb\xbf[\"/code/alpha\"]").unwrap();
+    assert_eq!(files.load(NOW).unwrap().projects[0].id, "alpha");
+    fs::write(&files.list, "{not json").unwrap();
+    fs::write(&files.meta, "[1]").unwrap();
+    assert_eq!(files.load(NOW).unwrap().projects.len(), 0);
+    assert_eq!(files.read_meta().len(), 0);
+}
+
+#[test]
+fn a_dev_format_registry_is_converted_and_backed_up_once() {
+    let (_dir, files) = registry_home();
+    fs::create_dir_all(files.list.parent().unwrap()).unwrap();
+    let original =
+        r#"{"active_project": "alpha", "projects": [{"id": "alpha", "path": "/code/alpha"}]}"#;
+    fs::write(&files.list, original).unwrap();
+    let registry = files.load(NOW).unwrap();
+    assert_eq!(registry.active_project.as_deref(), Some("alpha"));
+    let backup = files.list.with_file_name("projects.json.bak");
+    assert_eq!(fs::read_to_string(&backup).unwrap(), original);
+    assert_eq!(
+        fs::read_to_string(&files.list).unwrap(),
+        "[\n \"/code/alpha\"\n]\n"
+    );
+    fs::write(&files.list, r#"{"projects": []}"#).unwrap();
+    files.load(NOW).unwrap();
+    assert_eq!(fs::read_to_string(&backup).unwrap(), original);
+}
+
+#[test]
+fn the_version_stamp_keeps_other_keys_in_place() {
+    let (_dir, files) = registry_home();
+    assert_eq!(files.seen_version(), None);
+    files.record_version("1.0.0");
+    assert_eq!(
+        fs::read_to_string(&files.meta).unwrap(),
+        "{\n \"last_version\": \"1.0.0\"\n}\n"
+    );
+    fs::write(
+        &files.meta,
+        r#"{"by_path": {}, "last_version": "0.2.0", "z": 1}"#,
+    )
+    .unwrap();
+    assert_eq!(files.seen_version(), Some(serde_json::json!("0.2.0")));
+    files.record_version("1.0.1");
+    assert_eq!(
+        fs::read_to_string(&files.meta).unwrap(),
+        "{\n \"by_path\": {},\n \"last_version\": \"1.0.1\",\n \"z\": 1\n}\n"
+    );
+}
+
+#[test]
+fn an_unwritable_registry_reports_the_path() {
+    let (dir, files) = registry_home();
+    fs::write(dir.path().join("pm"), "a file, not a directory").unwrap();
+    let error = files
+        .save(&crate::core::registry::Registry::default())
+        .unwrap_err();
+    assert!(matches!(error, StoreError::Write { .. }));
+    files.record_version("1.0.0");
+}
+
+#[cfg(unix)]
+#[test]
+fn paths_resolve_like_python_expanduser_and_resolve() {
+    use std::os::unix::fs::symlink;
+
+    let dir = tempfile::tempdir().unwrap();
+    let root = fs::canonicalize(dir.path()).unwrap();
+    fs::create_dir_all(root.join("real/sub")).unwrap();
+    symlink(root.join("real"), root.join("link")).unwrap();
+    let home = root.join("home");
+    assert_eq!(resolve_path("~", Some(&home), &root), Some(home.clone()));
+    assert_eq!(
+        resolve_path("~/x", Some(&home), &root),
+        Some(home.join("x"))
+    );
+    assert_eq!(
+        resolve_path("~x", Some(&home), &root),
+        Some(root.join("~x"))
+    );
+    assert_eq!(
+        resolve_path("link/sub", None, &root),
+        Some(root.join("real/sub"))
+    );
+    assert_eq!(
+        resolve_path("link/missing/../gone/./y", None, &root),
+        Some(root.join("real/gone/y"))
+    );
+    assert_eq!(resolve_path("", None, &root), Some(root.clone()));
+    assert_eq!(
+        resolve_path(".", None, &root.join("real")),
+        Some(root.join("real"))
+    );
+}
+
+fn manifest_dir(files: &[(&str, &str)]) -> tempfile::TempDir {
+    let dir = tempfile::tempdir().unwrap();
+    for (name, text) in files {
+        fs::write(dir.path().join(name), text).unwrap();
+    }
+    dir
+}
+
+#[test]
+fn descriptions_come_from_pyproject_then_package_json_then_cargo() {
+    let py = manifest_dir(&[
+        ("pyproject.toml", "[project]\ndescription = \"The thing\"\n"),
+        ("package.json", r#"{"description": "Node thing"}"#),
+    ]);
+    assert_eq!(
+        manifest_info(py.path()).description.as_deref(),
+        Some("The thing")
+    );
+    let node = manifest_dir(&[(
+        "package.json",
+        "\u{feff}{\"description\": \"  Node thing \"}",
+    )]);
+    assert_eq!(
+        manifest_info(node.path()).description.as_deref(),
+        Some("Node thing")
+    );
+    let cargo = manifest_dir(&[
+        ("package.json", r#"{"description": " "}"#),
+        ("Cargo.toml", "[package]\n  description = 'Rust thing'\n"),
+    ]);
+    assert_eq!(
+        manifest_info(cargo.path()).description.as_deref(),
+        Some("Rust thing")
+    );
+    let blank = manifest_dir(&[
+        ("pyproject.toml", "description = \"  \"\n"),
+        ("package.json", r#"{"description": "ignored"}"#),
+    ]);
+    assert_eq!(manifest_info(blank.path()).description.as_deref(), Some(""));
+    let listed = manifest_dir(&[("package.json", "[1]")]);
+    assert_eq!(manifest_info(listed.path()).description, None);
+}
+
+#[test]
+fn entry_points_come_from_pyproject_scripts_and_npm_scripts() {
+    let dir = manifest_dir(&[
+        (
+            "pyproject.toml",
+            "[project.scripts]\nfoo = \"pkg.cli:main\"\nbar = 'pkg.other:run'\n[tool.something]\nfoo = \"should-not-appear\"\n",
+        ),
+        (
+            "package.json",
+            r#"{"scripts":{"dev":"vite","build":"vite build","test":"jest","custom":"x","start":5}}"#,
+        ),
+    ]);
+    assert_eq!(
+        manifest_info(dir.path()).entry_points,
+        [
+            "`foo` → `pkg.cli:main`",
+            "`bar` → `pkg.other:run`",
+            "`npm run dev` → `vite`",
+            "`npm run build` → `vite build`",
+            "`npm run test` → `jest`",
+        ]
+    );
+    let odd = manifest_dir(&[("package.json", r#"{"scripts": ["test", "start"]}"#)]);
+    assert_eq!(manifest_info(odd.path()).entry_points.len(), 0);
+    let text = manifest_dir(&[("package.json", r#"{"scripts": "restart"}"#)]);
+    assert_eq!(manifest_info(text.path()).entry_points.len(), 0);
+    let many = (0..12).fold(String::new(), |mut text, n| {
+        text.push_str(&["s", &n.to_string(), " = \"x\"\n"].concat());
+        text
+    });
+    let capped = manifest_dir(&[("pyproject.toml", &format!("[project.scripts]\n{many}"))]);
+    assert_eq!(manifest_info(capped.path()).entry_points.len(), 8);
+}
+
+#[test]
+fn main_folders_skip_dependencies_and_dot_folders() {
+    let dir = tempfile::tempdir().unwrap();
+    for name in [
+        "src",
+        "tests",
+        "docs",
+        "node_modules",
+        ".github",
+        "core",
+        "target",
+    ] {
+        fs::create_dir(dir.path().join(name)).unwrap();
+    }
+    fs::write(dir.path().join("file.txt"), "").unwrap();
+    assert_eq!(
+        manifest_info(dir.path()).main_folders,
+        [
+            ("core".to_owned(), ""),
+            ("docs".to_owned(), "documentation"),
+            ("src".to_owned(), "package or application code"),
+            ("tests".to_owned(), "test suite"),
+        ]
+    );
+    for n in 0..20 {
+        fs::create_dir(dir.path().join(format!("z{n:02}"))).unwrap();
+    }
+    assert_eq!(manifest_info(dir.path()).main_folders.len(), 15);
+    assert_eq!(
+        manifest_info(&dir.path().join("gone")).main_folders.len(),
+        0
+    );
 }

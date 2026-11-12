@@ -201,6 +201,13 @@ fn separator_at(bytes: &[u8], index: usize) -> Option<usize> {
 
 impl DecimalKey {
     #[must_use]
+    pub fn saturating_u32(&self) -> u32 {
+        self.digits.iter().fold(0_u32, |value, digit| {
+            value.saturating_mul(10).saturating_add(u32::from(*digit))
+        })
+    }
+
+    #[must_use]
     pub fn successor(&self, width: usize) -> String {
         let mut digits = self.digits.clone();
         let mut carry = true;
