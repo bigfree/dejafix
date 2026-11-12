@@ -100,6 +100,19 @@ cra-mcp, excalibur, onnet-nearnet), translated to Rust.
   through a pull request.
 - Code, commit messages and documentation are in English.
 
+## Improvement log
+
+An agent that sees a way to do something better than the current
+implementation (the Python behaviour, this spec, or Rust code from an earlier
+milestone) records it in `docs/superpowers/improvements.md` and carries on with
+the milestone as specified. It does not implement the idea unasked: the
+compatibility contract and the milestone scope stay as they are until the user
+reviews the log and decides.
+
+Each entry is appended at the end of the file under its own heading, using the
+template at the top of the file. Separate headings keep merges between
+milestone branches trivial.
+
 ## Development tooling
 
 Development runs locally. Nx is not used: Cargo already provides the
