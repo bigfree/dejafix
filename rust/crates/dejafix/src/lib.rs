@@ -1,5 +1,6 @@
 mod cli;
 mod config;
+pub mod hook;
 
 use std::io::Write;
 use std::process::ExitCode;

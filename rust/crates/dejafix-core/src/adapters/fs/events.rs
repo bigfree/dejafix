@@ -11,6 +11,21 @@ pub fn events_path(mem_dir: &Path) -> PathBuf {
     mem_dir.join(EVENTS_FILE)
 }
 
+pub fn read_events_unlocked(mem_dir: &Path) -> Result<Vec<u8>, StoreError> {
+    let path = events_path(mem_dir);
+    let read = |source| StoreError::Read {
+        path: path.clone(),
+        source,
+    };
+    if fs::metadata(&path).is_ok_and(|meta| !meta.is_file()) {
+        return Err(read(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "not a regular file",
+        )));
+    }
+    fs::read(&path).map_err(read)
+}
+
 pub fn read_events_file(mem_dir: &Path) -> Result<Vec<u8>, StoreError> {
     let path = events_path(mem_dir);
     let read = |source| StoreError::Read {

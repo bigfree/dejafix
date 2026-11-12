@@ -43,7 +43,7 @@ pub fn path_context(root: &Path) -> Result<PathContext, StoreError> {
     })
 }
 
-fn posix(path: &Path) -> String {
+pub(crate) fn posix(path: &Path) -> String {
     let text = path.to_string_lossy();
     let text = text
         .strip_prefix(r"\\?\UNC\")

@@ -25,6 +25,7 @@ fixtures dir="target/fixtures":
 
 bench:
     cargo bench -p dejafix-core --features testing --bench load --bench summary
+    cargo bench -p dejafix --bench hooks
 
 smoke:
     #!/usr/bin/env bash
@@ -40,6 +41,8 @@ smoke:
     git -c user.email=smoke@example.invalid -c user.name=smoke commit -q --allow-empty -m init
     expect() { local out; out="$("${@:2}")"; grep -q -- "$1" <<<"$out"; }
     expect "djf-mcp" djf init --no-hooks
+    expect "^dejafix git hooks installed: post-commit, post-merge, pre-commit$" djf hooks install
+    grep -q "DJF_BIN=\"$work/install/bin/djf\"" .git/hooks/pre-commit
     expect "^Logged issue #0001$" djf log "Smoke issue" --at src/smoke.py:1
     expect "^Recorded failed attempt on #0001$" djf attempt "Smoke attempt" --failed
     expect "^Fixed issue #0001$" djf fix "Smoke fix"
@@ -48,6 +51,13 @@ smoke:
     test -f .dejafix/issues/0001-smoke-issue.md
     grep -q "dejafix bridge" CLAUDE.md AGENTS.md
     expect "repo" djf project list
+    mkdir -p src && echo "print('login')" > src/login.py && git add src/login.py
+    PATH=/usr/bin:/bin git -c user.email=smoke@example.invalid -c user.name=smoke commit -q -m "fix: guard the login submit"
+    for _ in $(seq 50); do grep -q '"capture_source": "git_post_commit"' .dejafix/events.jsonl && break; sleep 0.1; done
+    grep -q '"summary": "Fix: fix: guard the login submit"' .dejafix/events.jsonl
+    expect "What already failed here" djf precheck src/smoke.py
+    printf '{"session_id": "smoke", "tool_name": "Edit", "tool_input": {"file_path": "%s/src/smoke.py"}}' "$PWD" > payload.json
+    expect "dejafix lessons for src/smoke.py" djf-edit-hook < payload.json
     echo "smoke: ok"
 
 casefold:

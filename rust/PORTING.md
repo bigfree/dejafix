@@ -59,7 +59,7 @@ Rows: 514.
 | `tests/test_agent_guidance.py::test_every_write_tool_states_its_record_length` | M4 | MCP tools and instructions | |
 | `tests/test_agent_guidance.py::test_the_three_surfaces_agree_about_the_session_start_order` | M4 | MCP tools and instructions | |
 | `tests/test_agent_guidance.py::test_get_context_drops_a_superseded_decision` | M4 | MCP tools and instructions | |
-| `tests/test_agent_guidance.py::test_precheck_does_not_warn_from_a_retired_event` | M3 | precheck skips superseded events | |
+| `tests/test_agent_guidance.py::test_precheck_does_not_warn_from_a_retired_event` | M3 | precheck skips superseded events | `crates/dejafix-core/src/core/precheck/tests.rs::retired_events_and_memory_files_are_not_warned_about` |
 | `tests/test_agent_guidance.py::test_every_agent_facing_surface_filters_superseded` | M4 | MCP tools and instructions | |
 | `tests/test_agent_guidance.py::test_init_writes_the_bridge_to_both_rule_files` | M2 | agent guidance surfaces | `crates/dejafix/tests/cli/guidance.rs::init_writes_the_bridge_to_both_rule_files` |
 | `tests/test_agent_guidance.py::test_both_rule_files_say_exactly_the_same_thing` | M2 | agent guidance surfaces | `crates/dejafix/tests/cli/guidance.rs::both_rule_files_say_exactly_the_same_thing` |
@@ -72,24 +72,24 @@ Rows: 514.
 | `tests/test_attempt.py::test_a_stale_current_issue_marker_is_ignored` | M2 | write path: attempt and issue resolution | `crates/dejafix/tests/cli/write.rs::a_stale_current_issue_marker_is_ignored` |
 | `tests/test_attempt.py::test_fix_ignores_and_clears_a_stale_marker` | M2 | write path: attempt and issue resolution | `crates/dejafix/tests/cli/write.rs::fix_ignores_and_clears_a_stale_marker` |
 | `tests/test_attempt.py::test_a_bare_hash_is_reported_readably` | M2 | write path: attempt and issue resolution | `crates/dejafix/tests/cli/write.rs::a_bare_hash_is_reported_readably` |
-| `tests/test_auto_capture.py::test_location_skips_dejafix_files` | M3 | git auto-capture | |
-| `tests/test_auto_capture.py::test_a_memory_only_commit_has_no_location` | M3 | git auto-capture | |
-| `tests/test_auto_capture.py::test_a_deleted_file_is_never_the_location` | M3 | git auto-capture | |
-| `tests/test_auto_capture.py::test_a_rename_is_located_at_the_new_path` | M3 | git auto-capture | |
-| `tests/test_auto_capture.py::test_the_repos_first_commit_lists_its_files` | M3 | git auto-capture | |
-| `tests/test_auto_capture.py::test_a_non_ascii_path_is_stored_as_written` | M3 | git auto-capture | |
-| `tests/test_auto_capture.py::test_code_outranks_docs_and_ci_config` | M3 | git auto-capture | |
-| `tests/test_auto_capture.py::test_docs_outrank_lockfiles_and_a_tie_keeps_git_order` | M3 | git auto-capture | |
-| `tests/test_auto_capture.py::test_manifests_and_build_files_never_beat_source` | M3 | git auto-capture | |
-| `tests/test_auto_capture.py::test_first_commit_with_manifests_is_located_at_the_code` | M3 | git auto-capture | |
-| `tests/test_auto_capture.py::test_source_outranks_tests_which_outrank_other_files` | M3 | git auto-capture | |
-| `tests/test_auto_capture.py::test_only_a_top_level_dot_dir_or_dot_file_counts_as_config` | M3 | git auto-capture | |
-| `tests/test_auto_capture.py::test_a_merge_commit_records_the_files_it_brought_in` | M3 | git auto-capture | |
-| `tests/test_auto_capture.py::test_memory_files_come_last_so_the_cap_keeps_the_code` | M3 | git auto-capture | |
-| `tests/test_auto_capture.py::test_the_location_is_always_first_in_files` | M3 | git auto-capture | |
-| `tests/test_auto_capture.py::test_a_code_file_whose_name_starts_like_a_doc_or_manifest_is_code` | M3 | git auto-capture | |
-| `tests/test_auto_capture.py::test_explicit_build_code_files_are_still_demoted` | M3 | git auto-capture | |
-| `tests/test_auto_capture.py::test_binary_assets_do_not_beat_docs` | M3 | git auto-capture | |
+| `tests/test_auto_capture.py::test_location_skips_dejafix_files` | M3 | git auto-capture | `crates/dejafix-core/src/core/capture/tests.rs::location_skips_memory_files_but_files_keep_them` |
+| `tests/test_auto_capture.py::test_a_memory_only_commit_has_no_location` | M3 | git auto-capture | `crates/dejafix-core/src/core/capture/tests.rs::a_memory_only_commit_has_no_location` |
+| `tests/test_auto_capture.py::test_a_deleted_file_is_never_the_location` | M3 | git auto-capture | `crates/dejafix-core/src/core/capture/tests.rs::a_deleted_file_is_never_the_location` |
+| `tests/test_auto_capture.py::test_a_rename_is_located_at_the_new_path` | M3 | git auto-capture | `crates/dejafix-core/src/adapters/git/tests.rs::last_changes_lists_a_rename_at_the_new_path` |
+| `tests/test_auto_capture.py::test_the_repos_first_commit_lists_its_files` | M3 | git auto-capture | `crates/dejafix-core/src/adapters/git/tests.rs::last_changes_of_the_first_commit_fall_back_to_root` |
+| `tests/test_auto_capture.py::test_a_non_ascii_path_is_stored_as_written` | M3 | git auto-capture | `crates/dejafix-core/src/adapters/git/tests.rs::last_changes_keeps_a_non_ascii_path_as_written` |
+| `tests/test_auto_capture.py::test_code_outranks_docs_and_ci_config` | M3 | git auto-capture | `crates/dejafix-core/src/core/capture/tests.rs::code_outranks_docs_and_ci_config` |
+| `tests/test_auto_capture.py::test_docs_outrank_lockfiles_and_a_tie_keeps_git_order` | M3 | git auto-capture | `crates/dejafix-core/src/core/capture/tests.rs::docs_outrank_lockfiles_and_a_tie_keeps_git_order` |
+| `tests/test_auto_capture.py::test_manifests_and_build_files_never_beat_source` | M3 | git auto-capture | `crates/dejafix-core/src/core/capture/tests.rs::manifests_and_build_files_never_beat_source` |
+| `tests/test_auto_capture.py::test_first_commit_with_manifests_is_located_at_the_code` | M3 | git auto-capture | `crates/dejafix-core/src/core/capture/tests.rs::the_first_commit_with_manifests_is_located_at_the_code` |
+| `tests/test_auto_capture.py::test_source_outranks_tests_which_outrank_other_files` | M3 | git auto-capture | `crates/dejafix-core/src/core/capture/tests.rs::source_outranks_tests_which_outrank_other_files` |
+| `tests/test_auto_capture.py::test_only_a_top_level_dot_dir_or_dot_file_counts_as_config` | M3 | git auto-capture | `crates/dejafix-core/src/core/capture/tests.rs::only_a_top_level_dot_dir_or_dot_file_counts_as_config` |
+| `tests/test_auto_capture.py::test_a_merge_commit_records_the_files_it_brought_in` | M3 | git auto-capture | `crates/dejafix-core/src/adapters/git/tests.rs::last_changes_of_a_merge_lists_only_the_merged_branch` |
+| `tests/test_auto_capture.py::test_memory_files_come_last_so_the_cap_keeps_the_code` | M3 | git auto-capture | `crates/dejafix-core/src/core/capture/tests.rs::memory_files_come_last_so_the_cap_keeps_the_code` |
+| `tests/test_auto_capture.py::test_the_location_is_always_first_in_files` | M3 | git auto-capture | `crates/dejafix-core/src/core/capture/tests.rs::the_location_is_always_first_in_files` |
+| `tests/test_auto_capture.py::test_a_code_file_whose_name_starts_like_a_doc_or_manifest_is_code` | M3 | git auto-capture | `crates/dejafix-core/src/core/capture/tests.rs::a_code_file_whose_name_starts_like_a_doc_or_manifest_is_code` |
+| `tests/test_auto_capture.py::test_explicit_build_code_files_are_still_demoted` | M3 | git auto-capture | `crates/dejafix-core/src/core/capture/tests.rs::explicit_build_code_files_are_still_demoted` |
+| `tests/test_auto_capture.py::test_binary_assets_do_not_beat_docs` | M3 | git auto-capture | `crates/dejafix-core/src/core/capture/tests.rs::binary_assets_do_not_beat_docs` |
 | `tests/test_client_config_discovery.py::test_a_store_installed_claude_desktop_is_discovered` | M2 | client config discovery, used by `doctor` (M2) and `migrate` (M5) | `crates/dejafix-core/src/adapters/fs/scan/tests.rs::a_store_installed_claude_desktop_is_discovered` |
 | `tests/test_client_config_discovery.py::test_the_store_entry_is_labelled_distinctly` | M2 | client config discovery, used by `doctor` (M2) and `migrate` (M5) | `crates/dejafix-core/src/adapters/fs/scan/tests.rs::the_store_entry_is_labelled_distinctly` |
 | `tests/test_client_config_discovery.py::test_appdata_is_honoured_over_the_default_under_home` | M2 | client config discovery, used by `doctor` (M2) and `migrate` (M5) | `crates/dejafix-core/src/adapters/fs/scan/tests.rs::appdata_is_honoured_over_the_default_under_home` |
@@ -111,73 +111,73 @@ Rows: 514.
 | `tests/test_dashboard.py::test_serve_mode_marks_the_page_as_live` | out of scope | `djf dashboard` is removed in 1.0 | |
 | `tests/test_dashboard.py::test_back_linked_injects_before_body_and_is_safe_without_one` | out of scope | `djf dashboard` is removed in 1.0 | |
 | `tests/test_dashboard.py::test_dashboard_output_follows_dejafix_home` | out of scope | `djf dashboard` is removed in 1.0 | |
-| `tests/test_edit_hook.py::test_edited_paths_reads_claude_and_codex_shapes[tool_input0-expected0]` | M3 | edit hook | |
-| `tests/test_edit_hook.py::test_edited_paths_reads_claude_and_codex_shapes[tool_input1-expected1]` | M3 | edit hook | |
-| `tests/test_edit_hook.py::test_edited_paths_reads_claude_and_codex_shapes[tool_input2-expected2]` | M3 | edit hook | |
-| `tests/test_edit_hook.py::test_edited_paths_reads_claude_and_codex_shapes[tool_input3-expected3]` | M3 | edit hook | |
-| `tests/test_edit_hook.py::test_edited_paths_reads_claude_and_codex_shapes[tool_input4-expected4]` | M3 | edit hook | |
-| `tests/test_edit_hook.py::test_edited_paths_reads_claude_and_codex_shapes[tool_input5-expected5]` | M3 | edit hook | |
-| `tests/test_edit_hook.py::test_edited_paths_reads_claude_and_codex_shapes[tool_input6-expected6]` | M3 | edit hook | |
-| `tests/test_edit_hook.py::test_edited_paths_reads_claude_and_codex_shapes[not a dict-expected7]` | M3 | edit hook | |
-| `tests/test_edit_hook.py::test_mention_pattern_respects_path_boundaries[project.json: keep targets sorted-True]` | M3 | edit hook | |
-| `tests/test_edit_hook.py::test_mention_pattern_respects_path_boundaries[see project.json.-True]` | M3 | edit hook | |
-| `tests/test_edit_hook.py::test_mention_pattern_respects_path_boundaries[(project.json)-True]` | M3 | edit hook | |
-| `tests/test_edit_hook.py::test_mention_pattern_respects_path_boundaries[libs/db/project.json pins the schema-False]` | M3 | edit hook | |
-| `tests/test_edit_hook.py::test_mention_pattern_respects_path_boundaries[old-project.json is gone-False]` | M3 | edit hook | |
-| `tests/test_edit_hook.py::test_mention_pattern_respects_path_boundaries[project.json5 is different-False]` | M3 | edit hook | |
-| `tests/test_edit_hook.py::test_mention_pattern_respects_path_boundaries[project.jsonl is different-False]` | M3 | edit hook | |
-| `tests/test_edit_hook.py::test_claude_code_edit_gets_issue_attempt_and_decision` | M3 | edit hook | |
-| `tests/test_edit_hook.py::test_codex_patch_paths_resolve_against_cwd` | M3 | edit hook | |
-| `tests/test_edit_hook.py::test_codex_patch_reports_each_file_with_lessons` | M3 | edit hook | |
-| `tests/test_edit_hook.py::test_codex_patch_across_two_projects_reads_each_log` | M3 | edit hook | |
-| `tests/test_edit_hook.py::test_silent_for_file_without_lessons` | M3 | edit hook | |
-| `tests/test_edit_hook.py::test_silent_outside_any_project` | M3 | edit hook | |
-| `tests/test_edit_hook.py::test_shown_once_per_session_until_lessons_change` | M3 | edit hook | |
-| `tests/test_edit_hook.py::test_subagent_sees_lessons_its_parent_already_saw` | M3 | edit hook | |
-| `tests/test_edit_hook.py::test_compaction_shows_lessons_again[event0]` | M3 | edit hook | |
-| `tests/test_edit_hook.py::test_compaction_shows_lessons_again[event1]` | M3 | edit hook | |
-| `tests/test_edit_hook.py::test_compaction_leaves_other_sessions_alone` | M3 | edit hook | |
-| `tests/test_edit_hook.py::test_without_session_id_every_edit_gets_lessons` | M3 | edit hook | |
-| `tests/test_edit_hook.py::test_shared_dedup_directory_is_not_trusted` | M3 | edit hook | |
-| `tests/test_edit_hook.py::test_symlinked_dedup_directory_is_not_followed` | M3 | edit hook | |
-| `tests/test_edit_hook.py::test_worktree_edit_reads_main_checkout_memory` | M3 | edit hook | |
-| `tests/test_edit_hook.py::test_worktree_with_its_own_memory_falls_back_to_it` | M3 | edit hook | |
-| `tests/test_edit_hook.py::test_memory_and_agent_files_are_skipped[.dejafix/events.jsonl]` | M3 | edit hook | |
-| `tests/test_edit_hook.py::test_memory_and_agent_files_are_skipped[.claude/settings.json]` | M3 | edit hook | |
-| `tests/test_edit_hook.py::test_summary_mention_counts_only_whole_paths` | M3 | edit hook | |
-| `tests/test_edit_hook.py::test_decision_with_its_own_files_ignores_passing_mentions` | M3 | edit hook | |
-| `tests/test_edit_hook.py::test_event_paths_in_other_spellings_still_match[src\\b.py]` | M3 | edit hook | |
-| `tests/test_edit_hook.py::test_event_paths_in_other_spellings_still_match[./src/../src/b.py]` | M3 | edit hook | |
-| `tests/test_edit_hook.py::test_event_paths_in_other_spellings_still_match[src/b.py:3:7]` | M3 | edit hook | |
-| `tests/test_edit_hook.py::test_event_paths_in_other_spellings_still_match[{root}/src/b.py]` | M3 | edit hook | |
-| `tests/test_edit_hook.py::test_event_path_through_symlinked_root_still_matches` | M3 | edit hook | |
-| `tests/test_edit_hook.py::test_closed_issue_and_superseded_decision_are_dropped` | M3 | edit hook | |
-| `tests/test_edit_hook.py::test_git_captured_decision_is_left_out` | M3 | edit hook | |
-| `tests/test_edit_hook.py::test_attempt_inherits_its_issue_location` | M3 | edit hook | |
-| `tests/test_edit_hook.py::test_long_history_is_capped` | M3 | edit hook | |
-| `tests/test_edit_hook.py::test_attempt_without_issue_renders_without_empty_reference` | M3 | edit hook | |
-| `tests/test_edit_hook.py::test_injected_issue_id_does_not_reach_context` | M3 | edit hook | |
-| `tests/test_edit_hook.py::test_undecodable_and_broken_event_lines_are_skipped` | M3 | edit hook | |
-| `tests/test_edit_hook.py::test_absolute_event_path_outside_the_project_is_ignored` | M3 | edit hook | |
-| `tests/test_edit_hook.py::test_broken_dedup_storage_still_shows_lessons` | M3 | edit hook | |
-| `tests/test_edit_hook.py::test_compaction_without_dedup_state_is_a_no_op[]` | M3 | edit hook | |
-| `tests/test_edit_hook.py::test_compaction_without_dedup_state_is_a_no_op[s1]` | M3 | edit hook | |
-| `tests/test_edit_hook.py::test_compaction_never_clears_a_shared_directory` | M3 | edit hook | |
-| `tests/test_edit_hook.py::test_main_prints_one_json_line` | M3 | edit hook | |
-| `tests/test_edit_hook.py::test_main_is_silent_on_malformed_input[]` | M3 | edit hook | |
-| `tests/test_edit_hook.py::test_main_is_silent_on_malformed_input[not json]` | M3 | edit hook | |
-| `tests/test_edit_hook.py::test_main_is_silent_on_malformed_input[[]]` | M3 | edit hook | |
-| `tests/test_edit_hook.py::test_main_is_silent_on_malformed_input[{}]` | M3 | edit hook | |
-| `tests/test_edit_hook.py::test_main_is_silent_on_malformed_input[{"tool_input": "x"}]` | M3 | edit hook | |
-| `tests/test_edit_hook.py::test_main_is_silent_on_malformed_input[\xff\xfe]` | M3 | edit hook | |
-| `tests/test_edit_hook.py::test_main_is_silent_on_malformed_input[{"session_id": "s", "tool_input": {"file_path": "a\u0000b"}}]` | M3 | edit hook | |
-| `tests/test_edit_hook.py::test_main_is_silent_when_the_log_is_unreadable` | M3 | edit hook | |
-| `tests/test_edit_hook.py::test_module_entry_point_runs_as_a_hook` | M3 | edit hook | |
-| `tests/test_edit_hook.py::test_unusable_temp_dir_falls_back_to_showing_lessons` | M3 | edit hook | |
-| `tests/test_edit_hook.py::test_call_log_records_each_call_without_lesson_text` | M3 | edit hook | |
-| `tests/test_edit_hook.py::test_call_log_records_the_error_the_hook_swallowed` | M3 | edit hook | |
-| `tests/test_edit_hook.py::test_unwritable_call_log_is_ignored` | M3 | edit hook | |
-| `tests/test_edit_hook.py::test_no_call_log_without_the_variable` | M3 | edit hook | |
+| `tests/test_edit_hook.py::test_edited_paths_reads_claude_and_codex_shapes[tool_input0-expected0]` | M3 | edit hook | `crates/dejafix-core/src/core/lessons/tests.rs::edited_paths_reads_claude_and_codex_shapes` |
+| `tests/test_edit_hook.py::test_edited_paths_reads_claude_and_codex_shapes[tool_input1-expected1]` | M3 | edit hook | `crates/dejafix-core/src/core/lessons/tests.rs::edited_paths_reads_claude_and_codex_shapes` |
+| `tests/test_edit_hook.py::test_edited_paths_reads_claude_and_codex_shapes[tool_input2-expected2]` | M3 | edit hook | `crates/dejafix-core/src/core/lessons/tests.rs::edited_paths_reads_claude_and_codex_shapes` |
+| `tests/test_edit_hook.py::test_edited_paths_reads_claude_and_codex_shapes[tool_input3-expected3]` | M3 | edit hook | `crates/dejafix-core/src/core/lessons/tests.rs::edited_paths_reads_claude_and_codex_shapes` |
+| `tests/test_edit_hook.py::test_edited_paths_reads_claude_and_codex_shapes[tool_input4-expected4]` | M3 | edit hook | `crates/dejafix-core/src/core/lessons/tests.rs::edited_paths_reads_claude_and_codex_shapes` |
+| `tests/test_edit_hook.py::test_edited_paths_reads_claude_and_codex_shapes[tool_input5-expected5]` | M3 | edit hook | `crates/dejafix-core/src/core/lessons/tests.rs::edited_paths_reads_claude_and_codex_shapes` |
+| `tests/test_edit_hook.py::test_edited_paths_reads_claude_and_codex_shapes[tool_input6-expected6]` | M3 | edit hook | `crates/dejafix-core/src/core/lessons/tests.rs::edited_paths_reads_claude_and_codex_shapes` |
+| `tests/test_edit_hook.py::test_edited_paths_reads_claude_and_codex_shapes[not a dict-expected7]` | M3 | edit hook | `crates/dejafix-core/src/core/lessons/tests.rs::edited_paths_reads_claude_and_codex_shapes` |
+| `tests/test_edit_hook.py::test_mention_pattern_respects_path_boundaries[project.json: keep targets sorted-True]` | M3 | edit hook | `crates/dejafix-core/src/core/lessons/tests.rs::mentions_respect_path_boundaries` |
+| `tests/test_edit_hook.py::test_mention_pattern_respects_path_boundaries[see project.json.-True]` | M3 | edit hook | `crates/dejafix-core/src/core/lessons/tests.rs::mentions_respect_path_boundaries` |
+| `tests/test_edit_hook.py::test_mention_pattern_respects_path_boundaries[(project.json)-True]` | M3 | edit hook | `crates/dejafix-core/src/core/lessons/tests.rs::mentions_respect_path_boundaries` |
+| `tests/test_edit_hook.py::test_mention_pattern_respects_path_boundaries[libs/db/project.json pins the schema-False]` | M3 | edit hook | `crates/dejafix-core/src/core/lessons/tests.rs::mentions_respect_path_boundaries` |
+| `tests/test_edit_hook.py::test_mention_pattern_respects_path_boundaries[old-project.json is gone-False]` | M3 | edit hook | `crates/dejafix-core/src/core/lessons/tests.rs::mentions_respect_path_boundaries` |
+| `tests/test_edit_hook.py::test_mention_pattern_respects_path_boundaries[project.json5 is different-False]` | M3 | edit hook | `crates/dejafix-core/src/core/lessons/tests.rs::mentions_respect_path_boundaries` |
+| `tests/test_edit_hook.py::test_mention_pattern_respects_path_boundaries[project.jsonl is different-False]` | M3 | edit hook | `crates/dejafix-core/src/core/lessons/tests.rs::mentions_respect_path_boundaries` |
+| `tests/test_edit_hook.py::test_claude_code_edit_gets_issue_attempt_and_decision` | M3 | edit hook | `crates/dejafix/tests/cli/edit_hook.rs::claude_code_edits_get_lessons_once_per_session` |
+| `tests/test_edit_hook.py::test_codex_patch_paths_resolve_against_cwd` | M3 | edit hook | `crates/dejafix/tests/cli/edit_hook.rs::codex_patches_and_several_projects` |
+| `tests/test_edit_hook.py::test_codex_patch_reports_each_file_with_lessons` | M3 | edit hook | `crates/dejafix/tests/cli/edit_hook.rs::codex_patches_and_several_projects` |
+| `tests/test_edit_hook.py::test_codex_patch_across_two_projects_reads_each_log` | M3 | edit hook | `crates/dejafix/tests/cli/edit_hook.rs::codex_patches_and_several_projects` |
+| `tests/test_edit_hook.py::test_silent_for_file_without_lessons` | M3 | edit hook | `crates/dejafix/tests/cli/edit_hook.rs::claude_code_edits_get_lessons_once_per_session` |
+| `tests/test_edit_hook.py::test_silent_outside_any_project` | M3 | edit hook | `crates/dejafix/tests/cli/edit_hook.rs::worktrees_memory_files_and_strays` |
+| `tests/test_edit_hook.py::test_shown_once_per_session_until_lessons_change` | M3 | edit hook | `crates/dejafix/tests/cli/edit_hook.rs::claude_code_edits_get_lessons_once_per_session` |
+| `tests/test_edit_hook.py::test_subagent_sees_lessons_its_parent_already_saw` | M3 | edit hook | `crates/dejafix/tests/cli/edit_hook.rs::claude_code_edits_get_lessons_once_per_session` |
+| `tests/test_edit_hook.py::test_compaction_shows_lessons_again[event0]` | M3 | edit hook | `crates/dejafix/tests/cli/edit_hook.rs::compaction_resets_one_session_only` |
+| `tests/test_edit_hook.py::test_compaction_shows_lessons_again[event1]` | M3 | edit hook | `crates/dejafix/tests/cli/edit_hook.rs::compaction_resets_one_session_only` |
+| `tests/test_edit_hook.py::test_compaction_leaves_other_sessions_alone` | M3 | edit hook | `crates/dejafix/tests/cli/edit_hook.rs::compaction_resets_one_session_only` |
+| `tests/test_edit_hook.py::test_without_session_id_every_edit_gets_lessons` | M3 | edit hook | `crates/dejafix/tests/cli/edit_hook.rs::claude_code_edits_get_lessons_once_per_session` |
+| `tests/test_edit_hook.py::test_shared_dedup_directory_is_not_trusted` | M3 | edit hook | `crates/dejafix/tests/cli/edit_hook.rs::shared_or_symlinked_dedup_directories_are_not_trusted` |
+| `tests/test_edit_hook.py::test_symlinked_dedup_directory_is_not_followed` | M3 | edit hook | `crates/dejafix/tests/cli/edit_hook.rs::shared_or_symlinked_dedup_directories_are_not_trusted` |
+| `tests/test_edit_hook.py::test_worktree_edit_reads_main_checkout_memory` | M3 | edit hook | `crates/dejafix/tests/cli/edit_hook.rs::worktrees_memory_files_and_strays` |
+| `tests/test_edit_hook.py::test_worktree_with_its_own_memory_falls_back_to_it` | M3 | edit hook | `crates/dejafix/tests/cli/edit_hook.rs::worktrees_memory_files_and_strays` |
+| `tests/test_edit_hook.py::test_memory_and_agent_files_are_skipped[.dejafix/events.jsonl]` | M3 | edit hook | `crates/dejafix/tests/cli/edit_hook.rs::worktrees_memory_files_and_strays` |
+| `tests/test_edit_hook.py::test_memory_and_agent_files_are_skipped[.claude/settings.json]` | M3 | edit hook | `crates/dejafix/tests/cli/edit_hook.rs::worktrees_memory_files_and_strays` |
+| `tests/test_edit_hook.py::test_summary_mention_counts_only_whole_paths` | M3 | edit hook | `crates/dejafix-core/src/core/lessons/tests.rs::shown_lessons_follow_python_selection` |
+| `tests/test_edit_hook.py::test_decision_with_its_own_files_ignores_passing_mentions` | M3 | edit hook | `crates/dejafix-core/src/core/lessons/tests.rs::shown_lessons_follow_python_selection` |
+| `tests/test_edit_hook.py::test_event_paths_in_other_spellings_still_match[src\\b.py]` | M3 | edit hook | `crates/dejafix-core/src/core/lessons/tests.rs::shown_lessons_follow_python_selection` |
+| `tests/test_edit_hook.py::test_event_paths_in_other_spellings_still_match[./src/../src/b.py]` | M3 | edit hook | `crates/dejafix-core/src/core/lessons/tests.rs::shown_lessons_follow_python_selection` |
+| `tests/test_edit_hook.py::test_event_paths_in_other_spellings_still_match[src/b.py:3:7]` | M3 | edit hook | `crates/dejafix-core/src/core/lessons/tests.rs::shown_lessons_follow_python_selection` |
+| `tests/test_edit_hook.py::test_event_paths_in_other_spellings_still_match[{root}/src/b.py]` | M3 | edit hook | `crates/dejafix-core/src/core/lessons/tests.rs::shown_lessons_follow_python_selection` |
+| `tests/test_edit_hook.py::test_event_path_through_symlinked_root_still_matches` | M3 | edit hook | `crates/dejafix-core/src/core/lessons/tests.rs::shown_lessons_follow_python_selection` |
+| `tests/test_edit_hook.py::test_closed_issue_and_superseded_decision_are_dropped` | M3 | edit hook | `crates/dejafix-core/src/core/lessons/tests.rs::closed_retired_and_git_captured_are_dropped` |
+| `tests/test_edit_hook.py::test_git_captured_decision_is_left_out` | M3 | edit hook | `crates/dejafix-core/src/core/lessons/tests.rs::closed_retired_and_git_captured_are_dropped` |
+| `tests/test_edit_hook.py::test_attempt_inherits_its_issue_location` | M3 | edit hook | `crates/dejafix-core/src/core/lessons/tests.rs::inheritance_caps_and_safe_ids` |
+| `tests/test_edit_hook.py::test_long_history_is_capped` | M3 | edit hook | `crates/dejafix-core/src/core/lessons/tests.rs::inheritance_caps_and_safe_ids` |
+| `tests/test_edit_hook.py::test_attempt_without_issue_renders_without_empty_reference` | M3 | edit hook | `crates/dejafix-core/src/core/lessons/tests.rs::inheritance_caps_and_safe_ids` |
+| `tests/test_edit_hook.py::test_injected_issue_id_does_not_reach_context` | M3 | edit hook | `crates/dejafix-core/src/core/lessons/tests.rs::inheritance_caps_and_safe_ids` |
+| `tests/test_edit_hook.py::test_undecodable_and_broken_event_lines_are_skipped` | M3 | edit hook | `crates/dejafix-core/src/core/lessons/tests.rs::broken_lines_are_skipped_and_undecodable_text_is_kept` |
+| `tests/test_edit_hook.py::test_absolute_event_path_outside_the_project_is_ignored` | M3 | edit hook | `crates/dejafix-core/src/core/lessons/tests.rs::shown_lessons_follow_python_selection` |
+| `tests/test_edit_hook.py::test_broken_dedup_storage_still_shows_lessons` | M3 | edit hook | `crates/dejafix/tests/cli/edit_hook.rs::broken_or_unusable_dedup_storage_still_shows_lessons` |
+| `tests/test_edit_hook.py::test_compaction_without_dedup_state_is_a_no_op[]` | M3 | edit hook | `crates/dejafix/tests/cli/edit_hook.rs::compaction_resets_one_session_only` |
+| `tests/test_edit_hook.py::test_compaction_without_dedup_state_is_a_no_op[s1]` | M3 | edit hook | `crates/dejafix/tests/cli/edit_hook.rs::compaction_resets_one_session_only` |
+| `tests/test_edit_hook.py::test_compaction_never_clears_a_shared_directory` | M3 | edit hook | `crates/dejafix/tests/cli/edit_hook.rs::shared_or_symlinked_dedup_directories_are_not_trusted` |
+| `tests/test_edit_hook.py::test_main_prints_one_json_line` | M3 | edit hook | `crates/dejafix/tests/cli/edit_hook.rs::claude_code_edits_get_lessons_once_per_session` |
+| `tests/test_edit_hook.py::test_main_is_silent_on_malformed_input[]` | M3 | edit hook | `crates/dejafix/tests/cli/edit_hook.rs::malformed_input_and_unreadable_logs_are_silent` |
+| `tests/test_edit_hook.py::test_main_is_silent_on_malformed_input[not json]` | M3 | edit hook | `crates/dejafix/tests/cli/edit_hook.rs::malformed_input_and_unreadable_logs_are_silent` |
+| `tests/test_edit_hook.py::test_main_is_silent_on_malformed_input[[]]` | M3 | edit hook | `crates/dejafix/tests/cli/edit_hook.rs::malformed_input_and_unreadable_logs_are_silent` |
+| `tests/test_edit_hook.py::test_main_is_silent_on_malformed_input[{}]` | M3 | edit hook | `crates/dejafix/tests/cli/edit_hook.rs::malformed_input_and_unreadable_logs_are_silent` |
+| `tests/test_edit_hook.py::test_main_is_silent_on_malformed_input[{"tool_input": "x"}]` | M3 | edit hook | `crates/dejafix/tests/cli/edit_hook.rs::malformed_input_and_unreadable_logs_are_silent` |
+| `tests/test_edit_hook.py::test_main_is_silent_on_malformed_input[\xff\xfe]` | M3 | edit hook | `crates/dejafix/tests/cli/edit_hook.rs::malformed_input_and_unreadable_logs_are_silent` |
+| `tests/test_edit_hook.py::test_main_is_silent_on_malformed_input[{"session_id": "s", "tool_input": {"file_path": "a\u0000b"}}]` | M3 | edit hook | `crates/dejafix/tests/cli/edit_hook.rs::malformed_input_and_unreadable_logs_are_silent` |
+| `tests/test_edit_hook.py::test_main_is_silent_when_the_log_is_unreadable` | M3 | edit hook | `crates/dejafix/tests/cli/edit_hook.rs::malformed_input_and_unreadable_logs_are_silent` |
+| `tests/test_edit_hook.py::test_module_entry_point_runs_as_a_hook` | M3 | edit hook | `crates/dejafix/tests/cli/edit_hook.rs::claude_code_edits_get_lessons_once_per_session` |
+| `tests/test_edit_hook.py::test_unusable_temp_dir_falls_back_to_showing_lessons` | M3 | edit hook | `crates/dejafix/tests/cli/edit_hook.rs::broken_or_unusable_dedup_storage_still_shows_lessons` |
+| `tests/test_edit_hook.py::test_call_log_records_each_call_without_lesson_text` | M3 | edit hook | `crates/dejafix/tests/cli/edit_hook.rs::the_call_log_records_calls_without_lesson_text` |
+| `tests/test_edit_hook.py::test_call_log_records_the_error_the_hook_swallowed` | M3 | edit hook | `crates/dejafix/tests/cli/edit_hook.rs::malformed_input_and_unreadable_logs_are_silent` |
+| `tests/test_edit_hook.py::test_unwritable_call_log_is_ignored` | M3 | edit hook | `crates/dejafix/tests/cli/edit_hook.rs::the_call_log_records_calls_without_lesson_text` |
+| `tests/test_edit_hook.py::test_no_call_log_without_the_variable` | M3 | edit hook | `crates/dejafix/tests/cli/edit_hook.rs::the_call_log_records_calls_without_lesson_text` |
 | `tests/test_global_mcp.py::test_a_0_2_x_registry_is_read_without_being_rewritten` | M2 | project registry and `djf project` | `crates/dejafix-core/src/adapters/fs/tests.rs::a_0_2_x_registry_keeps_its_list_and_gains_a_sidecar` |
 | `tests/test_global_mcp.py::test_dashboard_still_reads_the_registry_after_migration` | out of scope | `djf dashboard` is removed in 1.0 | |
 | `tests/test_global_mcp.py::test_ids_do_not_collide_for_same_named_folders` | M2 | project registry and `djf project` | `crates/dejafix/tests/cli/project.rs::ids_do_not_collide_for_same_named_folders` |
@@ -224,20 +224,20 @@ Rows: 514.
 | `tests/test_global_mcp.py::test_doctor_tells_you_to_quit_the_client_before_editing` | M2 | `djf doctor` | `crates/dejafix/tests/cli/doctor.rs::doctor_tells_you_to_quit_the_client_before_editing_and_notices_a_revert` |
 | `tests/test_global_mcp.py::test_doctor_records_a_clean_config_it_has_never_seen_before` | M2 | `djf doctor` | `crates/dejafix-core/src/core/doctor/tests.rs::a_clean_config_is_recorded_the_first_time_it_is_seen` |
 | `tests/test_global_mcp.py::test_doctor_ignores_configs_that_never_mention_dejafix` | M2 | `djf doctor` | `crates/dejafix-core/src/wiring/tests.rs::doctor_ignores_configs_that_never_mention_dejafix` |
-| `tests/test_hooks_path.py::test_resolve_djf_binary_returns_absolute_path_or_bare_name` | M3 | git hook install and binary path | |
-| `tests/test_hooks_path.py::test_precheck_snippet_bakes_path_into_script` | M3 | git hook install and binary path | |
-| `tests/test_hooks_path.py::test_auto_capture_snippet_bakes_path_and_capture_arg` | M3 | git hook install and binary path | |
-| `tests/test_hooks_path.py::test_hook_runs_under_stripped_path` | M3 | git hook install and binary path | |
-| `tests/test_hooks_path.py::test_install_hooks_uses_resolved_path` | M3 | git hook install and binary path | |
-| `tests/test_hooks_path.py::test_resolver_prefers_the_djf_next_to_the_interpreter` | M3 | git hook install and binary path | |
-| `tests/test_hooks_path.py::test_resolver_falls_back_to_path_without_an_adjacent_djf` | M3 | git hook install and binary path | |
-| `tests/test_hooks_path.py::test_resolver_skips_an_adjacent_djf_that_is_not_executable` | M3 | git hook install and binary path | |
-| `tests/test_hooks_path.py::test_resolver_finds_scripts_djf_exe_on_windows` | M3 | git hook install and binary path | |
-| `tests/test_hooks_path.py::test_resolver_with_nothing_found_is_the_bare_name` | M3 | git hook install and binary path | |
-| `tests/test_hooks_path.py::test_a_hook_baked_by_an_old_release_gets_the_new_path_and_shebang` | M3 | git hook install and binary path | |
-| `tests/test_hooks_path.py::test_a_users_own_lines_and_shebang_survive_a_refresh_byte_for_byte` | M3 | git hook install and binary path | |
-| `tests/test_hooks_path.py::test_a_second_install_changes_nothing_and_says_so` | M3 | git hook install and binary path | |
-| `tests/test_hooks_path.py::test_a_block_with_no_end_marker_is_left_alone_with_a_warning` | M3 | git hook install and binary path | |
+| `tests/test_hooks_path.py::test_resolve_djf_binary_returns_absolute_path_or_bare_name` | M3 | git hook install and binary path | `crates/dejafix-core/src/adapters/git/tests.rs::nothing_found_is_the_bare_name` |
+| `tests/test_hooks_path.py::test_precheck_snippet_bakes_path_into_script` | M3 | git hook install and binary path | `crates/dejafix-core/src/core/hooks/tests.rs::the_precheck_snippet_bakes_the_path_and_keeps_the_markers` |
+| `tests/test_hooks_path.py::test_auto_capture_snippet_bakes_path_and_capture_arg` | M3 | git hook install and binary path | `crates/dejafix-core/src/core/hooks/tests.rs::the_auto_capture_snippet_bakes_the_path_and_the_argument` |
+| `tests/test_hooks_path.py::test_hook_runs_under_stripped_path` | M3 | git hook install and binary path | `crates/dejafix/tests/cli/hooks.rs::a_real_commit_records_the_event_and_is_never_blocked` |
+| `tests/test_hooks_path.py::test_install_hooks_uses_resolved_path` | M3 | git hook install and binary path | `crates/dejafix/tests/cli/hooks.rs::init_installs_three_executable_hooks_baked_with_this_binary` |
+| `tests/test_hooks_path.py::test_resolver_prefers_the_djf_next_to_the_interpreter` | M3 | git hook install and binary path | `crates/dejafix-core/src/adapters/git/tests.rs::the_djf_next_to_the_executable_beats_path` |
+| `tests/test_hooks_path.py::test_resolver_falls_back_to_path_without_an_adjacent_djf` | M3 | git hook install and binary path | `crates/dejafix-core/src/adapters/git/tests.rs::path_answers_when_nothing_is_adjacent` |
+| `tests/test_hooks_path.py::test_resolver_skips_an_adjacent_djf_that_is_not_executable` | M3 | git hook install and binary path | `crates/dejafix-core/src/adapters/git/tests.rs::a_djf_that_is_not_executable_is_skipped` |
+| `tests/test_hooks_path.py::test_resolver_finds_scripts_djf_exe_on_windows` | M3 | git hook install and binary path | `crates/dejafix-core/src/adapters/git/tests.rs::windows_finds_scripts_djf_exe_with_forward_slashes` |
+| `tests/test_hooks_path.py::test_resolver_with_nothing_found_is_the_bare_name` | M3 | git hook install and binary path | `crates/dejafix-core/src/adapters/git/tests.rs::nothing_found_is_the_bare_name` |
+| `tests/test_hooks_path.py::test_a_hook_baked_by_an_old_release_gets_the_new_path_and_shebang` | M3 | git hook install and binary path | `crates/dejafix-core/src/core/hooks/tests.rs::a_hook_of_an_old_release_gets_the_new_path_and_shebang` |
+| `tests/test_hooks_path.py::test_a_users_own_lines_and_shebang_survive_a_refresh_byte_for_byte` | M3 | git hook install and binary path | `crates/dejafix-core/src/core/hooks/tests.rs::a_users_own_lines_and_shebang_survive_a_refresh_byte_for_byte` |
+| `tests/test_hooks_path.py::test_a_second_install_changes_nothing_and_says_so` | M3 | git hook install and binary path | `crates/dejafix/tests/cli/hooks.rs::hooks_install_refresh_and_uninstall` |
+| `tests/test_hooks_path.py::test_a_block_with_no_end_marker_is_left_alone_with_a_warning` | M3 | git hook install and binary path | `crates/dejafix/tests/cli/hooks.rs::hooks_install_refresh_and_uninstall` |
 | `tests/test_init.py::test_init_creates_dejafix_files` | M2 | `djf init`, `instructions`, `map` | `crates/dejafix/tests/cli/init.rs::init_creates_the_memory_files_and_gitignores_the_log` |
 | `tests/test_init.py::test_instructions_command_prints_ai_protocol` | M2 | `djf init`, `instructions`, `map` | `crates/dejafix/tests/cli/init.rs::instructions_command_prints_the_ai_protocol` |
 | `tests/test_init.py::test_map_command_prints_project_map` | M2 | `djf init`, `instructions`, `map` | `crates/dejafix/tests/cli/init.rs::map_command_prints_the_project_map` |
@@ -298,7 +298,7 @@ Rows: 514.
 | `tests/test_log.py::test_attempt_without_open_issue_fails` | M2 | write path: log, attempt, fix | `crates/dejafix/tests/cli/write.rs::attempt_without_open_issue_fails` |
 | `tests/test_log.py::test_attempt_auto_issue_creates_parent` | M2 | write path: log, attempt, fix | `crates/dejafix/tests/cli/write.rs::attempt_auto_issue_creates_parent` |
 | `tests/test_log.py::test_attempt_after_fix_does_not_misattribute` | M2 | write path: log, attempt, fix | `crates/dejafix/tests/cli/write.rs::attempt_after_fix_does_not_misattribute` |
-| `tests/test_mcp_server.py::test_git_helpers_detach_stdin_and_keep_timeouts` | M3 | git adapter: detached stdin and timeouts | |
+| `tests/test_mcp_server.py::test_git_helpers_detach_stdin_and_keep_timeouts` | M3 | git adapter: detached stdin and timeouts | `crates/dejafix-core/src/adapters/git/tests.rs::git_returns_nothing_outside_a_repository_or_on_failure` |
 | `tests/test_mcp_server.py::test_mcp_stdio_precheck_file_returns_with_git_backed_analysis` | M4 | MCP server | |
 | `tests/test_mcp_server.py::test_mcp_precheck_file_names_a_memory_file_instead_of_clearing_it` | M4 | MCP server | |
 | `tests/test_mcp_server.py::test_mcp_stdio_add_note_returns_and_writes_event` | M4 | MCP server | |
@@ -335,13 +335,13 @@ Rows: 514.
 | `tests/test_plan.py::test_djf_plan_add_appends_to_ideas` | M2 | plan.md and `djf plan` | `crates/dejafix/tests/cli/init.rs::plan_add_appends_to_the_ideas_section` |
 | `tests/test_plan.py::test_plan_add_does_not_touch_events` | M2 | plan.md and `djf plan` | `crates/dejafix/tests/cli/init.rs::plan_add_does_not_touch_events` |
 | `tests/test_plan.py::test_get_plan_mcp_reads_the_file` | M4 | MCP `get_plan` | |
-| `tests/test_precheck_lessons.py::test_attempt_without_location_inherits_its_issue_file` | M3 | precheck lessons | |
-| `tests/test_precheck_lessons.py::test_partial_attempt_is_a_lesson` | M3 | precheck lessons | |
-| `tests/test_precheck_lessons.py::test_failure_older_than_thirty_days_still_warns` | M3 | precheck lessons | |
-| `tests/test_precheck_lessons.py::test_a_worked_attempt_is_not_a_lesson` | M3 | precheck lessons | |
-| `tests/test_precheck_lessons.py::test_lesson_title_counts_partial_attempts_separately` | M3 | precheck lessons | |
-| `tests/test_precheck_lessons.py::test_overflow_names_the_issues_of_hidden_lessons` | M3 | precheck lessons | |
-| `tests/test_precheck_lessons.py::test_precheck_files_analyzes_all_paths_in_one_pass` | M3 | precheck lessons | |
+| `tests/test_precheck_lessons.py::test_attempt_without_location_inherits_its_issue_file` | M3 | precheck lessons | `crates/dejafix-core/src/core/precheck/tests.rs::attempt_without_location_inherits_its_issue_file` |
+| `tests/test_precheck_lessons.py::test_partial_attempt_is_a_lesson` | M3 | precheck lessons | `crates/dejafix-core/src/core/precheck/tests.rs::partial_and_old_failures_are_lessons_and_worked_is_not` |
+| `tests/test_precheck_lessons.py::test_failure_older_than_thirty_days_still_warns` | M3 | precheck lessons | `crates/dejafix-core/src/core/precheck/tests.rs::partial_and_old_failures_are_lessons_and_worked_is_not` |
+| `tests/test_precheck_lessons.py::test_a_worked_attempt_is_not_a_lesson` | M3 | precheck lessons | `crates/dejafix-core/src/core/precheck/tests.rs::partial_and_old_failures_are_lessons_and_worked_is_not` |
+| `tests/test_precheck_lessons.py::test_lesson_title_counts_partial_attempts_separately` | M3 | precheck lessons | `crates/dejafix-core/src/core/precheck/tests.rs::partial_and_old_failures_are_lessons_and_worked_is_not` |
+| `tests/test_precheck_lessons.py::test_overflow_names_the_issues_of_hidden_lessons` | M3 | precheck lessons | `crates/dejafix-core/src/core/precheck/tests.rs::overflow_names_the_issues_of_hidden_lessons` |
+| `tests/test_precheck_lessons.py::test_precheck_files_analyzes_all_paths_in_one_pass` | M3 | precheck lessons | `crates/dejafix-core/src/core/precheck/tests.rs::spellings_root_and_blank_paths` (one pass over several paths; the MCP reply text is M4) |
 | `tests/test_redaction.py::test_redacts_known_secret_shapes[<lambda>-openai_key]` | M2 | redaction before write | `crates/dejafix-core/src/core/redact/tests.rs::redacts_known_secret_shapes` |
 | `tests/test_redaction.py::test_redacts_known_secret_shapes[<lambda>-github_token]` | M2 | redaction before write | `crates/dejafix-core/src/core/redact/tests.rs::redacts_known_secret_shapes` |
 | `tests/test_redaction.py::test_redacts_known_secret_shapes[<lambda>-github_pat]` | M2 | redaction before write | `crates/dejafix-core/src/core/redact/tests.rs::redacts_known_secret_shapes` |
@@ -394,34 +394,34 @@ Rows: 514.
 | `tests/test_showoff.py::test_template_has_watermark_toggle` | out of scope | `djf visualize` is removed in 1.0 | |
 | `tests/test_showoff.py::test_showoff_uses_existing_data_only` | out of scope | `djf visualize` is removed in 1.0 | |
 | `tests/test_showoff.py::test_graph_data_feeds_showoff_scenes` | out of scope | `djf visualize` is removed in 1.0 | |
-| `tests/test_staleness_performance.py::test_counts_match_a_per_event_git_log` | M3 | staleness performance | |
-| `tests/test_staleness_performance.py::test_one_git_call_per_file_not_per_event` | M3 | staleness performance | |
-| `tests/test_staleness_performance.py::test_only_files_restricts_the_work_and_the_answer` | M3 | staleness performance | |
-| `tests/test_staleness_performance.py::test_a_deleted_file_flags_without_asking_git` | M3 | staleness performance | |
-| `tests/test_staleness_performance.py::test_git_failure_reads_as_cannot_judge_not_stale` | M3 | staleness performance | |
-| `tests/test_staleness_performance.py::test_threshold_is_still_respected` | M3 | staleness performance | |
-| `tests/test_staleness_performance.py::test_superseded_events_are_still_skipped` | M3 | staleness performance | |
-| `tests/test_staleness_repair.py::test_commit_counts_do_not_depend_on_committer_or_machine_offsets[UTC]` | M3 | staleness | |
-| `tests/test_staleness_repair.py::test_commit_counts_do_not_depend_on_committer_or_machine_offsets[America/Denver]` | M3 | staleness | |
-| `tests/test_staleness_repair.py::test_commit_counts_do_not_depend_on_committer_or_machine_offsets[Asia/Dhaka]` | M3 | staleness | |
-| `tests/test_staleness_repair.py::test_commit_times_are_canonical_zulu` | M3 | staleness | |
-| `tests/test_staleness_repair.py::test_an_old_event_located_at_summary_md_is_not_flagged` | M3 | staleness | |
-| `tests/test_staleness_repair.py::test_precheck_skips_a_staged_summary_md` | M3 | staleness | |
-| `tests/test_staleness_repair.py::test_an_auto_captured_fix_or_note_is_not_flagged_as_stale[fix]` | M3 | staleness | |
-| `tests/test_staleness_repair.py::test_an_auto_captured_fix_or_note_is_not_flagged_as_stale[note]` | M3 | staleness | |
-| `tests/test_staleness_repair.py::test_an_auto_captured_decision_is_still_a_claim_and_is_flagged` | M3 | staleness | |
-| `tests/test_staleness_repair.py::test_memory_path_rule_is_anchored_at_the_project_root` | M3 | staleness | |
-| `tests/test_staleness_repair.py::test_memory_path_rule_folds_dot_dot_and_anchors_a_subdir_cwd` | M3 | staleness | |
-| `tests/test_staleness_repair.py::test_precheck_and_staleness_agree_on_a_nested_dejafix_dir` | M3 | staleness | |
-| `tests/test_staleness_repair.py::test_a_manual_decision_in_the_same_spot_is_still_flagged` | M3 | staleness | |
-| `tests/test_staleness_repair.py::test_an_absolute_path_through_a_symlinked_folder_is_still_ours` | M3 | staleness | |
-| `tests/test_staleness_repair.py::test_a_decision_logged_at_an_absolute_path_is_stale_for_precheck_too` | M3 | staleness | |
-| `tests/test_staleness_repair.py::test_a_windows_drive_path_is_made_project_relative` | M3 | staleness | |
-| `tests/test_staleness_repair.py::test_precheck_matches_a_windows_drive_path_on_a_windows_root` | M3 | staleness | |
-| `tests/test_staleness_repair.py::test_two_spellings_of_one_file_warn_once` | M3 | staleness | |
-| `tests/test_staleness_repair.py::test_the_project_root_is_not_a_file` | M3 | staleness | |
-| `tests/test_staleness_repair.py::test_a_blank_path_is_not_a_file` | M3 | staleness | |
-| `tests/test_staleness_repair.py::test_precheck_normalizes_each_logged_path_once` | M3 | staleness | |
+| `tests/test_staleness_performance.py::test_counts_match_a_per_event_git_log` | M3 | staleness performance | `crates/dejafix-core/src/adapters/git/tests.rs::counts_match_a_per_event_git_log` |
+| `tests/test_staleness_performance.py::test_one_git_call_per_file_not_per_event` | M3 | staleness performance | `crates/dejafix-core/src/core/stale/tests.rs::one_history_per_file_bounded_by_the_oldest_event` |
+| `tests/test_staleness_performance.py::test_only_files_restricts_the_work_and_the_answer` | M3 | staleness performance | `crates/dejafix-core/src/core/stale/tests.rs::only_files_restricts_the_work_and_the_answer` |
+| `tests/test_staleness_performance.py::test_a_deleted_file_flags_without_asking_git` | M3 | staleness performance | `crates/dejafix-core/src/core/stale/tests.rs::threshold_missing_files_and_unknown_history` |
+| `tests/test_staleness_performance.py::test_git_failure_reads_as_cannot_judge_not_stale` | M3 | staleness performance | `crates/dejafix-core/src/adapters/git/tests.rs::history_outside_a_repository_cannot_judge` |
+| `tests/test_staleness_performance.py::test_threshold_is_still_respected` | M3 | staleness performance | `crates/dejafix-core/src/core/stale/tests.rs::threshold_missing_files_and_unknown_history` |
+| `tests/test_staleness_performance.py::test_superseded_events_are_still_skipped` | M3 | staleness performance | `crates/dejafix-core/src/core/stale/tests.rs::retired_attempts_and_auto_captured_records_are_skipped` |
+| `tests/test_staleness_repair.py::test_commit_counts_do_not_depend_on_committer_or_machine_offsets[UTC]` | M3 | staleness | `crates/dejafix-core/src/adapters/git/tests.rs::commit_times_are_canonical_zulu_whatever_the_committer_offset` |
+| `tests/test_staleness_repair.py::test_commit_counts_do_not_depend_on_committer_or_machine_offsets[America/Denver]` | M3 | staleness | `crates/dejafix-core/src/adapters/git/tests.rs::commit_times_are_canonical_zulu_whatever_the_committer_offset` |
+| `tests/test_staleness_repair.py::test_commit_counts_do_not_depend_on_committer_or_machine_offsets[Asia/Dhaka]` | M3 | staleness | `crates/dejafix-core/src/adapters/git/tests.rs::commit_times_are_canonical_zulu_whatever_the_committer_offset` |
+| `tests/test_staleness_repair.py::test_commit_times_are_canonical_zulu` | M3 | staleness | `crates/dejafix-core/src/adapters/git/tests.rs::commit_times_are_canonical_zulu_whatever_the_committer_offset` |
+| `tests/test_staleness_repair.py::test_an_old_event_located_at_summary_md_is_not_flagged` | M3 | staleness | `crates/dejafix-core/src/core/stale/tests.rs::retired_attempts_and_auto_captured_records_are_skipped` |
+| `tests/test_staleness_repair.py::test_precheck_skips_a_staged_summary_md` | M3 | staleness | `crates/dejafix/tests/cli/precheck.rs::staged_and_working_files_and_quiet_runs` |
+| `tests/test_staleness_repair.py::test_an_auto_captured_fix_or_note_is_not_flagged_as_stale[fix]` | M3 | staleness | `crates/dejafix-core/src/core/stale/tests.rs::retired_attempts_and_auto_captured_records_are_skipped` |
+| `tests/test_staleness_repair.py::test_an_auto_captured_fix_or_note_is_not_flagged_as_stale[note]` | M3 | staleness | `crates/dejafix-core/src/core/stale/tests.rs::retired_attempts_and_auto_captured_records_are_skipped` |
+| `tests/test_staleness_repair.py::test_an_auto_captured_decision_is_still_a_claim_and_is_flagged` | M3 | staleness | `crates/dejafix-core/src/core/stale/tests.rs::retired_attempts_and_auto_captured_records_are_skipped` |
+| `tests/test_staleness_repair.py::test_memory_path_rule_is_anchored_at_the_project_root` | M3 | staleness | `crates/dejafix-core/src/core/path/tests.rs` (M1 `is_memory_path`) |
+| `tests/test_staleness_repair.py::test_memory_path_rule_folds_dot_dot_and_anchors_a_subdir_cwd` | M3 | staleness | `crates/dejafix-core/src/core/path/tests.rs` (M1 `is_memory_path`) |
+| `tests/test_staleness_repair.py::test_precheck_and_staleness_agree_on_a_nested_dejafix_dir` | M3 | staleness | `crates/dejafix-core/src/core/precheck/tests.rs::spellings_root_and_blank_paths` |
+| `tests/test_staleness_repair.py::test_a_manual_decision_in_the_same_spot_is_still_flagged` | M3 | staleness | `crates/dejafix-core/src/core/stale/tests.rs::threshold_missing_files_and_unknown_history` |
+| `tests/test_staleness_repair.py::test_an_absolute_path_through_a_symlinked_folder_is_still_ours` | M3 | staleness | `crates/dejafix-core/src/core/path/tests.rs` (M1 `is_memory_path`) |
+| `tests/test_staleness_repair.py::test_a_decision_logged_at_an_absolute_path_is_stale_for_precheck_too` | M3 | staleness | `crates/dejafix-core/src/core/stale/tests.rs::an_absolute_location_is_judged_project_relative` |
+| `tests/test_staleness_repair.py::test_a_windows_drive_path_is_made_project_relative` | M3 | staleness | `crates/dejafix-core/src/core/path/tests.rs` (M1 `project_relative`) |
+| `tests/test_staleness_repair.py::test_precheck_matches_a_windows_drive_path_on_a_windows_root` | M3 | staleness | `crates/dejafix-core/src/core/precheck/tests.rs::a_windows_drive_path_matches_on_a_windows_root` |
+| `tests/test_staleness_repair.py::test_two_spellings_of_one_file_warn_once` | M3 | staleness | `crates/dejafix-core/src/core/precheck/tests.rs::spellings_root_and_blank_paths` |
+| `tests/test_staleness_repair.py::test_the_project_root_is_not_a_file` | M3 | staleness | `crates/dejafix-core/src/core/precheck/tests.rs::spellings_root_and_blank_paths` |
+| `tests/test_staleness_repair.py::test_a_blank_path_is_not_a_file` | M3 | staleness | `crates/dejafix-core/src/core/precheck/tests.rs::spellings_root_and_blank_paths` |
+| `tests/test_staleness_repair.py::test_precheck_normalizes_each_logged_path_once` | M3 | staleness | `crates/dejafix-core/src/core/precheck/tests.rs::each_logged_path_is_normalised_once` |
 | `tests/test_structure.py::test_walk_finds_source_and_excludes_noise` | out of scope | the structure.json cache is removed in 1.0 | |
 | `tests/test_structure.py::test_python_imports_resolve_to_internal_files_only` | out of scope | the structure.json cache is removed in 1.0 | |
 | `tests/test_structure.py::test_write_structure_writes_gitignored_cache` | out of scope | the structure.json cache is removed in 1.0 | |
@@ -465,18 +465,18 @@ Rows: 514.
 | `tests/test_v014_features.py::test_supersede_bad_ref_fails_without_writing` | M2 | supersede, brief, search | `crates/dejafix/tests/cli/write.rs::supersede_bad_ref_fails_without_writing` |
 | `tests/test_v014_features.py::test_resolve_event_ref_ambiguous_and_missing` | M1 | event reference and location parsing | `crates/dejafix-core/src/core/log/tests.rs::resolve_event_ref_ambiguous_and_missing` |
 | `tests/test_v014_features.py::test_search_tags_superseded` | M2 | supersede, brief, search | `crates/dejafix/tests/cli/read.rs::search_tags_superseded_and_shows_ids` |
-| `tests/test_v014_features.py::test_stale_flags_decision_after_commits` | M3 | precheck, staleness and snooze | |
-| `tests/test_v014_features.py::test_stale_flags_missing_file_and_skips_superseded` | M3 | precheck, staleness and snooze | |
+| `tests/test_v014_features.py::test_stale_flags_decision_after_commits` | M3 | precheck, staleness and snooze | `crates/dejafix-core/src/core/stale/tests.rs::threshold_missing_files_and_unknown_history` |
+| `tests/test_v014_features.py::test_stale_flags_missing_file_and_skips_superseded` | M3 | precheck, staleness and snooze | `crates/dejafix-core/src/core/stale/tests.rs::retired_attempts_and_auto_captured_records_are_skipped` |
 | `tests/test_v014_features.py::test_location_file_ignores_non_paths` | M1 | event reference and location parsing | `crates/dejafix-core/src/core/path/tests.rs::location_file_ignores_non_paths` |
-| `tests/test_v014_features.py::test_parse_snooze_duration` | M3 | precheck, staleness and snooze | |
-| `tests/test_v014_features.py::test_snooze_silences_and_unsnooze_restores` | M3 | precheck, staleness and snooze | |
-| `tests/test_v014_features.py::test_expired_snooze_self_cleans` | M3 | precheck, staleness and snooze | |
+| `tests/test_v014_features.py::test_parse_snooze_duration` | M3 | precheck, staleness and snooze | `crates/dejafix-core/src/core/precheck/tests.rs::snooze_durations_and_remaining_time` |
+| `tests/test_v014_features.py::test_snooze_silences_and_unsnooze_restores` | M3 | precheck, staleness and snooze | `crates/dejafix/tests/cli/precheck.rs::snooze_silences_logs_and_unsnooze_restores` |
+| `tests/test_v014_features.py::test_expired_snooze_self_cleans` | M3 | precheck, staleness and snooze | `crates/dejafix/tests/cli/precheck.rs::an_expired_or_broken_snooze_cleans_itself_up` |
 | `tests/test_v014_features.py::test_brief_shows_all_sections` | M4 | `djf brief` needs staleness (M3) and score (M4) | |
 | `tests/test_v014_features.py::test_brief_runs_clean_on_fresh_project` | M4 | `djf brief` needs staleness (M3) and score (M4) | |
 | `tests/test_v014_features.py::test_brief_console_helpers_are_cp1252_safe` | M4 | `djf brief` needs staleness (M3) and score (M4) | |
-| `tests/test_v014_features.py::test_precheck_lists_failed_approaches` | M3 | precheck, staleness and snooze | |
-| `tests/test_v014_features.py::test_precheck_console_helpers_are_cp1252_safe` | M3 | precheck, staleness and snooze | |
-| `tests/test_v014_features.py::test_precheck_named_files_cli` | M3 | precheck, staleness and snooze | |
+| `tests/test_v014_features.py::test_precheck_lists_failed_approaches` | M3 | precheck, staleness and snooze | `crates/dejafix-core/src/core/precheck/tests.rs::every_check_and_both_renderings` |
+| `tests/test_v014_features.py::test_precheck_console_helpers_are_cp1252_safe` | M3 | precheck, staleness and snooze | `crates/dejafix/tests/cli/precheck.rs::named_files_list_what_already_failed` (Rust writes UTF-8 with the real rule; plan Decision 8) |
+| `tests/test_v014_features.py::test_precheck_named_files_cli` | M3 | precheck, staleness and snooze | `crates/dejafix/tests/cli/precheck.rs::named_files_list_what_already_failed` |
 | `tests/test_v014_features.py::test_search_matches_location_field` | M2 | supersede, brief, search | `crates/dejafix/tests/cli/read.rs::search_matches_location_and_filters_failed_attempts` |
 | `tests/test_v014_features.py::test_search_failed_only` | M2 | supersede, brief, search | `crates/dejafix/tests/cli/read.rs::search_matches_location_and_filters_failed_attempts` |
 | `tests/test_v014_features.py::test_export_writes_marked_block` | out of scope | `djf export` is removed in 1.0 | |
@@ -529,11 +529,11 @@ Rows: 514.
 | `tests/test_windows_console_encoding.py::test_cp1252_output_contains_no_byte_that_renders_as_a_black_diamond` | M2 | CLI output on a cp1252 console | `crates/dejafix/tests/cli/init.rs::init_output_is_utf8_with_its_real_characters` |
 | `tests/test_windows_console_encoding.py::test_utf8_output_keeps_its_real_characters` | M2 | CLI output on a cp1252 console | `crates/dejafix/tests/cli/init.rs::init_output_is_utf8_with_its_real_characters` |
 | `tests/test_windows_console_encoding.py::test_folding_stream_still_looks_like_a_stream` | out of scope | Python stream wrapper; Rust writes UTF-8 through std | |
-| `tests/test_windows_hooks_and_context.py::test_hook_shebang_is_posix_sh_not_bash` | M3 | Windows hooks | |
-| `tests/test_windows_hooks_and_context.py::test_baked_binary_path_has_no_backslashes` | M3 | Windows hooks | |
-| `tests/test_windows_hooks_and_context.py::test_baked_path_survives_a_real_shell` | M3 | Windows hooks | |
-| `tests/test_windows_hooks_and_context.py::test_windows_falls_back_to_scripts_not_bin` | M3 | Windows hooks | |
-| `tests/test_windows_hooks_and_context.py::test_installed_hook_does_not_block_a_commit` | M3 | Windows hooks | |
+| `tests/test_windows_hooks_and_context.py::test_hook_shebang_is_posix_sh_not_bash` | M3 | Windows hooks | `crates/dejafix-core/src/core/hooks/tests.rs::the_shebang_is_posix_sh` |
+| `tests/test_windows_hooks_and_context.py::test_baked_binary_path_has_no_backslashes` | M3 | Windows hooks | `crates/dejafix-core/src/core/hooks/tests.rs::shell_path_turns_backslashes_into_slashes` |
+| `tests/test_windows_hooks_and_context.py::test_baked_path_survives_a_real_shell` | M3 | Windows hooks | `crates/dejafix-core/src/core/hooks/tests.rs::an_escaped_path_reaches_the_shell_unchanged` |
+| `tests/test_windows_hooks_and_context.py::test_windows_falls_back_to_scripts_not_bin` | M3 | Windows hooks | `crates/dejafix-core/src/adapters/git/tests.rs::windows_finds_scripts_djf_exe_with_forward_slashes` |
+| `tests/test_windows_hooks_and_context.py::test_installed_hook_does_not_block_a_commit` | M3 | Windows hooks | `crates/dejafix/tests/cli/hooks.rs::a_real_commit_records_the_event_and_is_never_blocked` |
 | `tests/test_windows_hooks_and_context.py::test_get_context_uses_the_resolved_project_not_cwd` | M4 | MCP tools use the resolved project | |
 | `tests/test_windows_hooks_and_context.py::test_precheck_file_uses_the_resolved_project_not_cwd` | M4 | MCP tools use the resolved project | |
 | `tests/test_windows_hooks_and_context.py::test_precheck_churn_counts_the_projects_git_not_the_servers` | M4 | MCP tools use the resolved project | |

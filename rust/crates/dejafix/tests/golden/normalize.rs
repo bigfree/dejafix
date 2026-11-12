@@ -6,6 +6,7 @@ use regex::{Captures, Regex};
 use crate::types::Normalizer;
 
 const ID: &str = r"(?P<id>evt_[0-9a-f]{20}|(?:pat|got)_[0-9a-f]{12})";
+const DJF_BIN: &str = r#"(?P<djf>(?m:^DJF_BIN="[^"$`\n]*"$))"#;
 const STAMP: &str =
     r"(?P<stamp>\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}(?:\.\d{6})?Z| \d{2}:\d{2})?)";
 
@@ -22,9 +23,9 @@ impl Normalizer {
         paths.sort_by_key(|path| std::cmp::Reverse(path.len()));
         let escaped: Vec<String> = paths.into_iter().map(|path| regex::escape(path)).collect();
         let pattern = if escaped.is_empty() {
-            format!("{ID}|{STAMP}")
+            format!("{DJF_BIN}|{ID}|{STAMP}")
         } else {
-            format!("(?P<root>{})|{ID}|{STAMP}", escaped.join("|"))
+            format!("{DJF_BIN}|(?P<root>{})|{ID}|{STAMP}", escaped.join("|"))
         };
         Ok(Self {
             pattern: Regex::new(&pattern)?,
@@ -63,6 +64,9 @@ impl Normalizer {
         };
         pattern
             .replace_all(&text, |caps: &Captures| {
+                if caps.name("djf").is_some() {
+                    return r#"DJF_BIN="<DJF>""#.to_owned();
+                }
                 if let Some(root) = caps.name("root") {
                     return labels.get(root.as_str()).cloned().unwrap_or_default();
                 }

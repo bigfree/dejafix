@@ -155,3 +155,25 @@ proptest::proptest! {
         proptest::prop_assert_eq!(twice.text.as_ref(), once.as_str());
     }
 }
+
+#[test]
+fn every_redactable_field_of_an_event_is_scrubbed() {
+    use std::borrow::Cow;
+
+    let key = openai_key();
+    let line = format!(
+        r#"{{"type": "fix", "summary": "Fix: {key}", "git_message": "fix: {key}", "location": "{key}", "command": "auto-capture"}}"#
+    );
+    let clock = crate::testing::fixed_clock();
+    let context = crate::core::event::LineContext::new(&clock);
+    let mut event = crate::core::event::decode_line(&line, &context).unwrap();
+    let fired = super::redact_event(&mut event);
+    assert_eq!(fired, [SecretKind::OpenaiKey; 3]);
+    assert_eq!(event.summary.as_str(), "Fix: [REDACTED:openai_key]");
+    assert_eq!(
+        event.origin.git_message.as_deref(),
+        Some("fix: [REDACTED:openai_key]")
+    );
+    assert_eq!(event.location, Some(Cow::Borrowed("[REDACTED:openai_key]")));
+    assert_eq!(event.command.as_deref(), Some("auto-capture"));
+}

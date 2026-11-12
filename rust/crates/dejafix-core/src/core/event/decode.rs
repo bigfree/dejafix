@@ -102,7 +102,7 @@ pub(crate) fn decode_line<'a>(
     })
 }
 
-fn text<'a>(raw: &'a RawValue) -> Option<Cow<'a, str>> {
+pub(crate) fn text<'a>(raw: &'a RawValue) -> Option<Cow<'a, str>> {
     raw.get()
         .starts_with('"')
         .then(|| serde_json::from_str::<CowStr<'a>>(raw.get()).ok())

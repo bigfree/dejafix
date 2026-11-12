@@ -2,12 +2,15 @@ use std::fs::{self, OpenOptions};
 use std::io;
 use std::path::{Path, PathBuf};
 
+use super::hooks::install;
 use super::registry::{load_registry, now_text};
+use super::types::InitHooks;
 use super::types::{BridgeOutcome, Inherited, InitOptions, InitReport, Settings, WiringError};
 use crate::adapters::fs::{
     GlobalStore, RegistryFiles, StoreError, detect_stack, manifest_info, project_name,
     read_optional_text, read_text_within, resolve_path, write_text,
 };
+use crate::adapters::git::hooks_dir;
 use crate::core::global::{Stack, inherited_block, promotable_libraries, relevant_entries};
 use crate::core::registry::{RegisterResult, Registry, same_path, slugify};
 use crate::core::scaffold::{
@@ -231,6 +234,17 @@ pub fn init_project(
     } else {
         None
     };
+    let hooks = match &options.hooks {
+        None => None,
+        Some(djf) => {
+            let directory = hooks_dir(root);
+            Some(if directory.exists() {
+                InitHooks::Installed(install(&directory, djf)?)
+            } else {
+                InitHooks::NoGit
+            })
+        }
+    };
     let inherited = if options.global {
         inherit(root, settings, options.global_tags.as_deref(), &mut stack)?
     } else {
@@ -242,6 +256,7 @@ pub fn init_project(
         bridges,
         project_map,
         inherited,
+        hooks,
     })
 }
 

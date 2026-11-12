@@ -7,6 +7,14 @@ pub type Step<'a> = &'a [&'a str];
 pub type Arguments<'a> =
     Box<dyn Fn(&std::path::Path) -> Result<Vec<String>, Box<dyn std::error::Error>> + 'a>;
 
+pub type Payload<'a> =
+    Box<dyn Fn(&std::path::Path) -> Result<String, Box<dyn std::error::Error>> + 'a>;
+
+pub enum Action<'a> {
+    Djf(Arguments<'a>),
+    EditHook(Payload<'a>),
+}
+
 #[derive(Clone, Copy)]
 pub enum Implementation {
     Python,

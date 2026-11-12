@@ -545,3 +545,19 @@ fn main_folders_skip_dependencies_and_dot_folders() {
         0
     );
 }
+
+#[test]
+fn no_gotcha_file_is_created_when_nothing_is_promoted() {
+    let home = tempfile::tempdir().unwrap();
+    let store = super::GlobalStore::new(home.path());
+    assert!(!store.append_gotcha_if_new(|_| None).unwrap());
+    assert!(!store.dir.join("library_gotchas.jsonl").exists());
+    let mut entry = serde_json::Map::new();
+    entry.insert("library".to_owned(), serde_json::json!("react"));
+    assert!(
+        store
+            .append_gotcha_if_new(|existing| existing.is_empty().then_some(entry))
+            .unwrap()
+    );
+    assert!(store.dir.join("library_gotchas.jsonl").exists());
+}

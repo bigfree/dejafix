@@ -3,8 +3,8 @@ use std::path::PathBuf;
 use super::project::regenerate_locked;
 use super::types::{Project, Recorded, WiringError};
 use crate::adapters::fs::{
-    FsResolver, GlobalStore, StoreError, clear_marker, detect_stack, lock_events, read_marker,
-    write_marker,
+    FsResolver, GlobalStore, LockedLog, StoreError, clear_marker, detect_stack, lock_events,
+    read_marker, write_marker,
 };
 use crate::adapters::git::head_short;
 use crate::core::event::{Event, EventKind};
@@ -46,8 +46,35 @@ pub fn record(
         redact: project.settings.redact,
     };
     let plan = plan_command(&log, command, &context, ids)?;
+    let incomplete = commit_events(
+        project,
+        &mut locked,
+        &mut log,
+        plan.events,
+        Some(&plan.marker),
+        true,
+        ids,
+    )?;
+    drop(locked);
+    Ok(Recorded {
+        outcome: plan.outcome,
+        notices: plan.notices,
+        incomplete,
+    })
+}
+
+pub(super) fn commit_events<'a>(
+    project: &Project,
+    locked: &mut LockedLog,
+    log: &mut EventLog<'a>,
+    events: Vec<Event<'a>>,
+    marker: Option<&MarkerChange>,
+    regenerate: bool,
+    ids: &mut impl Ids,
+) -> Result<Option<WiringError>, WiringError> {
+    let dir = &project.memory.dir;
     let mut lines = Vec::new();
-    for event in &plan.events {
+    for event in &events {
         event
             .write_line(&mut lines)
             .map_err(|error| StoreError::Write {
@@ -56,23 +83,21 @@ pub fn record(
             })?;
     }
     locked.append(&lines)?;
-    match &plan.marker {
-        MarkerChange::Keep => {}
-        MarkerChange::Set(issue) => write_marker(dir, issue.as_str()),
-        MarkerChange::Clear => clear_marker(dir),
+    match marker {
+        None | Some(MarkerChange::Keep) => {}
+        Some(MarkerChange::Set(issue)) => write_marker(dir, issue.as_str()),
+        Some(MarkerChange::Clear) => clear_marker(dir),
     }
-    for event in &plan.events {
+    for event in &events {
         promote(project, event, ids);
     }
-    for event in plan.events {
+    for event in events {
         log.push(event, &project.context, &FsResolver);
     }
-    let incomplete = regenerate_locked(project, &log).err();
-    drop(locked);
-    Ok(Recorded {
-        outcome: plan.outcome,
-        notices: plan.notices,
-        incomplete,
+    Ok(if regenerate {
+        regenerate_locked(project, log).err()
+    } else {
+        None
     })
 }
 

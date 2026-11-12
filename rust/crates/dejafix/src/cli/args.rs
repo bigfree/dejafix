@@ -121,6 +121,22 @@ pub enum Commands {
     },
     #[command(about = "Rebuild summary.md from events.jsonl.")]
     Regenerate,
+    #[command(about = "Manage dejafix git hooks (install/uninstall).")]
+    Hooks {
+        #[arg(default_value = "install", help = "Action: install or uninstall.")]
+        action: String,
+    },
+    #[command(
+        name = "_auto-capture",
+        hide = true,
+        about = "Internal: called by git hooks to auto-capture events."
+    )]
+    AutoCapture {
+        #[arg(default_value = "commit", help = "Trigger type: commit, merge.")]
+        trigger: String,
+    },
+    #[command(about = "Check staged changes (or named files) against project memory.")]
+    Precheck(PrecheckArgs),
 }
 
 #[derive(Debug, Args)]
@@ -212,4 +228,30 @@ pub enum ProjectAction {
         #[arg(short, long, help = "Remove the tag.")]
         remove: bool,
     },
+}
+
+#[derive(Debug, Args)]
+pub struct PrecheckArgs {
+    #[arg(
+        help = "Specific files to check (e.g. `djf precheck payment.py auth.py`). Default: staged files."
+    )]
+    pub files: Vec<String>,
+    #[arg(
+        short,
+        long,
+        default_value = "warn",
+        help = "Strictness: info, warn, block."
+    )]
+    pub level: String,
+    #[arg(long, help = "Check working tree instead of staged.")]
+    pub working: bool,
+    #[arg(short, long, help = "Only output if warnings present.")]
+    pub quiet: bool,
+    #[arg(
+        long,
+        help = "Silence precheck warnings for a duration (30m, 2h, 1d). The snooze is logged to memory, so the silence is audited."
+    )]
+    pub snooze: Option<String>,
+    #[arg(long, help = "Re-enable warnings before the snooze expires.")]
+    pub unsnooze: bool,
 }

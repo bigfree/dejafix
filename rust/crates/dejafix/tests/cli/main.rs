@@ -1,6 +1,9 @@
 mod doctor;
+mod edit_hook;
 mod guidance;
+mod hooks;
 mod init;
+mod precheck;
 mod project;
 mod read;
 mod support;

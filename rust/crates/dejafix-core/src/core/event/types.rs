@@ -106,7 +106,7 @@ pub(crate) struct LineContext<'c> {
     pub(super) now: Timestamp<'static>,
 }
 
-pub(super) struct Object<'a>(pub(super) Vec<(Cow<'a, str>, &'a RawValue)>);
+pub(crate) struct Object<'a>(pub(crate) Vec<(Cow<'a, str>, &'a RawValue)>);
 
 pub(super) struct CowStr<'a>(pub(super) Cow<'a, str>);
 

@@ -1,5 +1,6 @@
 mod args;
 mod doctor;
+mod hooks;
 mod init;
 mod notice;
 mod output;
@@ -122,7 +123,12 @@ fn dispatch(
 ) -> io::Result<Outcome> {
     let cwd = &config.cwd;
     match command {
-        Commands::Init(args) => return init::run(args, config, settings, out),
+        Commands::Init(args) => return init::run(args, config, settings, out, err),
+        Commands::Hooks { action } => return hooks::run_hooks(action, config, out, err),
+        Commands::AutoCapture { trigger } => {
+            return hooks::run_capture(&trigger, config, settings, out, err);
+        }
+        Commands::Precheck(args) => return hooks::run_precheck(args, config, settings, out, err),
         Commands::Project { action } => return project::run(action, config, settings, out),
         Commands::Doctor { fix, depth, path } => {
             let Some(paths) = config.client_paths() else {

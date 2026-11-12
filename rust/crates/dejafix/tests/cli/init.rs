@@ -98,10 +98,11 @@ fn retired_init_flags_are_accepted_as_no_ops() -> TestResult {
 }
 
 #[test]
-fn init_never_mentions_hooks() -> TestResult {
+fn init_without_hooks_never_mentions_them() -> TestResult {
     let repo = Repo::bare()?;
-    let out = init_stdout(&repo, &[])?;
+    let out = init_stdout(&repo, &["--no-hooks"])?;
     assert!(!out.to_lowercase().contains("hook"));
+    assert!(!repo.root.join(".git/hooks/pre-commit").exists());
     Ok(())
 }
 

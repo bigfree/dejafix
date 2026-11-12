@@ -403,6 +403,7 @@ version = "0.0.0"
 dependencies = [
  "assert_cmd",
  "clap",
+ "criterion",
  "dejafix-core",
  "insta",
  "jiff",
@@ -421,6 +422,7 @@ dependencies = [
  "jiff",
  "proptest",
  "regex",
+ "rustix",
  "serde",
  "serde_json",
  "sha1",

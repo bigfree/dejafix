@@ -158,25 +158,46 @@ impl GlobalStore {
     ) -> Result<bool, StoreError> {
         self.ensure()?;
         let path = self.path(GOTCHAS_FILE);
-        let mut file = OpenOptions::new()
-            .read(true)
-            .append(true)
-            .create(true)
-            .open(&path)
-            .map_err(write_error(&path))?;
-        file.lock().map_err(|source| StoreError::Lock {
-            path: path.clone(),
-            source,
-        })?;
-        let mut text = String::new();
-        if file.read_to_string(&mut text).is_err() {
-            return Ok(false);
-        }
-        let Some(existing) = parse_entries(&universal_newlines(&text)) else {
-            return Ok(false);
-        };
-        let Some(entry) = decide(&existing) else {
-            return Ok(false);
+        let opened = OpenOptions::new().read(true).append(true).open(&path);
+        let (mut file, entry) = match opened {
+            Ok(mut file) => {
+                file.lock().map_err(|source| StoreError::Lock {
+                    path: path.clone(),
+                    source,
+                })?;
+                let mut text = String::new();
+                if file.read_to_string(&mut text).is_err() {
+                    return Ok(false);
+                }
+                let Some(existing) = parse_entries(&universal_newlines(&text)) else {
+                    return Ok(false);
+                };
+                let Some(entry) = decide(&existing) else {
+                    return Ok(false);
+                };
+                (file, entry)
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                let Some(entry) = decide(&[]) else {
+                    return Ok(false);
+                };
+                let mut file = OpenOptions::new()
+                    .read(true)
+                    .append(true)
+                    .create(true)
+                    .open(&path)
+                    .map_err(write_error(&path))?;
+                file.lock().map_err(|source| StoreError::Lock {
+                    path: path.clone(),
+                    source,
+                })?;
+                let mut text = String::new();
+                if file.read_to_string(&mut text).is_err() || !text.is_empty() {
+                    return Ok(false);
+                }
+                (file, entry)
+            }
+            Err(error) => return Err(write_error(&path)(error)),
         };
         let mut line = Vec::new();
         write_canonical(&mut line, &Value::Object(entry))

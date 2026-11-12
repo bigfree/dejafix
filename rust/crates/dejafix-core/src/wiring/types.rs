@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use super::hooks::HooksReport;
 use crate::adapters::fs::{ClientConfig, MemoryDir, StoreError};
 use crate::core::doctor::Reverted;
 use crate::core::log::Skipped;
@@ -51,6 +52,13 @@ pub struct InitOptions {
     pub stack_detect: bool,
     pub global: bool,
     pub global_tags: Option<String>,
+    pub hooks: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum InitHooks {
+    Installed(HooksReport),
+    NoGit,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -74,6 +82,7 @@ pub struct InitReport {
     pub bridges: Vec<(&'static str, BridgeOutcome)>,
     pub project_map: Option<String>,
     pub inherited: Option<Inherited>,
+    pub hooks: Option<InitHooks>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

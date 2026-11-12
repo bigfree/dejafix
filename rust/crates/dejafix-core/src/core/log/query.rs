@@ -50,6 +50,11 @@ impl<'a> EventLog<'a> {
             .filter_map(|index| self.events.get(*index))
     }
 
+    #[must_use]
+    pub fn live_indices_for_file(&self, path: &str) -> &[usize] {
+        self.files.get(path).map_or(&[], Vec::as_slice)
+    }
+
     pub fn indexed_files(&self) -> impl Iterator<Item = &RelativePath<'a>> {
         self.files.keys()
     }

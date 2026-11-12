@@ -109,3 +109,57 @@ Append new entries at the end, one heading each, with this template:
 - Gain: a hostile folder name can no longer drive the terminal.
 - Compatibility: output differs from Python 0.4.x only for paths that contain control characters.
 - Status: proposed
+
+## Let the golden harness find the main checkout's virtualenv
+
+- Found: 2026-11-12, M3, `rust/crates/dejafix/tests/golden/harness.rs`
+- Today: without `DEJAFIX_PYTHON`, the harness looks for `.venv` in the repository it runs from. A git worktree has no `.venv`, so it falls back to the system `python3`, which lacks `typer`, and every golden test fails with an import error far from the cause.
+- Proposal: when the worktree has no `.venv`, look in the main checkout (`git rev-parse --git-common-dir`, then its parent) before falling back; if no interpreter with `typer` is found, fail once with a message that names `DEJAFIX_PYTHON`.
+- Gain: `just golden` and `just verify` work in every worktree without setup; a missing oracle is reported as such.
+- Compatibility: none (test tooling only).
+- Status: proposed
+
+## Find the hooks directory through git
+
+- Found: 2026-11-12, M3, `rust/crates/dejafix-core/src/adapters/git/hooks.rs`
+- Today: `djf hooks` and `djf init` use `<cwd>/.git/hooks`, as Python does. In a linked worktree `.git` is a file, and with `core.hooksPath` set (husky, lefthook, a shared hooks folder) git never runs what dejafix installs; both cases print "not a git repository" or install hooks that never fire.
+- Proposal: ask git (`git rev-parse --git-path hooks`), which honours worktrees and `core.hooksPath`, and print where the hooks went.
+- Gain: auto-capture and precheck work in worktrees and in repositories with a hooks manager.
+- Compatibility: output changes in those two cases only (Python reports an error or installs into an unused folder).
+- Status: proposed
+
+## Bake a stable path for the hook binary
+
+- Found: 2026-11-12, M3, `rust/crates/dejafix-core/src/adapters/git/hooks.rs`
+- Today: the hooks bake the `djf` next to `std::env::current_exe()`. On Linux that is the resolved path, so a Homebrew install bakes `…/Cellar/dejafix/<version>/bin/djf`, which disappears on the next upgrade; the hook then depends on its `command -v djf` fallback and the PATH git happens to have.
+- Proposal: when a `djf` on `PATH` resolves to the same file as the running executable, bake the `PATH` spelling (for example `/home/linuxbrew/.linuxbrew/bin/djf`), else the executable's path.
+- Gain: hooks keep working across package-manager upgrades without `djf init` again.
+- Compatibility: none for the hook format; only the baked path differs.
+- Status: proposed
+
+## One git query per file for churn and staleness
+
+- Found: 2026-11-12, M3, `rust/crates/dejafix-core/src/wiring/hooks/precheck.rs`
+- Today: precheck asks git twice per checked file (`git log --since=30.days.ago --oneline` for churn and `git log --format=%cI --since=<oldest claim>` for staleness), after `git diff --cached` has listed the staged files. On the measuring machine one git process costs 6–9 ms even for `git --version`, so a pre-commit run is at least two serial git start-ups (about 20 ms) before any work; measured whole-process median 29 ms against the 20 ms budget.
+- Proposal: one `git log --format=%cI --since=<min(30 days ago, oldest claim)> -- FILE` per file, counting churn from the same times (tried in M3: same output on every golden scenario, fewer processes), and accept that git's own `--since` walk can differ from an in-memory cut-off on clock-skewed histories. Separately, decide whether the budget measures the work dejafix does (about 9 ms with process start) or includes git's start-up cost.
+- Gain: half the git processes per precheck; a budget that can be met on macOS.
+- Compatibility: HIGH CHURN counts can differ from Python on histories whose committer dates go backwards.
+- Status: proposed
+
+## Pass log paths to git as literal pathspecs
+
+- Found: 2026-11-12, M3, `rust/crates/dejafix-core/src/adapters/git/history.rs`
+- Today: staleness and churn pass a path taken from `events.jsonl` to `git log -- PATH`, as Python does, so a logged path such as `src/*.py` or `:(top)x` is read as a glob or pathspec magic and counts commits of other files.
+- Proposal: add `--literal-pathspecs` (or `:(literal)`) to those queries.
+- Gain: counts always refer to the one file the event cites; a hostile log cannot widen the query.
+- Compatibility: counts change only for logged paths that contain glob or magic characters.
+- Status: proposed
+
+## Print the redacted summary after an auto-capture
+
+- Found: 2026-11-12, M3, `rust/crates/dejafix-core/src/wiring/hooks/capture.rs`
+- Today: like Python, `djf _auto-capture` stores the redacted event but prints `[dejafix] Auto-captured: …` with the summary as it was before redaction, so a secret in a commit message reaches the terminal (the hooks send it to /dev/null; a manual run does not).
+- Proposal: print the summary that was written.
+- Gain: a secret never appears in dejafix's own output.
+- Compatibility: stdout differs from Python only when a secret was redacted.
+- Status: proposed

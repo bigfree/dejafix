@@ -5,7 +5,7 @@ use std::path::PathBuf;
 
 use dejafix_core::ClientPaths;
 
-use super::types::Config;
+use super::types::{Config, HookConfig};
 
 const NO_REDACT_VALUES: [&str; 3] = ["1", "true", "yes"];
 
@@ -42,6 +42,24 @@ impl Config {
             redact,
             color: std::io::stdout().is_terminal(),
             zone: jiff::tz::TimeZone::system(),
+            path_var: env::var_os("PATH"),
+            exe_dir: env::current_exe()
+                .ok()
+                .and_then(|exe| exe.parent().map(std::path::Path::to_path_buf)),
         })
+    }
+}
+
+impl HookConfig {
+    pub fn from_env() -> Self {
+        Self {
+            cwd: env::current_dir().unwrap_or_default(),
+            temp: env::temp_dir(),
+            log: non_empty("DJF_EDIT_HOOK_LOG").map(PathBuf::from),
+        }
+    }
+
+    pub fn zone() -> jiff::tz::TimeZone {
+        jiff::tz::TimeZone::system()
     }
 }

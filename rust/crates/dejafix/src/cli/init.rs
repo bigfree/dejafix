@@ -3,7 +3,8 @@ use std::io::{self, Write};
 use std::path::Path;
 
 use dejafix_core::{
-    BridgeOutcome, InitOptions, Settings, init_project, other_projects, pinned_client_configs,
+    BridgeOutcome, InitHooks, InitOptions, Settings, init_project, other_projects,
+    pinned_client_configs,
 };
 
 use super::args::InitArgs;
@@ -184,9 +185,10 @@ pub fn run(
     config: &Config,
     settings: &Settings,
     out: &mut impl Write,
+    err: &mut impl Write,
 ) -> io::Result<Outcome> {
     let InitArgs {
-        no_hooks: _,
+        no_hooks,
         no_global,
         no_watch: _,
         no_backfill: _,
@@ -202,6 +204,7 @@ pub fn run(
         stack_detect: !no_stack_detect,
         global: !no_global,
         global_tags,
+        hooks: (!no_hooks).then(|| super::hooks::djf_binary(config)),
     };
     let root = &config.cwd;
     let report = match init_project(root, config.home.as_deref(), settings, &options) {
@@ -228,6 +231,7 @@ pub fn run(
             "  PROJECT_MAP.md: pre-populated from project manifests{suffix}."
         )?;
     }
+    print_hooks(report.hooks.as_ref(), out, err)?;
     if let Some(inherited) = &report.inherited {
         writeln!(
             out,
@@ -281,4 +285,25 @@ pub fn run(
         "\n  Next: Start an AI session to refine PROJECT_MAP.md and capture decisions."
     )?;
     Ok(Outcome::Done)
+}
+
+fn print_hooks(
+    hooks: Option<&InitHooks>,
+    out: &mut impl Write,
+    err: &mut impl Write,
+) -> io::Result<()> {
+    match hooks {
+        Some(InitHooks::Installed(hooks)) => {
+            super::hooks::print_report(hooks, out, err)?;
+            writeln!(
+                out,
+                "  Auto-capture active — events will be logged automatically."
+            )
+        }
+        Some(InitHooks::NoGit) => writeln!(
+            out,
+            "  Note: No .git directory found. Run `djf hooks install` after `git init`."
+        ),
+        None => Ok(()),
+    }
 }

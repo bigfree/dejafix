@@ -291,6 +291,7 @@ fn options() -> InitOptions {
         stack_detect: true,
         global: true,
         global_tags: None,
+        hooks: None,
     }
 }
 

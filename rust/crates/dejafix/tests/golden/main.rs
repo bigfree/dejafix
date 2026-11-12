@@ -4,6 +4,7 @@ mod m1;
 mod m2;
 mod m2b;
 mod m2c;
+mod m3;
 mod normalize;
 mod scenario;
 mod types;

@@ -2,11 +2,12 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;
 use std::ffi::OsStr;
 use std::fs;
+use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
+use std::process::{Command, Output, Stdio};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::types::{Arguments, Implementation, Normalizer, Run, Step, StepOutput};
+use crate::types::{Action, Arguments, Implementation, Normalizer, Run, Step, StepOutput};
 
 pub fn python(repository: &Path) -> PathBuf {
     if let Some(python) = std::env::var_os("DEJAFIX_PYTHON") {
@@ -78,37 +79,83 @@ pub fn run_scenario(
     home_fixture: Option<&Path>,
     steps: &[Arguments<'_>],
 ) -> Result<Run, Box<dyn Error>> {
+    let actions: Vec<Action<'_>> = steps
+        .iter()
+        .map(|step| Action::Djf(Box::new(move |project: &Path| step(project))))
+        .collect();
+    run_actions(implementation, fixture, home_fixture, &actions)
+}
+
+const GIT_HOOKS: [&str; 3] = ["post-commit", "post-merge", "pre-commit"];
+
+pub fn run_actions(
+    implementation: Implementation,
+    fixture: &Path,
+    home_fixture: Option<&Path>,
+    actions: &[Action<'_>],
+) -> Result<Run, Box<dyn Error>> {
     let since = now_iso()?;
     let temp = tempfile::tempdir()?;
     let project = temp.path().join("project");
     let home = temp.path().join("home");
+    let scratch = temp.path().join("tmp");
     copy_tree(fixture, &project)?;
     match home_fixture {
         Some(source) => copy_tree(source, &home)?,
         None => fs::create_dir_all(&home)?,
     }
+    fs::create_dir_all(&scratch)?;
     let repository = repository()?;
     let source = repository.join("src");
     let interpreter = python(&repository);
-    let mut outputs = Vec::with_capacity(steps.len());
-    for step in steps {
-        let args = step(&project)?;
+    let mut outputs = Vec::with_capacity(actions.len());
+    for action in actions {
+        let (program, module, args, stdin) = match action {
+            Action::Djf(arguments) => (
+                env!("CARGO_BIN_EXE_djf"),
+                "dejafix.cli",
+                arguments(&project)?,
+                None,
+            ),
+            Action::EditHook(payload) => (
+                env!("CARGO_BIN_EXE_djf-edit-hook"),
+                "dejafix.edit_hook",
+                Vec::new(),
+                Some(payload(&project)?),
+            ),
+        };
         let mut command = match implementation {
             Implementation::Python => {
                 let mut command = isolated(&interpreter, &home, &source);
-                command.args(["-m", "dejafix.cli"]);
+                command.args(["-m", module]);
                 command
             }
-            Implementation::Rust => isolated(env!("CARGO_BIN_EXE_djf"), &home, &source),
+            Implementation::Rust => isolated(program, &home, &source),
         };
-        outputs.push(output(command.args(&args).current_dir(&project))?);
+        for name in ["TMPDIR", "TEMP", "TMP"] {
+            command.env(name, &scratch);
+        }
+        command.args(&args).current_dir(&project);
+        outputs.push(match stdin {
+            Some(stdin) => output_with_stdin(&mut command, &stdin)?,
+            None => output(&mut command)?,
+        });
     }
     let mut files = BTreeMap::new();
     snapshot(&project, "project", &mut files)?;
     snapshot(&home, "home", &mut files)?;
+    snapshot_git_hooks(&project, &mut files)?;
     let python_version = python_version(&repository)?;
-    let mut normalizer = Normalizer::new(&[(&project, "<PROJECT>"), (&home, "<HOME>")], &since)?
-        .with_versions(&[&python_version, env!("CARGO_PKG_VERSION")])?;
+    let mut normalizer = Normalizer::new(
+        &[
+            (&project, "<PROJECT>"),
+            (&home, "<HOME>"),
+            (&scratch, "<TMP>"),
+            (temp.path(), "<ROOT>"),
+        ],
+        &since,
+    )?
+    .with_versions(&[&python_version, env!("CARGO_PKG_VERSION")])?;
     let steps = outputs
         .into_iter()
         .map(|output| StepOutput {
@@ -125,6 +172,55 @@ pub fn run_scenario(
         })
         .collect();
     Ok(Run { steps, files })
+}
+
+fn output_with_stdin(command: &mut Command, stdin: &str) -> Result<Output, Box<dyn Error>> {
+    let mut child = command
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|error| format!("cannot run {}: {error}", command.get_program().display()))?;
+    child
+        .stdin
+        .take()
+        .ok_or("no stdin")?
+        .write_all(stdin.as_bytes())?;
+    Ok(child.wait_with_output()?)
+}
+
+fn snapshot_git_hooks(
+    project: &Path,
+    files: &mut BTreeMap<String, String>,
+) -> Result<(), Box<dyn Error>> {
+    let hooks = project.join(".git/hooks");
+    for name in GIT_HOOKS {
+        let path = hooks.join(name);
+        if !path.is_file() {
+            continue;
+        }
+        let text = String::from_utf8_lossy(&fs::read(&path)?).into_owned();
+        files.insert(format!("project/.git/hooks/{name}"), text);
+        files.insert(format!("project/.git/hooks/{name} (mode)"), mode(&path)?);
+    }
+    Ok(())
+}
+
+#[cfg(unix)]
+fn mode(path: &Path) -> Result<String, Box<dyn Error>> {
+    use std::os::unix::fs::PermissionsExt;
+    Ok(format!(
+        "{:o}",
+        fs::metadata(path)?.permissions().mode() & 0o777
+    ))
+}
+
+#[cfg(not(unix))]
+fn mode(path: &Path) -> Result<String, Box<dyn Error>> {
+    Ok(format!(
+        "readonly={}",
+        fs::metadata(path)?.permissions().readonly()
+    ))
 }
 
 pub fn diff(left: &Run, right: &Run) -> Vec<String> {
