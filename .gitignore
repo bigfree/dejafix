@@ -51,7 +51,7 @@ htmlcov/
 # Exclude the entire folder from the public source repo.
 landing/
 scripts/
-docs/
+docs/*
 
 # ── Editor / IDE / OS junk ─────────────────────────────────────
 .DS_Store
@@ -81,10 +81,13 @@ TODO.md
 
 # ── Sensitive / private (do not push) ──────────────────────────
 report/
-docs/
+docs/*
 DEJAFIX_PLAN.md
 *PLAN*.md
 *plan*.md
+# Design specs and implementation plans of this fork are public.
+!docs/superpowers/
+!docs/superpowers/**
 .worktrees/
 
 # Brand SVG sources only (PNGs and demo SVG stay public)
