@@ -142,9 +142,9 @@ Append new entries at the end, one heading each, with this template:
 - Found: 2026-11-12, M3, `rust/crates/dejafix-core/src/wiring/hooks/precheck.rs`
 - Today: precheck asks git twice per checked file (`git log --since=30.days.ago --oneline` for churn and `git log --format=%cI --since=<oldest claim>` for staleness), after `git diff --cached` has listed the staged files. On the measuring machine one git process costs 6–9 ms even for `git --version`, so a pre-commit run is at least two serial git start-ups (about 20 ms) before any work; measured whole-process median 29 ms against the 20 ms budget.
 - Proposal: one `git log --format=%cI --since=<min(30 days ago, oldest claim)> -- FILE` per file, counting churn from the same times (tried in M3: same output on every golden scenario, fewer processes), and accept that git's own `--since` walk can differ from an in-memory cut-off on clock-skewed histories. Separately, decide whether the budget measures the work dejafix does (about 9 ms with process start) or includes git's start-up cost.
-- Gain: half the git processes per precheck; a budget that can be met on macOS.
+- Gain: half the git processes per precheck.
 - Compatibility: HIGH CHURN counts can differ from Python on histories whose committer dates go backwards.
-- Status: proposed
+- Status: approved by the user on 2026-11-12 on condition of a clear speed-up, implemented and measured (A/B, same load: 25.6 ms against 26.3 ms median for a staged precheck, about 3 %), and therefore not kept. The critical path is two serial git start-ups; only removing one of them (for example listing staged files without a `git diff` process) can reach 20 ms on this machine.
 
 ## Pass log paths to git as literal pathspecs
 
