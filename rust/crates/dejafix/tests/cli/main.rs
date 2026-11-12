@@ -1,3 +1,4 @@
+mod doctor;
 mod guidance;
 mod init;
 mod project;

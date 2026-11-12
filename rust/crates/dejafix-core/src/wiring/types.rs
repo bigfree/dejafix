@@ -1,6 +1,8 @@
 use std::path::PathBuf;
 
-use crate::adapters::fs::{MemoryDir, StoreError};
+use crate::adapters::fs::{ClientConfig, MemoryDir, StoreError};
+use crate::core::doctor::Reverted;
+use crate::core::log::Skipped;
 use crate::core::path::PathContext;
 use crate::core::registry::{ProjectRecord, RegistryError};
 use crate::core::time::Clock;
@@ -118,4 +120,47 @@ pub enum RegistryReply {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UpgradeNotice {
     pub version: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DoctorOptions {
+    pub fix: bool,
+    pub depth: usize,
+    pub roots: Option<Vec<String>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CorruptLog {
+    pub path: PathBuf,
+    pub lines: Vec<Skipped>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct DoctorReport {
+    pub roots: usize,
+    pub found: usize,
+    pub missing: Vec<PathBuf>,
+    pub register_failures: Vec<(PathBuf, String)>,
+    pub stale: Vec<ProjectRecord>,
+    pub prune_failure: Option<String>,
+    pub unreadable: Vec<ClientConfig>,
+    pub pinned: Vec<ClientConfig>,
+    pub reverted: Vec<Reverted>,
+    pub corrupt: Vec<CorruptLog>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FoundProject {
+    pub path: PathBuf,
+    pub known: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ScanReport {
+    NotADirectory(PathBuf),
+    Scanned {
+        roots: Vec<PathBuf>,
+        found: Vec<FoundProject>,
+        failures: Vec<(PathBuf, String)>,
+    },
 }

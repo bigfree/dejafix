@@ -5,6 +5,7 @@ use std::path::{Component, Path, PathBuf};
 use serde_json::{Map, Value};
 
 use super::types::{RegistryFiles, StoreError};
+use super::write::write_text;
 use crate::core::json::write_python_json_indented;
 use crate::core::registry::{Loaded, Registry, list_payload, load, meta_payload};
 use crate::core::text::platform_newlines;
@@ -13,6 +14,7 @@ const LIST_FILE: &str = "projects.json";
 const META_FILE: &str = "projects.meta.json";
 const BACKUP_FILE: &str = "projects.json.bak";
 const LAST_VERSION: &str = "last_version";
+const DOCTOR_STATE: &str = "doctor-state.json";
 
 fn read_json(path: &Path) -> Option<Value> {
     let bytes = fs::read(path).ok()?;
@@ -109,6 +111,29 @@ impl RegistryFiles {
         self.read_meta().remove(LAST_VERSION)
     }
 
+    #[must_use]
+    pub fn doctor_state(&self) -> Map<String, Value> {
+        match read_json(&self.list.with_file_name(DOCTOR_STATE)) {
+            Some(Value::Object(state)) => state,
+            _ => Map::new(),
+        }
+    }
+
+    pub fn save_doctor_state(&self, state: Map<String, Value>) -> Result<(), StoreError> {
+        let path = self.list.with_file_name(DOCTOR_STATE);
+        let failed = |source: io::Error| StoreError::Write {
+            path: path.clone(),
+            source,
+        };
+        if let Some(directory) = path.parent() {
+            fs::create_dir_all(directory).map_err(failed)?;
+        }
+        let mut text = Vec::new();
+        write_python_json_indented(&mut text, &Value::Object(state), 2, true)
+            .map_err(|error| failed(error.into()))?;
+        write_text(&path, &String::from_utf8_lossy(&text))
+    }
+
     pub fn record_version(&self, version: &str) {
         let mut meta = self.read_meta();
         meta.insert(LAST_VERSION.to_owned(), Value::String(version.to_owned()));
@@ -138,6 +163,11 @@ fn without_verbatim(path: PathBuf) -> PathBuf {
         return PathBuf::from(rest);
     }
     path
+}
+
+#[must_use]
+pub fn canonical_path(path: &Path) -> Option<PathBuf> {
+    fs::canonicalize(path).ok().map(without_verbatim)
 }
 
 #[must_use]

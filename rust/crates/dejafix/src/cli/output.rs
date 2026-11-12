@@ -13,19 +13,21 @@ pub const ARROW: &str = "→";
 pub const RULE_DOUBLE: &str = "═";
 
 impl Style {
-    fn code(self) -> &'static str {
+    fn prefix(self) -> &'static str {
         match self {
-            Self::Red => "31",
-            Self::Green => "32",
-            Self::Yellow => "33",
-            Self::Cyan => "36",
+            Self::Red => "\x1b[31m",
+            Self::Green => "\x1b[32m",
+            Self::Yellow => "\x1b[33m",
+            Self::Cyan => "\x1b[36m",
+            Self::Bold => "\x1b[1m",
+            Self::GreenBold => "\x1b[32m\x1b[1m",
         }
     }
 }
 
 pub fn secho(out: &mut impl Write, text: &str, style: Style, color: bool) -> io::Result<()> {
     if color {
-        writeln!(out, "\x1b[{}m{text}\x1b[0m", style.code())
+        writeln!(out, "{}{text}\x1b[0m", style.prefix())
     } else {
         writeln!(out, "{text}")
     }

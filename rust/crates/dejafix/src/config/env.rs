@@ -3,6 +3,8 @@ use std::ffi::OsString;
 use std::io::IsTerminal;
 use std::path::PathBuf;
 
+use dejafix_core::ClientPaths;
+
 use super::types::Config;
 
 const NO_REDACT_VALUES: [&str; 3] = ["1", "true", "yes"];
@@ -12,6 +14,15 @@ fn non_empty(name: &str) -> Option<OsString> {
 }
 
 impl Config {
+    pub fn client_paths(&self) -> Option<ClientPaths> {
+        Some(ClientPaths {
+            home: self.home.clone()?,
+            xdg_config_home: self.xdg_config_home.clone(),
+            appdata: self.appdata.clone(),
+            local_appdata: self.local_appdata.clone(),
+        })
+    }
+
     pub fn from_env() -> std::io::Result<Self> {
         let cwd = env::current_dir()?;
         let home = env::home_dir();

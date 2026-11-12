@@ -18,7 +18,7 @@ pub(super) fn load_registry(settings: &Settings) -> Result<Registry, StoreError>
     RegistryFiles::new(&settings.dejafix_home).load(&now_text(settings))
 }
 
-fn has_memory(path: &Path) -> bool {
+pub(super) fn has_memory(path: &Path) -> bool {
     path.join(MEMORY_DIR).is_dir()
 }
 

@@ -5,12 +5,11 @@ use dejafix_core::{
     register_project, registry_op,
 };
 
+use super::USER_ERROR;
 use super::args::ProjectAction;
 use super::output::{FAIL, OK, RUNNING, WARN, secho};
 use super::types::{Outcome, Style};
 use crate::config::Config;
-
-const USER_ERROR: u8 = 1;
 
 fn listing(project: &ListedProject, active: Option<&str>) -> String {
     let record = &project.record;
@@ -147,6 +146,11 @@ pub fn run(
                 .map(|record| print_registered(&record, out, color));
             return finish(result, out, color);
         }
+        ProjectAction::Scan {
+            paths,
+            depth,
+            dry_run,
+        } => return super::doctor::scan(&paths, depth, dry_run, config, settings, out),
         ProjectAction::List => RegistryOp::List,
         ProjectAction::Use { identifier } => RegistryOp::Use(identifier),
         ProjectAction::Remove { identifier } => RegistryOp::Remove(identifier),

@@ -15,6 +15,8 @@ pub enum Style {
     Red,
     Yellow,
     Cyan,
+    Bold,
+    GreenBold,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

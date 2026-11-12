@@ -246,15 +246,20 @@ impl Registry {
         resolve: impl Fn(&str) -> Option<PathBuf>,
     ) -> Result<ProjectRecord, RegistryError> {
         let index = self.require(identifier, resolve)?;
-        let record = self
+        let id = self
             .projects
             .get(index)
-            .cloned()
+            .map(|record| record.id.clone())
             .ok_or_else(|| RegistryError::NotFound(identifier.to_owned()))?;
-        if self.active_project.as_deref() == Some(record.id.as_str()) {
+        self.remove_id(&id)
+            .ok_or_else(|| RegistryError::NotFound(identifier.to_owned()))
+    }
+
+    pub fn remove_id(&mut self, id: &str) -> Option<ProjectRecord> {
+        let index = self.projects.iter().position(|record| record.id == id)?;
+        if self.active_project.as_deref() == Some(id) {
             self.active_project = None;
         }
-        self.projects.retain(|existing| existing.id != record.id);
-        Ok(record)
+        Some(self.projects.remove(index))
     }
 }

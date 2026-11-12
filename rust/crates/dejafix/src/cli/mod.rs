@@ -1,4 +1,5 @@
 mod args;
+mod doctor;
 mod init;
 mod notice;
 mod output;
@@ -21,7 +22,7 @@ use crate::config::Config;
 use args::{Cli, Commands};
 use types::Outcome;
 
-const USER_ERROR: u8 = 1;
+pub(super) const USER_ERROR: u8 = 1;
 const IO_ERROR: u8 = 3;
 
 pub fn run(
@@ -123,6 +124,13 @@ fn dispatch(
     match command {
         Commands::Init(args) => return init::run(args, config, settings, out),
         Commands::Project { action } => return project::run(action, config, settings, out),
+        Commands::Doctor { fix, depth, path } => {
+            let Some(paths) = config.client_paths() else {
+                writeln!(err, "Error: cannot determine the home directory")?;
+                return Ok(Outcome::Exit(IO_ERROR));
+            };
+            return doctor::run(fix, depth, path, &paths, config, settings, out);
+        }
         _ => {}
     }
     let project = match Project::open(cwd, settings.clone()) {

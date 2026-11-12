@@ -323,3 +323,24 @@ fn an_older_dejafix_can_only_append_a_path() {
     assert_eq!(appended.find("a", no_resolve), Some(0));
     assert_eq!(appended.projects[0].created_at, NOW);
 }
+
+#[test]
+fn remove_id_removes_only_that_record_and_clears_it_as_active() {
+    let mut registry = registry_of(&["/code/api", "/code/web"]);
+    registry
+        .set_alias("web", "api-old", LATER, no_resolve)
+        .unwrap();
+    registry.active_project = Some("web".to_owned());
+    assert_eq!(
+        registry.remove_id("api").map(|record| record.id),
+        Some("api".to_owned())
+    );
+    assert_eq!(ids(&registry), ["web"]);
+    assert_eq!(registry.active_project.as_deref(), Some("web"));
+    assert_eq!(
+        registry.remove_id("web").map(|record| record.id),
+        Some("web".to_owned())
+    );
+    assert_eq!(registry.active_project, None);
+    assert_eq!(registry.remove_id("web"), None);
+}

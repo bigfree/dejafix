@@ -34,6 +34,21 @@ pub enum Commands {
         #[command(subcommand)]
         action: ProjectAction,
     },
+    #[command(about = "Check your setup: unregistered projects, stale entries, pinned configs.")]
+    Doctor {
+        #[arg(long, help = "Apply the fixes, not just report them.")]
+        fix: bool,
+        #[arg(
+            short,
+            long,
+            default_value_t = 4,
+            allow_negative_numbers = true,
+            help = "How deep to scan for projects."
+        )]
+        depth: i64,
+        #[arg(short, long, help = "Scan here instead of the usual places.")]
+        path: Vec<String>,
+    },
     #[command(about = "Start a new issue.")]
     Log {
         text: String,
@@ -159,6 +174,25 @@ pub enum ProjectAction {
         path: Option<String>,
         #[arg(short, long, help = "Short name to call it by.")]
         alias: Option<String>,
+    },
+    #[command(about = "Find projects that already have memory and add them to the registry.")]
+    Scan {
+        #[arg(help = "Where to look. Several are allowed (default: here).")]
+        paths: Vec<String>,
+        #[arg(
+            short,
+            long,
+            default_value_t = 4,
+            allow_negative_numbers = true,
+            help = "How deep to walk."
+        )]
+        depth: i64,
+        #[arg(
+            short = 'n',
+            long = "dry-run",
+            help = "Show what would be registered, change nothing."
+        )]
+        dry_run: bool,
     },
     #[command(about = "Show every registered project.")]
     List,

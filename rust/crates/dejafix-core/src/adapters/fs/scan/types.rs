@@ -21,3 +21,14 @@ pub struct ClientConfig {
     pub path: PathBuf,
     pub state: ConfigState,
 }
+
+#[cfg(unix)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Identity {
+    pub(super) device: u64,
+    pub(super) inode: u64,
+}
+
+#[cfg(not(unix))]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Identity(pub(super) PathBuf);

@@ -2,10 +2,12 @@ use std::fs;
 use std::path::Path;
 
 use super::{
-    BridgeOutcome, InitOptions, MemoryFile, Project, RegistryOp, RegistryReply, SearchOutput,
-    Settings, WiringError, add_plan_idea, init_project, other_projects, read_memory_file, record,
-    regenerate, register_project, registry_op, search_project, show, upgrade_notice,
+    BridgeOutcome, DoctorOptions, InitOptions, MemoryFile, Project, RegistryOp, RegistryReply,
+    ScanReport, SearchOutput, Settings, WiringError, add_plan_idea, doctor, init_project,
+    other_projects, read_memory_file, record, regenerate, register_project, registry_op,
+    scan_projects, search_project, show, upgrade_notice,
 };
+use crate::adapters::fs::ClientPaths;
 use crate::core::event::Outcome;
 use crate::core::registry::RegistryError;
 use crate::core::scaffold::{INSTRUCTIONS_VERSION, ai_instructions, instructions_version};
@@ -691,4 +693,306 @@ fn a_symlink_out_of_the_project_is_never_copied_into_it() {
             .exists()
     );
     assert_eq!(fs::read_to_string(&secret).unwrap(), "TOKEN=hunter2\n");
+}
+
+struct Machine {
+    _dir: tempfile::TempDir,
+    root: std::path::PathBuf,
+    paths: ClientPaths,
+    settings: Settings,
+}
+
+fn machine() -> Machine {
+    let dir = tempfile::tempdir().unwrap();
+    let root = fs::canonicalize(dir.path()).unwrap();
+    let home = root.join("home");
+    fs::create_dir_all(&home).unwrap();
+    Machine {
+        paths: ClientPaths {
+            home: home.clone(),
+            xdg_config_home: None,
+            appdata: None,
+            local_appdata: None,
+        },
+        settings: settings(&root.join("djf")),
+        root,
+        _dir: dir,
+    }
+}
+
+fn doctor_options(fix: bool, roots: &[&std::path::Path]) -> DoctorOptions {
+    DoctorOptions {
+        fix,
+        depth: 4,
+        roots: Some(
+            roots
+                .iter()
+                .map(|root| root.display().to_string())
+                .collect(),
+        ),
+    }
+}
+
+fn registered(machine: &Machine) -> Vec<std::path::PathBuf> {
+    match registry_op(&machine.settings, &machine.root, None, RegistryOp::List).unwrap() {
+        RegistryReply::Listed { projects, .. } => projects
+            .into_iter()
+            .map(|project| project.record.path)
+            .collect(),
+        other => panic!("{other:?}"),
+    }
+}
+
+#[test]
+fn doctor_reports_then_registers_what_it_finds() {
+    let machine = machine();
+    let work = machine.root.join("work");
+    empty_project(&work.join("one"));
+    let options = doctor_options(false, &[&work]);
+    let report = doctor(&machine.settings, &machine.paths, &machine.root, &options).unwrap();
+    assert_eq!((report.roots, report.found), (1, 1));
+    assert_eq!(report.missing, [work.join("one")]);
+    assert_eq!(registered(&machine).len(), 0);
+    let fixed = doctor_options(true, &[&work]);
+    let report = doctor(&machine.settings, &machine.paths, &machine.root, &fixed).unwrap();
+    assert_eq!(report.register_failures.len(), 0);
+    assert_eq!(registered(&machine), [work.join("one")]);
+    let again = doctor(&machine.settings, &machine.paths, &machine.root, &options).unwrap();
+    assert_eq!(again.missing.len(), 0);
+}
+
+#[test]
+fn doctor_prunes_entries_whose_memory_is_gone() {
+    let machine = machine();
+    let gone = machine.root.join("deleted");
+    empty_project(&gone);
+    register_project(&machine.settings, &machine.root, None, "deleted", None).unwrap();
+    registry_op(
+        &machine.settings,
+        &machine.root,
+        None,
+        RegistryOp::Use(Some("deleted".into())),
+    )
+    .unwrap();
+    fs::remove_dir_all(gone.join(".dejafix")).unwrap();
+    let empty = machine.root.join("empty-dir");
+    let report = doctor(
+        &machine.settings,
+        &machine.paths,
+        &machine.root,
+        &doctor_options(true, &[&empty]),
+    )
+    .unwrap();
+    assert_eq!(report.stale.len(), 1);
+    assert_eq!(report.prune_failure, None);
+    assert_eq!(registered(&machine).len(), 0);
+}
+
+#[test]
+fn doctor_tracks_pinned_configs_across_runs() {
+    let machine = machine();
+    let config = machine.paths.home.join(".cursor/mcp.json");
+    fs::create_dir_all(config.parent().unwrap()).unwrap();
+    let options = doctor_options(false, &[]);
+    fs::write(&config, r#"{"dejafix": {"args": []}}"#).unwrap();
+    let first = doctor(&machine.settings, &machine.paths, &machine.root, &options).unwrap();
+    assert!(first.pinned.is_empty() && first.reverted.is_empty());
+    let state = fs::read_to_string(machine.root.join("djf/doctor-state.json")).unwrap();
+    let key = serde_json::to_string(&config.display().to_string()).unwrap();
+    assert_eq!(
+        state,
+        format!(
+            "{{\n  {key}: {{\n    \"client\": \"Cursor\",\n    \"pinned\": false,\n    \"seen\": \"2027-01-15 08:00\"\n  }}\n}}"
+        )
+    );
+    fs::write(&config, r#"{"dejafix": {"args": ["--root", "/x"]}}"#).unwrap();
+    let second = doctor(&machine.settings, &machine.paths, &machine.root, &options).unwrap();
+    assert_eq!(second.pinned.len(), 1);
+    assert_eq!(
+        second
+            .reverted
+            .iter()
+            .map(|entry| (entry.client.as_str(), entry.clean_since.as_str()))
+            .collect::<Vec<_>>(),
+        [("Cursor", "2027-01-15 08:00")]
+    );
+}
+
+#[test]
+fn doctor_survives_an_unwritable_state_file_and_reports_unreadable_configs() {
+    let machine = machine();
+    fs::create_dir_all(machine.root.join("djf/doctor-state.json")).unwrap();
+    fs::create_dir_all(machine.paths.home.join(".codex/config.toml")).unwrap();
+    let report = doctor(
+        &machine.settings,
+        &machine.paths,
+        &machine.root,
+        &doctor_options(false, &[]),
+    )
+    .unwrap();
+    assert_eq!(report.unreadable.len(), 1);
+    assert_eq!(report.reverted.len(), 0);
+}
+
+#[test]
+fn doctor_reports_corrupt_lines_of_registered_projects() {
+    let machine = machine();
+    let project = machine.root.join("broken");
+    empty_project(&project);
+    fs::write(
+        project.join(".dejafix/events.jsonl"),
+        "{not json\n\n{\"type\": \"note\", \"summary\": \"ok\", \"id\": \"evt_1\", \"timestamp\": \"2026-01-01T00:00:00Z\"}\n[1]\n",
+    )
+    .unwrap();
+    register_project(&machine.settings, &machine.root, None, "broken", None).unwrap();
+    let report = doctor(
+        &machine.settings,
+        &machine.paths,
+        &machine.root,
+        &doctor_options(false, &[]),
+    )
+    .unwrap();
+    assert_eq!(report.corrupt.len(), 1);
+    let log = report.corrupt.first().unwrap();
+    assert_eq!(log.path, project.join(".dejafix/events.jsonl"));
+    assert_eq!(
+        log.lines
+            .iter()
+            .map(|skipped| skipped.line)
+            .collect::<Vec<_>>(),
+        [1, 4]
+    );
+}
+
+#[test]
+fn a_failed_registration_is_reported_per_project_and_not_kept() {
+    let machine = machine();
+    let work = machine.root.join("work");
+    empty_project(&work.join("one"));
+    fs::create_dir_all(machine.root.join("djf/projects.json")).unwrap();
+    let report = doctor(
+        &machine.settings,
+        &machine.paths,
+        &machine.root,
+        &doctor_options(true, &[&work]),
+    )
+    .unwrap();
+    assert_eq!(report.register_failures.len(), 1);
+    assert!(
+        report.register_failures.first().is_some_and(
+            |(path, message)| *path == work.join("one") && message.starts_with("cannot write")
+        )
+    );
+    assert_eq!(report.corrupt.len(), 0);
+}
+
+#[test]
+fn scan_registers_fresh_projects_once() {
+    let machine = machine();
+    let work = machine.root.join("work");
+    empty_project(&work.join("one"));
+    empty_project(&work.join("nested/two"));
+    let paths = [work.display().to_string()];
+    let dry = scan_projects(&machine.settings, &machine.root, None, &paths, 4, true).unwrap();
+    assert!(
+        matches!(&dry, ScanReport::Scanned { found, failures, .. } if found.len() == 2 && failures.is_empty())
+    );
+    assert_eq!(registered(&machine).len(), 0);
+    scan_projects(&machine.settings, &machine.root, None, &paths, 4, false).unwrap();
+    let mut paths_now = registered(&machine);
+    paths_now.sort();
+    assert_eq!(paths_now, [work.join("nested/two"), work.join("one")]);
+    let again = scan_projects(&machine.settings, &machine.root, None, &paths, 4, false).unwrap();
+    assert!(
+        matches!(again, ScanReport::Scanned { found, .. } if found.iter().all(|project| project.known))
+    );
+}
+
+#[test]
+fn scan_refuses_a_root_that_is_not_a_directory() {
+    let machine = machine();
+    let report = scan_projects(
+        &machine.settings,
+        &machine.root,
+        None,
+        &["missing".to_owned()],
+        4,
+        false,
+    )
+    .unwrap();
+    assert_eq!(
+        report,
+        ScanReport::NotADirectory(machine.root.join("missing"))
+    );
+    let here = scan_projects(&machine.settings, &machine.root, None, &[], 4, false).unwrap();
+    assert!(
+        matches!(here, ScanReport::Scanned { roots, found, .. } if roots == [machine.root.clone()] && found.is_empty())
+    );
+    assert!(!machine.root.join("djf/projects.json").exists());
+}
+
+#[test]
+fn doctor_ignores_configs_that_never_mention_dejafix() {
+    let machine = machine();
+    let config = machine.paths.home.join(".cursor/mcp.json");
+    fs::create_dir_all(config.parent().unwrap()).unwrap();
+    fs::write(
+        &config,
+        r#"{"mcpServers":{"other":{"args":["--root","/x"]}}}"#,
+    )
+    .unwrap();
+    let report = doctor(
+        &machine.settings,
+        &machine.paths,
+        &machine.root,
+        &doctor_options(false, &[]),
+    )
+    .unwrap();
+    assert_eq!(report.pinned.len(), 0);
+    assert_eq!(
+        fs::read_to_string(machine.root.join("djf/doctor-state.json")).unwrap(),
+        "{}"
+    );
+}
+
+#[test]
+fn doctor_prunes_the_stale_record_not_one_whose_alias_matches_its_id() {
+    let machine = machine();
+    let api = machine.root.join("api");
+    let web = machine.root.join("web");
+    empty_project(&api);
+    empty_project(&web);
+    register_project(&machine.settings, &machine.root, None, "web", Some("api")).unwrap();
+    register_project(&machine.settings, &machine.root, None, "api", None).unwrap();
+    fs::remove_dir_all(api.join(".dejafix")).unwrap();
+    doctor(
+        &machine.settings,
+        &machine.paths,
+        &machine.root,
+        &doctor_options(true, &[&machine.root.join("none")]),
+    )
+    .unwrap();
+    assert_eq!(registered(&machine), [web]);
+}
+
+#[cfg(unix)]
+#[test]
+fn doctor_never_reads_an_events_file_that_is_not_a_regular_file() {
+    let machine = machine();
+    let project = machine.root.join("fifo");
+    empty_project(&project);
+    let status = std::process::Command::new("mkfifo")
+        .arg(project.join(".dejafix/events.jsonl"))
+        .status()
+        .unwrap();
+    assert!(status.success());
+    register_project(&machine.settings, &machine.root, None, "fifo", None).unwrap();
+    let report = doctor(
+        &machine.settings,
+        &machine.paths,
+        &machine.root,
+        &doctor_options(false, &[]),
+    )
+    .unwrap();
+    assert_eq!(report.corrupt.len(), 0);
 }

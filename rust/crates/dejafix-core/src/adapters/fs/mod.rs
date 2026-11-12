@@ -10,14 +10,14 @@ mod store;
 mod types;
 mod write;
 
-pub use events::{lock_events, read_events_file};
+pub use events::{events_path, lock_events, read_events_file};
 pub use manifest::manifest_info;
 pub use marker::{clear_marker, read_marker, write_marker};
-pub use registry::resolve_path;
+pub use registry::{canonical_path, resolve_path};
 pub use resolve::path_context;
 pub use scan::{
-    ClientConfig, ClientPaths, ConfigState, client_configs, pinned_client_configs,
-    scan_client_configs,
+    ClientConfig, ClientPaths, ConfigState, Identity, client_configs, dedupe_paths, default_roots,
+    find_projects, identity, pinned_client_configs, scan_client_configs,
 };
 pub use stack::detect_stack;
 pub use store::{

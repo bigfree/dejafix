@@ -31,7 +31,8 @@ Out of scope for 1.0 and removed from the CLI: `visualize`, `dashboard`,
 `watch`, `wrap`, `backfill`, `score`, `stats`, `context`, `export`. The logic
 behind `score` and `context` stays in the core because the MCP tools
 `get_score` and `get_context` use it. Users who need the removed commands stay
-on Python 0.4.x.
+on Python 0.4.x. Visualisation (today `visualize` and `dashboard`, including the
+local HTTP server) gets its own design after 1.0 and is not ported from Python.
 
 ## Workspace layout
 
@@ -281,8 +282,8 @@ Deliberate differences:
   the PyPI package `dejafix`, so `pipx upgrade dejafix` moves from the Python
   version to the Rust binary.
 - The PyPI name `dejafix` is still unclaimed. Publishing Python 0.4.0 soon
-  reserves it; until then `doctor` and the dashboard could point users at
-  someone else's package.
+  reserves it; until then `doctor` could point users at someone else's
+  package.
 
 ## Milestones
 
@@ -293,11 +294,19 @@ pull request. Python remains the released version until M6.
 |---|---|---|
 | M0 | Install rustup (with the user's approval), workspace, lints, `justfile`, nextest, bacon, sccache, coverage gate, fixture generator, golden harness skeleton, `rust/PORTING.md` | `just verify` passes on the empty workspace |
 | M1 | Event model, serde compatibility, `EventLog` and indexes, path and id normalisation | reading and writing every fixture is byte-identical to Python |
-| M2 | Write path with lock, redaction, `summary.md`, issues, marker, global memory, instructions template, registry; CLI `init`, `log`, `attempt`, `fix`, `decision`, `note`, `show`, `search`, `brief`, `project`, `doctor`, `instructions`, `plan`, `map` | the CLI golden scenario matches and the `summary.md` budget is met |
+| M2 | Write path with lock, redaction, `summary.md`, issues, marker, global memory, instructions template, registry; CLI `init`, `log`, `attempt`, `fix`, `decision`, `note`, `show`, `search`, `regenerate`, `project`, `doctor` (offline), `instructions`, `plan`, `map` | the CLI golden scenario matches and the `summary.md` budget is met |
 | M3 | Git hooks (install, uninstall, auto-capture, precheck) and the edit hook | the edit-hook and precheck budgets are met and a real `git commit` records events |
-| M4 | MCP server: 19 tools, `instructions`, cache | MCP golden replies match and the `precheck_file` budget is met |
-| M5 | `migrate`, `dist` and `maturin` configuration, release workflow, tap | `1.0.0-rc.1` is released and the author's projects and clients run on it |
+| M4 | MCP server: 19 tools, `instructions`, cache; CLI `brief` and `global` | MCP golden replies match and the `precheck_file` budget is met |
+| M5 | `migrate`, `doctor --online` and `--auto`, `dist` and `maturin` configuration, release workflow, tap | `1.0.0-rc.1` is released and the author's projects and clients run on it |
 | M6 | At least two weeks on `rc` in the author's projects, then remove the Python `src/` and `tests/`, update the documentation and CHANGELOG | `1.0.0` is released |
+
+Changes approved by the user on 2026-11-12 (M2 plan, "Changes to the milestone
+table"): `brief` moved from M2 to M4, because it needs staleness (M3) and the
+score (M4); `doctor --online` and `--auto` moved to M5 with the HTTPS client and
+the release channel, so M2 ports the offline `doctor`; `regenerate` joined M2;
+`djf global` went to M4, next to `get_global_gotchas`; `init` keeps
+`--no-watch`, `--no-backfill` and `--no-structure` as hidden flags that do
+nothing.
 
 Estimate: M0–M4 about 4–6 weeks, M5–M6 about 1–2 weeks plus the `rc` period;
 6–10 weeks in total, toward the lower end because of the narrower scope.

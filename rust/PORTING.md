@@ -15,10 +15,10 @@ Rows: 514.
 | Milestone | Tests |
 |---|---|
 | M1 | 24 |
-| M2 | 185 |
+| M2 | 182 |
 | M3 | 149 |
 | M4 | 60 |
-| M5 | 17 |
+| M5 | 20 |
 | M6 | 16 |
 | out of scope | 63 |
 
@@ -199,31 +199,31 @@ Rows: 514.
 | `tests/test_global_mcp.py::test_absolute_check_is_used_rather_than_a_slash_test` | M2 | project registry and `djf project` | `crates/dejafix-core/src/core/registry/tests.rs::junk_entries_are_dropped` |
 | `tests/test_global_mcp.py::test_a_utf8_bom_does_not_empty_the_registry` | M2 | project registry and `djf project` | `crates/dejafix-core/src/adapters/fs/tests.rs::a_utf8_bom_and_a_corrupt_file_are_tolerated` |
 | `tests/test_global_mcp.py::test_a_utf8_bom_does_not_break_the_event_log` | M1 | UTF-8 BOM in events.jsonl | `crates/dejafix-core/src/core/log/tests.rs::a_utf8_bom_does_not_break_the_event_log` |
-| `tests/test_global_mcp.py::test_scan_finds_projects_the_registry_never_knew_about` | M2 | project registry and `djf project` | |
-| `tests/test_global_mcp.py::test_scan_is_idempotent` | M2 | `djf doctor` | |
-| `tests/test_global_mcp.py::test_scan_accepts_several_roots` | M2 | `djf doctor` | |
+| `tests/test_global_mcp.py::test_scan_finds_projects_the_registry_never_knew_about` | M2 | project registry and `djf project` | `crates/dejafix/tests/cli/doctor.rs::scan_finds_projects_the_registry_never_knew_about` |
+| `tests/test_global_mcp.py::test_scan_is_idempotent` | M2 | `djf doctor` | `crates/dejafix/tests/cli/doctor.rs::scan_is_idempotent` |
+| `tests/test_global_mcp.py::test_scan_accepts_several_roots` | M2 | `djf doctor` | `crates/dejafix/tests/cli/doctor.rs::scan_accepts_several_roots` |
 | `tests/test_global_mcp.py::test_package_version_matches_pyproject` | M5 | version in Cargo and the maturin wheel match | |
-| `tests/test_global_mcp.py::test_doctor_registers_what_it_finds` | M2 | `djf doctor` | |
-| `tests/test_global_mcp.py::test_doctor_prunes_entries_whose_memory_is_gone` | M2 | `djf doctor` | |
+| `tests/test_global_mcp.py::test_doctor_registers_what_it_finds` | M2 | `djf doctor` | `crates/dejafix/tests/cli/doctor.rs::doctor_reports_then_registers_what_it_finds` |
+| `tests/test_global_mcp.py::test_doctor_prunes_entries_whose_memory_is_gone` | M2 | `djf doctor` | `crates/dejafix/tests/cli/doctor.rs::doctor_prunes_entries_whose_memory_is_gone` |
 | `tests/test_global_mcp.py::test_upgrade_notice_fires_once` | M2 | `djf doctor` | `crates/dejafix/tests/cli/project.rs::the_upgrade_notice_fires_once` |
 | `tests/test_global_mcp.py::test_no_notice_on_a_first_ever_run` | M2 | `djf doctor` | `crates/dejafix/tests/cli/project.rs::no_notice_on_a_first_ever_run` |
-| `tests/test_global_mcp.py::test_default_depth_reaches_a_nested_repo_folder` | M2 | `djf doctor` | |
-| `tests/test_global_mcp.py::test_cloud_folders_are_included_by_default` | M2 | `djf doctor` | |
-| `tests/test_global_mcp.py::test_cloud_roots_are_deduped_by_what_they_resolve_to` | M2 | `djf doctor` | |
-| `tests/test_global_mcp.py::test_several_cloud_clients_are_covered` | M2 | `djf doctor` | |
+| `tests/test_global_mcp.py::test_default_depth_reaches_a_nested_repo_folder` | M2 | `djf doctor` | `crates/dejafix/tests/cli/doctor.rs::the_default_depth_reaches_a_nested_repo_folder` |
+| `tests/test_global_mcp.py::test_cloud_folders_are_included_by_default` | M2 | `djf doctor` | `crates/dejafix-core/src/adapters/fs/scan/tests.rs::cloud_folders_are_included_by_default` |
+| `tests/test_global_mcp.py::test_cloud_roots_are_deduped_by_what_they_resolve_to` | M2 | `djf doctor` | `crates/dejafix-core/src/adapters/fs/scan/tests.rs::cloud_roots_are_deduped_by_what_they_resolve_to` |
+| `tests/test_global_mcp.py::test_several_cloud_clients_are_covered` | M2 | `djf doctor` | `crates/dejafix-core/src/adapters/fs/scan/tests.rs::cloud_folders_are_included_by_default` |
 | `tests/test_global_mcp.py::test_project_lookup_is_case_insensitive` | M2 | project registry and `djf project` | `crates/dejafix-core/src/core/registry/tests.rs::lookup_is_case_insensitive_and_accepts_a_path` |
-| `tests/test_global_mcp.py::test_the_same_folder_reached_twice_registers_once` | M2 | project registry and `djf project` | |
-| `tests/test_global_mcp.py::test_dedupe_paths_uses_identity_not_text` | M2 | project registry and `djf project` | |
-| `tests/test_global_mcp.py::test_no_network_unless_asked` | M2 | `djf doctor` | |
-| `tests/test_global_mcp.py::test_online_flag_reports_a_newer_release` | M2 | `djf doctor` | |
-| `tests/test_global_mcp.py::test_auto_check_is_remembered_and_can_be_turned_off` | M2 | `djf doctor` | |
-| `tests/test_global_mcp.py::test_version_comparison_ignores_suffixes` | M2 | `djf doctor` | |
-| `tests/test_global_mcp.py::test_doctor_remembers_a_config_that_was_clean_and_is_pinned_again` | M2 | `djf doctor` | |
-| `tests/test_global_mcp.py::test_doctor_does_not_cry_revert_for_a_config_pinned_all_along` | M2 | `djf doctor` | |
-| `tests/test_global_mcp.py::test_doctor_state_survives_an_unwritable_home` | M2 | `djf doctor` | |
-| `tests/test_global_mcp.py::test_doctor_tells_you_to_quit_the_client_before_editing` | M2 | `djf doctor` | |
-| `tests/test_global_mcp.py::test_doctor_records_a_clean_config_it_has_never_seen_before` | M2 | `djf doctor` | |
-| `tests/test_global_mcp.py::test_doctor_ignores_configs_that_never_mention_dejafix` | M2 | `djf doctor` | |
+| `tests/test_global_mcp.py::test_the_same_folder_reached_twice_registers_once` | M2 | project registry and `djf project` | `crates/dejafix/tests/cli/doctor.rs::the_same_folder_reached_twice_registers_once` |
+| `tests/test_global_mcp.py::test_dedupe_paths_uses_identity_not_text` | M2 | project registry and `djf project` | `crates/dejafix-core/src/adapters/fs/scan/tests.rs::dedupe_paths_uses_identity_not_text` |
+| `tests/test_global_mcp.py::test_no_network_unless_asked` | M2 | `djf doctor` | `crates/dejafix/tests/cli/doctor.rs::doctor_reports_then_registers_what_it_finds` |
+| `tests/test_global_mcp.py::test_online_flag_reports_a_newer_release` | M5 | `djf doctor --online`/`--auto` need an HTTPS client and the release channel | |
+| `tests/test_global_mcp.py::test_auto_check_is_remembered_and_can_be_turned_off` | M5 | `djf doctor --online`/`--auto` need an HTTPS client and the release channel | |
+| `tests/test_global_mcp.py::test_version_comparison_ignores_suffixes` | M5 | `djf doctor --online`/`--auto` need an HTTPS client and the release channel | |
+| `tests/test_global_mcp.py::test_doctor_remembers_a_config_that_was_clean_and_is_pinned_again` | M2 | `djf doctor` | `crates/dejafix-core/src/core/doctor/tests.rs::a_config_that_was_clean_and_is_pinned_again_is_reported` |
+| `tests/test_global_mcp.py::test_doctor_does_not_cry_revert_for_a_config_pinned_all_along` | M2 | `djf doctor` | `crates/dejafix-core/src/core/doctor/tests.rs::a_config_pinned_all_along_is_not_a_revert` |
+| `tests/test_global_mcp.py::test_doctor_state_survives_an_unwritable_home` | M2 | `djf doctor` | `crates/dejafix-core/src/wiring/tests.rs::doctor_survives_an_unwritable_state_file_and_reports_unreadable_configs` |
+| `tests/test_global_mcp.py::test_doctor_tells_you_to_quit_the_client_before_editing` | M2 | `djf doctor` | `crates/dejafix/tests/cli/doctor.rs::doctor_tells_you_to_quit_the_client_before_editing_and_notices_a_revert` |
+| `tests/test_global_mcp.py::test_doctor_records_a_clean_config_it_has_never_seen_before` | M2 | `djf doctor` | `crates/dejafix-core/src/core/doctor/tests.rs::a_clean_config_is_recorded_the_first_time_it_is_seen` |
+| `tests/test_global_mcp.py::test_doctor_ignores_configs_that_never_mention_dejafix` | M2 | `djf doctor` | `crates/dejafix-core/src/wiring/tests.rs::doctor_ignores_configs_that_never_mention_dejafix` |
 | `tests/test_hooks_path.py::test_resolve_djf_binary_returns_absolute_path_or_bare_name` | M3 | git hook install and binary path | |
 | `tests/test_hooks_path.py::test_precheck_snippet_bakes_path_into_script` | M3 | git hook install and binary path | |
 | `tests/test_hooks_path.py::test_auto_capture_snippet_bakes_path_and_capture_arg` | M3 | git hook install and binary path | |
@@ -523,7 +523,7 @@ Rows: 514.
 | `tests/test_windows_console_encoding.py::test_init_prints_the_mcp_block_on_cp1252` | M2 | CLI output on a cp1252 console | `crates/dejafix/tests/cli/init.rs::init_output_is_utf8_with_its_real_characters` |
 | `tests/test_windows_console_encoding.py::test_commands_survive_a_cp1252_console[command0]` | out of scope | `djf score` is removed in 1.0 | |
 | `tests/test_windows_console_encoding.py::test_commands_survive_a_cp1252_console[command1]` | M2 | CLI output on a cp1252 console | `crates/dejafix/tests/cli/read.rs::output_is_utf8_without_replacement_characters` |
-| `tests/test_windows_console_encoding.py::test_commands_survive_a_cp1252_console[command2]` | M2 | CLI output on a cp1252 console | |
+| `tests/test_windows_console_encoding.py::test_commands_survive_a_cp1252_console[command2]` | M2 | CLI output on a cp1252 console | `crates/dejafix/tests/cli/doctor.rs::doctor_output_is_utf8_and_a_negative_depth_finds_nothing` |
 | `tests/test_windows_console_encoding.py::test_no_replacement_characters_leak_into_cp1252_output` | M2 | CLI output on a cp1252 console | `crates/dejafix/tests/cli/init.rs::init_output_is_utf8_with_its_real_characters` |
 | `tests/test_windows_console_encoding.py::test_configure_stdio_tolerates_a_stream_it_cannot_reconfigure` | out of scope | Python stream wrapper; Rust writes UTF-8 through std | |
 | `tests/test_windows_console_encoding.py::test_cp1252_output_contains_no_byte_that_renders_as_a_black_diamond` | M2 | CLI output on a cp1252 console | `crates/dejafix/tests/cli/init.rs::init_output_is_utf8_with_its_real_characters` |

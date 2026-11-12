@@ -1,3 +1,4 @@
+pub mod doctor;
 pub mod event;
 pub mod global;
 pub(crate) mod json;

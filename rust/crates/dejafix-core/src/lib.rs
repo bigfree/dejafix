@@ -3,10 +3,12 @@ mod core;
 mod wiring;
 
 pub use crate::adapters::fs::{
-    ClientConfig, ClientPaths, ConfigState, FsResolver, GlobalStore, MemoryDir, RegistryFiles,
-    StoreError, client_configs, detect_stack, find_memory_dir, manifest_info, path_context,
+    ClientConfig, ClientPaths, ConfigState, FsResolver, GlobalStore, Identity, MemoryDir,
+    RegistryFiles, StoreError, canonical_path, client_configs, dedupe_paths, default_roots,
+    detect_stack, find_memory_dir, find_projects, identity, manifest_info, path_context,
     pinned_client_configs, read_events_file, resolve_path, scan_client_configs,
 };
+pub use crate::core::doctor::{Reverted, SeenConfig, track_pins};
 pub use crate::core::event::{
     CaptureSource, Confidence, Event, EventId, EventKind, Extra, IssueId, LineError, Origin,
     Outcome, Summary,
@@ -15,7 +17,7 @@ pub use crate::core::global::{
     Entry, PROMOTABLE_SEED, Relevant, Stack, gotcha_entry, inherited_block, is_gotcha_signal,
     promotable_libraries, promotable_set, promotion, relevant_entries, similar,
 };
-pub use crate::core::log::{EventLog, EventRefError, Skipped};
+pub use crate::core::log::{EventLog, EventRefError, Skipped, skipped_lines};
 pub use crate::core::path::{
     PathContext, PathResolver, RelativePath, is_memory_path, location_file, location_to_file,
     project_relative,
@@ -47,10 +49,11 @@ pub use crate::core::write::{
     sole_open_issue,
 };
 pub use crate::wiring::{
-    BridgeOutcome, Inherited, InitOptions, InitReport, ListedProject, MemoryFile, Project,
-    Recorded, RegistryOp, RegistryReply, SearchOutput, Settings, UpgradeNotice, WiringError,
-    add_plan_idea, init_project, other_projects, read_memory_file, record, regenerate,
-    register_project, registry_op, search_project, show, upgrade_notice,
+    BridgeOutcome, CorruptLog, DoctorOptions, DoctorReport, FoundProject, Inherited, InitOptions,
+    InitReport, ListedProject, MemoryFile, Project, Recorded, RegistryOp, RegistryReply,
+    ScanReport, SearchOutput, Settings, UpgradeNotice, WiringError, add_plan_idea, doctor,
+    init_project, other_projects, read_memory_file, record, regenerate, register_project,
+    registry_op, scan_projects, search_project, show, upgrade_notice,
 };
 
 #[cfg(any(test, feature = "testing"))]

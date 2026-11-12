@@ -2,7 +2,7 @@ use std::cell::Cell;
 
 use proptest::prelude::*;
 
-use super::{EventLog, EventRefError};
+use super::{EventLog, EventRefError, skipped_lines};
 use crate::core::event::{EventId, IssueId, LineError};
 use crate::core::path::{PathContext, PathResolver};
 use crate::core::time::Clock;
@@ -295,4 +295,12 @@ fn push_keeps_the_index_in_step_with_a_new_fix_and_issue() {
             .collect::<Vec<_>>(),
         ["0002"]
     );
+}
+
+#[test]
+fn skipped_lines_agree_with_the_full_parse() {
+    let log = parse(LOG);
+    assert_eq!(skipped_lines(LOG.as_bytes(), &clock()), log.skipped());
+    assert_eq!(skipped_lines(b"\xff\n{}\n", &clock()).len(), 2);
+    assert_eq!(skipped_lines(b"", &clock()).len(), 0);
 }

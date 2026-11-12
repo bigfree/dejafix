@@ -131,3 +131,19 @@ impl Serialize for Sorted<'_> {
         }
     }
 }
+
+pub(crate) fn python_str(value: &Value) -> String {
+    match value {
+        Value::Null => "None".to_owned(),
+        Value::Bool(true) => "True".to_owned(),
+        Value::Bool(false) => "False".to_owned(),
+        Value::String(text) => text.clone(),
+        Value::Number(_) | Value::Array(_) | Value::Object(_) => {
+            let mut out = Vec::new();
+            match write_python_json(&mut out, value) {
+                Ok(()) => String::from_utf8_lossy(&out).into_owned(),
+                Err(_) => String::new(),
+            }
+        }
+    }
+}

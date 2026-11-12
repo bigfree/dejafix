@@ -3,8 +3,7 @@ use std::io::{self, Write};
 use std::path::Path;
 
 use dejafix_core::{
-    BridgeOutcome, ClientPaths, InitOptions, Settings, init_project, other_projects,
-    pinned_client_configs,
+    BridgeOutcome, InitOptions, Settings, init_project, other_projects, pinned_client_configs,
 };
 
 use super::args::InitArgs;
@@ -180,15 +179,6 @@ fn write_shared_notes(out: &mut impl Write, block: &McpBlock<'_>) -> io::Result<
     writeln!(out)
 }
 
-fn client_paths(config: &Config) -> Option<ClientPaths> {
-    Some(ClientPaths {
-        home: config.home.clone()?,
-        xdg_config_home: config.xdg_config_home.clone(),
-        appdata: config.appdata.clone(),
-        local_appdata: config.local_appdata.clone(),
-    })
-}
-
 pub fn run(
     args: InitArgs,
     config: &Config,
@@ -263,7 +253,8 @@ pub fn run(
         let pinned = if mcp_config_single {
             Vec::new()
         } else {
-            client_paths(config)
+            config
+                .client_paths()
                 .map(|paths| pinned_client_configs(&paths, None))
                 .unwrap_or_default()
         };

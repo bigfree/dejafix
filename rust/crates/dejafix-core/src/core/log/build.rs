@@ -9,6 +9,36 @@ use crate::core::time::Clock;
 
 const BOM: &[u8] = b"\xef\xbb\xbf";
 
+fn decoded_lines<'a, 'c>(
+    bytes: &'a [u8],
+    line_context: &'c LineContext<'c>,
+) -> impl Iterator<Item = (usize, Result<Option<Event<'a>>, LineError>)> + 'c
+where
+    'a: 'c,
+{
+    let body = bytes.strip_prefix(BOM).unwrap_or(bytes);
+    python_lines(body).map(move |(line, raw)| {
+        let decoded = std::str::from_utf8(raw)
+            .map_err(|_| LineError::Utf8)
+            .and_then(|text| {
+                if python_strip(text).is_empty() {
+                    Ok(None)
+                } else {
+                    decode_line(text, line_context).map(Some)
+                }
+            });
+        (line, decoded)
+    })
+}
+
+#[must_use]
+pub fn skipped_lines(bytes: &[u8], clock: &Clock) -> Vec<Skipped> {
+    let line_context = LineContext::new(clock);
+    decoded_lines(bytes, &line_context)
+        .filter_map(|(line, decoded)| decoded.err().map(|error| Skipped { line, error }))
+        .collect()
+}
+
 impl<'a> EventLog<'a> {
     pub fn parse(
         bytes: &'a [u8],
@@ -17,19 +47,9 @@ impl<'a> EventLog<'a> {
         resolver: &impl PathResolver,
     ) -> Self {
         let line_context = LineContext::new(clock);
-        let body = bytes.strip_prefix(BOM).unwrap_or(bytes);
         let mut events = Vec::new();
         let mut skipped = Vec::new();
-        for (line, raw) in python_lines(body) {
-            let decoded = std::str::from_utf8(raw)
-                .map_err(|_| LineError::Utf8)
-                .and_then(|text| {
-                    if python_strip(text).is_empty() {
-                        Ok(None)
-                    } else {
-                        decode_line(text, &line_context).map(Some)
-                    }
-                });
+        for (line, decoded) in decoded_lines(bytes, &line_context) {
             match decoded {
                 Ok(Some(event)) => events.push(event),
                 Ok(None) => {}

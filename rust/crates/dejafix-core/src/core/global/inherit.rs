@@ -4,7 +4,7 @@ use std::fmt::Write;
 use serde_json::Value;
 
 use super::types::{Entry, Relevant, Stack};
-use crate::core::json::write_python_json;
+use crate::core::json::python_str;
 
 const HEADING: &str = "## Global Memory — Inherited Knowledge\n";
 const INTRO: &str = "The following patterns and gotchas were inherited from your global memory\n(~/.dejafix/global/). They represent lessons learned from other projects.\n";
@@ -73,22 +73,6 @@ fn is_truthy(value: &Value) -> bool {
         Value::String(text) => !text.is_empty(),
         Value::Array(items) => !items.is_empty(),
         Value::Object(map) => !map.is_empty(),
-    }
-}
-
-fn python_str(value: &Value) -> String {
-    match value {
-        Value::Null => "None".to_owned(),
-        Value::Bool(true) => "True".to_owned(),
-        Value::Bool(false) => "False".to_owned(),
-        Value::String(text) => text.clone(),
-        Value::Number(_) | Value::Array(_) | Value::Object(_) => {
-            let mut out = Vec::new();
-            match write_python_json(&mut out, value) {
-                Ok(()) => String::from_utf8_lossy(&out).into_owned(),
-                Err(_) => String::new(),
-            }
-        }
     }
 }
 

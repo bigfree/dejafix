@@ -82,3 +82,30 @@ Append new entries at the end, one heading each, with this template:
 - Gain: a hostile repository can neither exfiltrate a local file into a commit nor modify a file outside the repository.
 - Compatibility: a rule file intentionally linked outside the repository loses its link on `djf init` (it becomes a regular file with the bridge); links inside the repository (`CLAUDE.md -> AGENTS.md`) are read as before.
 - Status: implemented in M2b, awaiting review
+
+## Compare scanned projects with the registry by identity, not by text
+
+- Found: 2026-11-12, M2c, `rust/crates/dejafix-core/src/wiring/doctor.rs` (`scan_projects`)
+- Today: `djf doctor` decides whether a found project is registered by `(device, inode)`, but `djf project scan` (Python `scan_command`, ported as is) compares path text. On a case-insensitive macOS volume, `djf project scan ~/Code` after `~/code/api` was registered lists `~/Code/api` as new, and registering it adds a second record `api-2` for the same folder, the very duplicate `dedupe_paths` was written to prevent.
+- Proposal: mark a scanned project as known when its identity matches a registered path's identity, as `doctor` does, and register nothing for it.
+- Gain: no duplicate registry entries when the same folder is reached under two spellings or through a symlink.
+- Compatibility: `project scan` output shows such a folder as "(already registered)" where Python 0.4.x shows it as new; the registry no longer gains the duplicate.
+- Status: proposed
+
+## Save the registry once per `doctor --fix` section
+
+- Found: 2026-11-12, M2c, `rust/crates/dejafix-core/src/wiring/doctor.rs`
+- Today: Python's `doctor --fix` and `project scan` call `register` and `unregister` once per project, and each call loads and rewrites both registry files. Rust applies every registration in memory and saves once, then every removal and saves once more; the files end up identical.
+- Proposal: keep the Rust behaviour, and when a save fails, report it per project instead of stopping with a traceback (Rust already does this and keeps the registry unchanged).
+- Gain: two writes instead of up to two per project; an unwritable home gives a readable report.
+- Compatibility: none for the files; on an unwritable home Rust prints `✗` lines where Python prints a traceback.
+- Status: implemented in M2c, awaiting review
+
+## Escape control characters in paths printed to the terminal
+
+- Found: 2026-11-12, M2c security review (confidence 6 of 10, below the reporting threshold), `rust/crates/dejafix/src/cli/doctor.rs`, `cli/project.rs`
+- Today: `djf doctor` and `djf project scan` print the paths of every project they find, and `djf project list` the registered ones, as they are (Python's `click.echo` does the same). A cloned repository can contain a folder whose name carries terminal escape sequences, for example OSC 52, which some terminals use to replace the clipboard, or cursor movements that overwrite doctor's warnings. Plain `djf doctor` walks `~/code` and similar folders, so it prints such names without the user having chosen them.
+- Proposal: one helper in `cli/output.rs` that escapes C0, DEL and C1 control characters in file-system names before printing, used by `doctor`, `project scan` and `project list`.
+- Gain: a hostile folder name can no longer drive the terminal.
+- Compatibility: output differs from Python 0.4.x only for paths that contain control characters.
+- Status: proposed
