@@ -1,0 +1,26 @@
+[package]
+name = "dejafix-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+testing = ["dep:jiff", "dep:serde", "dep:serde_json", "dep:thiserror"]
+
+[dependencies]
+jiff = { workspace = true, optional = true }
+serde = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
+thiserror = { workspace = true, optional = true }
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[[example]]
+name = "gen-fixtures"
+required-features = ["testing"]
+
+[lints]
+workspace = true

@@ -1,0 +1,30 @@
+set shell := ["bash", "-euo", "pipefail", "-c"]
+
+export RUSTC_WRAPPER := env("RUSTC_WRAPPER", `command -v sccache || true`)
+
+default: verify
+
+verify: fmt clippy cov
+
+fmt:
+    cargo fmt --all --check
+
+clippy:
+    cargo clippy --workspace --all-targets --all-features -- -D warnings
+
+cov:
+    cargo llvm-cov nextest --workspace --all-features --no-report
+    cargo llvm-cov report --ignore-filename-regex 'crates/dejafix/' --fail-under-lines 90
+    cargo llvm-cov report --ignore-filename-regex 'crates/dejafix-core/' --fail-under-lines 80
+
+golden:
+    cargo nextest run -p dejafix --test golden
+
+fixtures dir="target/fixtures":
+    cargo run -p dejafix-core --features testing --example gen-fixtures -- {{dir}}
+
+bench:
+    @echo "bench: no benchmarks before M2 (summary.md budget)"
+
+smoke:
+    @echo "smoke: no installable binary before M3"

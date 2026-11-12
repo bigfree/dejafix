@@ -1,0 +1,37 @@
+[package]
+name = "dejafix"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+autobins = false
+
+[[bin]]
+name = "djf"
+path = "src/main.rs"
+
+[[bin]]
+name = "dejafix"
+path = "src/bin/dejafix.rs"
+
+[[bin]]
+name = "djf-mcp"
+path = "src/bin/djf-mcp.rs"
+
+[[bin]]
+name = "djf-edit-hook"
+path = "src/bin/djf-edit-hook.rs"
+
+[[test]]
+name = "golden"
+path = "tests/golden/main.rs"
+
+[dev-dependencies]
+dejafix-core = { workspace = true, features = ["testing"] }
+jiff.workspace = true
+regex.workspace = true
+tempfile.workspace = true
+
+[lints]
+workspace = true

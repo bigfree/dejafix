@@ -1,0 +1,64 @@
+use std::collections::HashMap;
+use std::path::Path;
+
+use regex::{Captures, Regex};
+
+use crate::types::Normalizer;
+
+const ID: &str = r"(?P<id>evt_[0-9a-f]{20})";
+const STAMP: &str = r"(?P<stamp>\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}Z)?)";
+
+impl Normalizer {
+    pub fn new(roots: &[(&Path, &str)], since: &str) -> Result<Self, regex::Error> {
+        let mut labels = HashMap::new();
+        for (path, label) in roots {
+            if let Ok(canonical) = std::fs::canonicalize(path) {
+                labels.insert(canonical.display().to_string(), (*label).to_owned());
+            }
+            labels.insert(path.display().to_string(), (*label).to_owned());
+        }
+        let mut paths: Vec<&String> = labels.keys().collect();
+        paths.sort_by_key(|path| std::cmp::Reverse(path.len()));
+        let escaped: Vec<String> = paths.into_iter().map(|path| regex::escape(path)).collect();
+        let pattern = if escaped.is_empty() {
+            format!("{ID}|{STAMP}")
+        } else {
+            format!("(?P<root>{})|{ID}|{STAMP}", escaped.join("|"))
+        };
+        Ok(Self {
+            pattern: Regex::new(&pattern)?,
+            labels,
+            since: since.to_owned(),
+            today: since.get(..10).unwrap_or(since).to_owned(),
+            ids: HashMap::new(),
+        })
+    }
+
+    pub fn apply(&mut self, text: &str) -> String {
+        let Self {
+            pattern,
+            labels,
+            since,
+            today,
+            ids,
+        } = self;
+        pattern
+            .replace_all(text, |caps: &Captures| {
+                if let Some(root) = caps.name("root") {
+                    return labels.get(root.as_str()).cloned().unwrap_or_default();
+                }
+                if let Some(id) = caps.name("id") {
+                    let next = ids.len() + 1;
+                    let number = ids.entry(id.as_str().to_owned()).or_insert(next);
+                    return format!("<ID {number}>");
+                }
+                let stamp = caps.name("stamp").map_or("", |found| found.as_str());
+                match stamp.len() {
+                    10 if stamp >= today.as_str() => "<TODAY>".to_owned(),
+                    20 if stamp >= since.as_str() => "<NOW>".to_owned(),
+                    _ => stamp.to_owned(),
+                }
+            })
+            .into_owned()
+    }
+}

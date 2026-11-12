@@ -7,6 +7,9 @@
 .dejafix/structure.json
 .dejafix/AI_INSTRUCTIONS.md.bak
 
+# Rust build output
+/rust/target/
+
 # Specs and plans are tracked here, overriding a global ignore of them.
 !/docs/superpowers/
 
