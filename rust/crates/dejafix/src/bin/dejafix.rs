@@ -1,5 +1,9 @@
 use std::process::ExitCode;
 
 fn main() -> ExitCode {
-    dejafix::stub("dejafix", &mut std::io::stderr())
+    dejafix::run(
+        std::env::args_os(),
+        &mut std::io::stdout().lock(),
+        &mut std::io::stderr().lock(),
+    )
 }

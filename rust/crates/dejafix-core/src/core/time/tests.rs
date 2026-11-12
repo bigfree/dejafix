@@ -147,3 +147,18 @@ proptest! {
         prop_assert_eq!(once.as_str(), text.as_str());
     }
 }
+
+#[test]
+fn isoformat_drops_zero_microseconds() {
+    let at = |nanos: i32| super::Clock {
+        now: jiff::Timestamp::new(1_800_000_000, nanos).unwrap(),
+        zone: jiff::tz::TimeZone::UTC,
+    };
+    assert_eq!(super::iso_micros(&at(0)), "2027-01-15T08:00:00Z");
+    assert_eq!(super::iso_micros(&at(1_000)), "2027-01-15T08:00:00.000001Z");
+    assert_eq!(super::iso_micros(&at(999)), "2027-01-15T08:00:00Z");
+    assert_eq!(
+        super::Timestamp::now(&at(5_000_000)).as_str(),
+        "2027-01-15T08:00:00Z"
+    );
+}

@@ -1,7 +1,9 @@
 mod corpus;
 mod harness;
 mod m1;
+mod m2;
 mod normalize;
+mod scenario;
 mod types;
 
 use std::error::Error;
@@ -71,9 +73,9 @@ fn rust_runs_on_a_fixture_copy_without_touching_it() -> TestResult {
     let dir = tempfile::tempdir()?;
     write_project(dir.path(), 100, FIXTURE_SEED)?;
     let untouched = run(Implementation::Rust, dir.path(), &[])?;
-    let stub = run(Implementation::Rust, dir.path(), &[&["show"]])?;
-    assert_eq!(stub.steps.first().and_then(|step| step.code), Some(1));
-    assert_eq!(diff(&untouched, &stub), ["step count 0 != 1"]);
+    let searched = run(Implementation::Rust, dir.path(), &[&["search", "anything"]])?;
+    assert_eq!(searched.steps.first().and_then(|step| step.code), Some(0));
+    assert_eq!(diff(&untouched, &searched), ["step count 0 != 1"]);
     Ok(())
 }
 
@@ -111,6 +113,21 @@ fn normalizer_numbers_ids_and_collapses_new_timestamps() -> TestResult {
         normalizer.apply(text),
         "<ID 1> <ID 2> <ID 1> 2024-01-01T00:00:00Z <NOW> <NOW> <PROJECT>/x \
          2025-03-04 <TODAY> <TODAY>"
+    );
+    Ok(())
+}
+
+#[test]
+fn normalizer_handles_global_ids_fractions_minutes_and_versions() -> TestResult {
+    let mut normalizer =
+        Normalizer::new(&[], "2026-11-12T10:00:00Z")?.with_versions(&["0.4.0", "0.0.0"])?;
+    let text = "got_0123456789ab evt_0123456789abcdef0123 got_0123456789ab \
+                2026-11-12T10:00:01.123456Z 2026-11-12 10:31 2026-11-11 23:59 \
+                \"last_version\": \"0.4.0\" dejafix 0.0.0 — checking";
+    assert_eq!(
+        normalizer.apply(text),
+        "<ID 1> <ID 2> <ID 1> <NOW> <MINUTE> 2026-11-11 23:59 \
+         \"last_version\": \"<VERSION>\" dejafix <VERSION> — checking"
     );
     Ok(())
 }

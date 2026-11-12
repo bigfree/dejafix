@@ -52,7 +52,7 @@ impl<'a> EventLog<'a> {
         log
     }
 
-    fn index<R: PathResolver>(&mut self, mut paths: PathTable<'_, 'a, R>) {
+    pub(super) fn index<R: PathResolver>(&mut self, mut paths: PathTable<'_, 'a, R>) {
         for event in &self.events {
             if event.kind == EventKind::Fix
                 && let Some(issue) = event

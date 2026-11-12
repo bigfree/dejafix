@@ -38,6 +38,7 @@ pub fn isolated(program: impl AsRef<OsStr>, home: &Path, source: &Path) -> Comma
         .env("DEJAFIX_HOME", home.join(".dejafix"))
         .env("PYTHONPATH", source)
         .env("PYTHONDONTWRITEBYTECODE", "1")
+        .env("PYTHONHASHSEED", "0")
         .env("PYTHONIOENCODING", "utf-8");
     command
 }

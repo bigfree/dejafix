@@ -33,3 +33,6 @@ pub(crate) struct FixtureState {
     pub(crate) open_issues: Vec<String>,
     pub(crate) decisions: Vec<String>,
 }
+
+#[derive(Debug, Default)]
+pub struct SeqIds(pub(super) u32);

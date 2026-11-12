@@ -1,5 +1,10 @@
+mod cli;
+mod config;
+
 use std::io::Write;
 use std::process::ExitCode;
+
+pub use cli::run;
 
 pub fn stub(program: &str, stderr: &mut impl Write) -> ExitCode {
     writeln!(

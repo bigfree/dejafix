@@ -2,10 +2,8 @@ use std::error::Error;
 use std::process::Command;
 
 #[test]
-fn every_executable_is_a_stub_that_names_itself() -> Result<(), Box<dyn Error>> {
+fn the_mcp_server_and_edit_hook_are_still_stubs() -> Result<(), Box<dyn Error>> {
     for (binary, program) in [
-        (env!("CARGO_BIN_EXE_djf"), "djf"),
-        (env!("CARGO_BIN_EXE_dejafix"), "dejafix"),
         (env!("CARGO_BIN_EXE_djf-mcp"), "djf-mcp"),
         (env!("CARGO_BIN_EXE_djf-edit-hook"), "djf-edit-hook"),
     ] {

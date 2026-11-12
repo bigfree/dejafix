@@ -105,7 +105,8 @@ impl Timestamp<'_> {
         self.utc
     }
 
-    pub(crate) fn now(clock: &Clock) -> Timestamp<'static> {
+    #[must_use]
+    pub fn now(clock: &Clock) -> Timestamp<'static> {
         let utc = TimeZone::UTC.to_datetime(clock.now);
         let utc = utc.with().subsec_nanosecond(0).build().unwrap_or(utc);
         Timestamp {
@@ -113,4 +114,16 @@ impl Timestamp<'_> {
             utc: Some(utc),
         }
     }
+}
+
+#[must_use]
+pub fn iso_micros(clock: &Clock) -> String {
+    let utc = TimeZone::UTC.to_datetime(clock.now);
+    let micros = utc.subsec_nanosecond() / 1_000;
+    let seconds = utc.strftime(FORMAT).to_string();
+    if micros == 0 {
+        return seconds;
+    }
+    let stem = seconds.strip_suffix('Z').unwrap_or(&seconds);
+    format!("{stem}.{micros:06}Z")
 }

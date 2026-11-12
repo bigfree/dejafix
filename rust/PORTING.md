@@ -10,17 +10,17 @@ Regenerate the id list with
 table in step with it: a new Python test adds a row, a removed one drops its
 row.
 
-Rows: 510.
+Rows: 512.
 
 | Milestone | Tests |
 |---|---|
 | M1 | 24 |
-| M2 | 191 |
+| M2 | 187 |
 | M3 | 149 |
-| M4 | 56 |
+| M4 | 59 |
 | M5 | 17 |
-| M6 | 12 |
-| out of scope | 61 |
+| M6 | 14 |
+| out of scope | 62 |
 
 | Python test | Milestone | Scope | Ported |
 |---|---|---|---|
@@ -38,6 +38,7 @@ Rows: 510.
 | `tests/test_agent_guidance.py::test_every_call_shown_uses_the_tools_real_arguments[llms.txt]` | M6 | user documentation is rewritten for 1.0 | |
 | `tests/test_agent_guidance.py::test_every_call_shown_uses_the_tools_real_arguments[docs/2026-11-12-rust-m0-plan.md]` | M6 | user documentation is rewritten for 1.0 | |
 | `tests/test_agent_guidance.py::test_every_call_shown_uses_the_tools_real_arguments[docs/2026-11-12-rust-m1-plan.md]` | M6 | user documentation is rewritten for 1.0 | |
+| `tests/test_agent_guidance.py::test_every_call_shown_uses_the_tools_real_arguments[docs/2026-11-12-rust-m2-plan.md]` | M6 | user documentation is rewritten for 1.0 | |
 | `tests/test_agent_guidance.py::test_every_call_shown_uses_the_tools_real_arguments[docs/2026-11-12-rust-rewrite-design.md]` | M6 | user documentation is rewritten for 1.0 | |
 | `tests/test_agent_guidance.py::test_every_call_shown_passes_the_tools_required_arguments[AI_INSTRUCTIONS.md (get_instructions)]` | M2 | agent guidance surfaces | |
 | `tests/test_agent_guidance.py::test_every_call_shown_passes_the_tools_required_arguments[CLAUDE.md bridge]` | M2 | agent guidance surfaces | |
@@ -47,6 +48,7 @@ Rows: 510.
 | `tests/test_agent_guidance.py::test_every_call_shown_passes_the_tools_required_arguments[llms.txt]` | M6 | user documentation is rewritten for 1.0 | |
 | `tests/test_agent_guidance.py::test_every_call_shown_passes_the_tools_required_arguments[docs/2026-11-12-rust-m0-plan.md]` | M6 | user documentation is rewritten for 1.0 | |
 | `tests/test_agent_guidance.py::test_every_call_shown_passes_the_tools_required_arguments[docs/2026-11-12-rust-m1-plan.md]` | M6 | user documentation is rewritten for 1.0 | |
+| `tests/test_agent_guidance.py::test_every_call_shown_passes_the_tools_required_arguments[docs/2026-11-12-rust-m2-plan.md]` | M6 | user documentation is rewritten for 1.0 | |
 | `tests/test_agent_guidance.py::test_every_call_shown_passes_the_tools_required_arguments[docs/2026-11-12-rust-rewrite-design.md]` | M6 | user documentation is rewritten for 1.0 | |
 | `tests/test_agent_guidance.py::test_precheck_file_is_shown_on_every_runtime_surface` | M4 | MCP tools and instructions | |
 | `tests/test_agent_guidance.py::test_the_call_scanner_reads_names_not_values` | M2 | agent guidance surfaces | |
@@ -63,11 +65,11 @@ Rows: 510.
 | `tests/test_agent_guidance.py::test_re_running_init_does_not_duplicate_the_block` | M2 | agent guidance surfaces | |
 | `tests/test_agent_guidance.py::test_list_projects_leads_with_the_active_project` | M4 | MCP tools and instructions | |
 | `tests/test_agent_guidance.py::test_instructions_do_not_tell_the_agent_to_list_projects_first` | M2 | agent guidance surfaces | |
-| `tests/test_attempt.py::test_attempt_on_an_unknown_issue_is_refused` | M2 | write path: attempt and issue resolution | |
-| `tests/test_attempt.py::test_attempt_issue_id_is_normalised_like_fix` | M2 | write path: attempt and issue resolution | |
-| `tests/test_attempt.py::test_a_stale_current_issue_marker_is_ignored` | M2 | write path: attempt and issue resolution | |
-| `tests/test_attempt.py::test_fix_ignores_and_clears_a_stale_marker` | M2 | write path: attempt and issue resolution | |
-| `tests/test_attempt.py::test_a_bare_hash_is_reported_readably` | M2 | write path: attempt and issue resolution | |
+| `tests/test_attempt.py::test_attempt_on_an_unknown_issue_is_refused` | M2 | write path: attempt and issue resolution | `crates/dejafix/tests/cli/write.rs::attempt_on_an_unknown_issue_is_refused_and_the_project_still_works` |
+| `tests/test_attempt.py::test_attempt_issue_id_is_normalised_like_fix` | M2 | write path: attempt and issue resolution | `crates/dejafix/tests/cli/write.rs::attempt_issue_id_is_normalised_like_fix` |
+| `tests/test_attempt.py::test_a_stale_current_issue_marker_is_ignored` | M2 | write path: attempt and issue resolution | `crates/dejafix/tests/cli/write.rs::a_stale_current_issue_marker_is_ignored` |
+| `tests/test_attempt.py::test_fix_ignores_and_clears_a_stale_marker` | M2 | write path: attempt and issue resolution | `crates/dejafix/tests/cli/write.rs::fix_ignores_and_clears_a_stale_marker` |
+| `tests/test_attempt.py::test_a_bare_hash_is_reported_readably` | M2 | write path: attempt and issue resolution | `crates/dejafix/tests/cli/write.rs::a_bare_hash_is_reported_readably` |
 | `tests/test_auto_capture.py::test_location_skips_dejafix_files` | M3 | git auto-capture | |
 | `tests/test_auto_capture.py::test_a_memory_only_commit_has_no_location` | M3 | git auto-capture | |
 | `tests/test_auto_capture.py::test_a_deleted_file_is_never_the_location` | M3 | git auto-capture | |
@@ -283,17 +285,17 @@ Rows: 510.
 | `tests/test_location_parsing.py::test_a_windows_path_is_not_counted_as_a_file_called_c` | M1 | location and path normalisation | `crates/dejafix-core/src/core/path/tests.rs::a_windows_path_is_not_counted_as_a_file_called_c (score half: M4 `get_score`)` |
 | `tests/test_location_parsing.py::test_a_method_location_is_not_a_file` | M1 | location and path normalisation | `crates/dejafix-core/src/core/path/tests.rs::a_method_location_is_not_a_file (score half: M4 `get_score`)` |
 | `tests/test_location_parsing.py::test_the_same_file_by_two_spellings_counts_once` | M1 | location and path normalisation | `crates/dejafix-core/src/core/path/tests.rs::the_same_file_by_two_spellings_counts_once (score half: M4 `get_score`)` |
-| `tests/test_location_parsing.py::test_global_dir_follows_dejafix_home` | M2 | global memory follows DEJAFIX_HOME | |
-| `tests/test_location_parsing.py::test_global_dir_falls_back_to_home_without_the_env_var` | M2 | global memory follows DEJAFIX_HOME | |
-| `tests/test_location_parsing.py::test_appending_an_event_stays_inside_an_isolated_home` | M2 | global memory follows DEJAFIX_HOME | |
-| `tests/test_log.py::test_log_attempt_and_fix_write_events` | M2 | write path: log, attempt, fix | |
-| `tests/test_log.py::test_fix_issue_closes_target_without_clearing_newer_active_issue` | M2 | write path: log, attempt, fix | |
-| `tests/test_log.py::test_plain_fix_still_closes_active_issue` | M2 | write path: log, attempt, fix | |
-| `tests/test_log.py::test_fix_issue_rejects_unknown_issue` | M2 | write path: log, attempt, fix | |
+| `tests/test_location_parsing.py::test_global_dir_follows_dejafix_home` | M2 | global memory follows DEJAFIX_HOME | `crates/dejafix/tests/cli/write.rs::appending_an_event_stays_inside_an_isolated_home` |
+| `tests/test_location_parsing.py::test_global_dir_falls_back_to_home_without_the_env_var` | M2 | global memory follows DEJAFIX_HOME | `crates/dejafix/tests/cli/write.rs::global_memory_falls_back_to_home_without_the_env_var` |
+| `tests/test_location_parsing.py::test_appending_an_event_stays_inside_an_isolated_home` | M2 | global memory follows DEJAFIX_HOME | `crates/dejafix/tests/cli/write.rs::appending_an_event_stays_inside_an_isolated_home` |
+| `tests/test_log.py::test_log_attempt_and_fix_write_events` | M2 | write path: log, attempt, fix | `crates/dejafix/tests/cli/write.rs::log_attempt_and_fix_write_events` |
+| `tests/test_log.py::test_fix_issue_closes_target_without_clearing_newer_active_issue` | M2 | write path: log, attempt, fix | `crates/dejafix/tests/cli/write.rs::fix_issue_closes_target_without_clearing_newer_active_issue` |
+| `tests/test_log.py::test_plain_fix_still_closes_active_issue` | M2 | write path: log, attempt, fix | `crates/dejafix/tests/cli/write.rs::plain_fix_still_closes_active_issue` |
+| `tests/test_log.py::test_fix_issue_rejects_unknown_issue` | M2 | write path: log, attempt, fix | `crates/dejafix/tests/cli/write.rs::fix_issue_rejects_unknown_issue` |
 | `tests/test_log.py::test_mcp_record_fix_accepts_target_issue_id` | M4 | MCP `record_fix` | |
-| `tests/test_log.py::test_attempt_without_open_issue_fails` | M2 | write path: log, attempt, fix | |
-| `tests/test_log.py::test_attempt_auto_issue_creates_parent` | M2 | write path: log, attempt, fix | |
-| `tests/test_log.py::test_attempt_after_fix_does_not_misattribute` | M2 | write path: log, attempt, fix | |
+| `tests/test_log.py::test_attempt_without_open_issue_fails` | M2 | write path: log, attempt, fix | `crates/dejafix/tests/cli/write.rs::attempt_without_open_issue_fails` |
+| `tests/test_log.py::test_attempt_auto_issue_creates_parent` | M2 | write path: log, attempt, fix | `crates/dejafix/tests/cli/write.rs::attempt_auto_issue_creates_parent` |
+| `tests/test_log.py::test_attempt_after_fix_does_not_misattribute` | M2 | write path: log, attempt, fix | `crates/dejafix/tests/cli/write.rs::attempt_after_fix_does_not_misattribute` |
 | `tests/test_mcp_server.py::test_git_helpers_detach_stdin_and_keep_timeouts` | M3 | git adapter: detached stdin and timeouts | |
 | `tests/test_mcp_server.py::test_mcp_stdio_precheck_file_returns_with_git_backed_analysis` | M4 | MCP server | |
 | `tests/test_mcp_server.py::test_mcp_precheck_file_names_a_memory_file_instead_of_clearing_it` | M4 | MCP server | |
@@ -338,42 +340,42 @@ Rows: 510.
 | `tests/test_precheck_lessons.py::test_lesson_title_counts_partial_attempts_separately` | M3 | precheck lessons | |
 | `tests/test_precheck_lessons.py::test_overflow_names_the_issues_of_hidden_lessons` | M3 | precheck lessons | |
 | `tests/test_precheck_lessons.py::test_precheck_files_analyzes_all_paths_in_one_pass` | M3 | precheck lessons | |
-| `tests/test_redaction.py::test_redacts_known_secret_shapes[<lambda>-openai_key]` | M2 | redaction before write | |
-| `tests/test_redaction.py::test_redacts_known_secret_shapes[<lambda>-github_token]` | M2 | redaction before write | |
-| `tests/test_redaction.py::test_redacts_known_secret_shapes[<lambda>-github_pat]` | M2 | redaction before write | |
-| `tests/test_redaction.py::test_redacts_known_secret_shapes[<lambda>-aws_access_key]` | M2 | redaction before write | |
-| `tests/test_redaction.py::test_redacts_known_secret_shapes[<lambda>-google_api_key]` | M2 | redaction before write | |
-| `tests/test_redaction.py::test_redacts_known_secret_shapes[<lambda>-slack_token]` | M2 | redaction before write | |
-| `tests/test_redaction.py::test_redacts_known_secret_shapes[<lambda>-stripe_key0]` | M2 | redaction before write | |
-| `tests/test_redaction.py::test_redacts_known_secret_shapes[<lambda>-stripe_key1]` | M2 | redaction before write | |
-| `tests/test_redaction.py::test_redacts_known_secret_shapes[<lambda>-jwt]` | M2 | redaction before write | |
-| `tests/test_redaction.py::test_redacts_known_secret_shapes[<lambda>-bearer_token]` | M2 | redaction before write | |
-| `tests/test_redaction.py::test_redacts_known_secret_shapes[<lambda>-private_key]` | M2 | redaction before write | |
-| `` tests/test_redaction.py::test_does_not_touch_ordinary_prose[tried `contain: layout` in styles.css and it did not fix the layout shift] `` | M2 | redaction before write | |
-| `tests/test_redaction.py::test_does_not_touch_ordinary_prose[summary: bug in src/auth.py \u2014 login form submits twice]` | M2 | redaction before write | |
-| `tests/test_redaction.py::test_does_not_touch_ordinary_prose[Decision: use bcrypt rounds=12 for password hashing.]` | M2 | redaction before write | |
-| `tests/test_redaction.py::test_does_not_touch_ordinary_prose[OPENAI_API_KEY is required in the environment for this script to run.]` | M2 | redaction before write | |
-| `tests/test_redaction.py::test_does_not_touch_ordinary_prose[.dejafix/events.jsonl]` | M2 | redaction before write | |
-| `tests/test_redaction.py::test_does_not_touch_ordinary_prose[sk- short prefix only]` | M2 | redaction before write | |
-| `tests/test_redaction.py::test_does_not_touch_ordinary_prose[ghp_short]` | M2 | redaction before write | |
-| `tests/test_redaction.py::test_does_not_touch_ordinary_prose[Forgot password reset flow needs a token email.]` | M2 | redaction before write | |
-| `tests/test_redaction.py::test_does_not_touch_ordinary_prose[use bearer auth]` | M2 | redaction before write | |
-| `tests/test_redaction.py::test_does_not_touch_ordinary_prose[version eyJsomeshortstring]` | M2 | redaction before write | |
-| `tests/test_redaction.py::test_is_redaction_enabled_default_on` | M2 | redaction before write | |
-| `tests/test_redaction.py::test_env_var_disables[1]` | M2 | redaction before write | |
-| `tests/test_redaction.py::test_env_var_disables[true]` | M2 | redaction before write | |
-| `tests/test_redaction.py::test_env_var_disables[yes]` | M2 | redaction before write | |
-| `tests/test_redaction.py::test_redact_event_fields_honours_opt_out` | M2 | redaction before write | |
-| `tests/test_redaction.py::test_redact_event_fields_default_on` | M2 | redaction before write | |
-| `tests/test_redaction.py::test_redactable_fields_constant_is_stable` | M2 | redaction before write | |
-| `tests/test_search.py::test_search_finds_matching_events` | M2 | search | |
-| `tests/test_session_issue.py::test_open_issue_ids_are_newest_first_without_fixed` | M2 | open-issue resolution | |
-| `tests/test_session_issue.py::test_sole_open_issue_resolves_the_only_open_issue` | M2 | open-issue resolution | |
-| `tests/test_session_issue.py::test_sole_open_issue_is_none_without_open_issues` | M2 | open-issue resolution | |
-| `tests/test_session_issue.py::test_sole_open_issue_refuses_and_lists_every_open_issue` | M2 | open-issue resolution | |
-| `tests/test_session_issue.py::test_refusal_caps_the_listing` | M2 | open-issue resolution | |
+| `tests/test_redaction.py::test_redacts_known_secret_shapes[<lambda>-openai_key]` | M2 | redaction before write | `crates/dejafix-core/src/core/redact/tests.rs::redacts_known_secret_shapes` |
+| `tests/test_redaction.py::test_redacts_known_secret_shapes[<lambda>-github_token]` | M2 | redaction before write | `crates/dejafix-core/src/core/redact/tests.rs::redacts_known_secret_shapes` |
+| `tests/test_redaction.py::test_redacts_known_secret_shapes[<lambda>-github_pat]` | M2 | redaction before write | `crates/dejafix-core/src/core/redact/tests.rs::redacts_known_secret_shapes` |
+| `tests/test_redaction.py::test_redacts_known_secret_shapes[<lambda>-aws_access_key]` | M2 | redaction before write | `crates/dejafix-core/src/core/redact/tests.rs::redacts_known_secret_shapes` |
+| `tests/test_redaction.py::test_redacts_known_secret_shapes[<lambda>-google_api_key]` | M2 | redaction before write | `crates/dejafix-core/src/core/redact/tests.rs::redacts_known_secret_shapes` |
+| `tests/test_redaction.py::test_redacts_known_secret_shapes[<lambda>-slack_token]` | M2 | redaction before write | `crates/dejafix-core/src/core/redact/tests.rs::redacts_known_secret_shapes` |
+| `tests/test_redaction.py::test_redacts_known_secret_shapes[<lambda>-stripe_key0]` | M2 | redaction before write | `crates/dejafix-core/src/core/redact/tests.rs::redacts_known_secret_shapes` |
+| `tests/test_redaction.py::test_redacts_known_secret_shapes[<lambda>-stripe_key1]` | M2 | redaction before write | `crates/dejafix-core/src/core/redact/tests.rs::redacts_known_secret_shapes` |
+| `tests/test_redaction.py::test_redacts_known_secret_shapes[<lambda>-jwt]` | M2 | redaction before write | `crates/dejafix-core/src/core/redact/tests.rs::redacts_known_secret_shapes` |
+| `tests/test_redaction.py::test_redacts_known_secret_shapes[<lambda>-bearer_token]` | M2 | redaction before write | `crates/dejafix-core/src/core/redact/tests.rs::redacts_known_secret_shapes` |
+| `tests/test_redaction.py::test_redacts_known_secret_shapes[<lambda>-private_key]` | M2 | redaction before write | `crates/dejafix-core/src/core/redact/tests.rs::redacts_known_secret_shapes` |
+| `` tests/test_redaction.py::test_does_not_touch_ordinary_prose[tried `contain: layout` in styles.css and it did not fix the layout shift] `` | M2 | redaction before write |`crates/dejafix-core/src/core/redact/tests.rs::does_not_touch_ordinary_prose` |
+| `tests/test_redaction.py::test_does_not_touch_ordinary_prose[summary: bug in src/auth.py \u2014 login form submits twice]` | M2 | redaction before write | `crates/dejafix-core/src/core/redact/tests.rs::does_not_touch_ordinary_prose` |
+| `tests/test_redaction.py::test_does_not_touch_ordinary_prose[Decision: use bcrypt rounds=12 for password hashing.]` | M2 | redaction before write | `crates/dejafix-core/src/core/redact/tests.rs::does_not_touch_ordinary_prose` |
+| `tests/test_redaction.py::test_does_not_touch_ordinary_prose[OPENAI_API_KEY is required in the environment for this script to run.]` | M2 | redaction before write | `crates/dejafix-core/src/core/redact/tests.rs::does_not_touch_ordinary_prose` |
+| `tests/test_redaction.py::test_does_not_touch_ordinary_prose[.dejafix/events.jsonl]` | M2 | redaction before write | `crates/dejafix-core/src/core/redact/tests.rs::does_not_touch_ordinary_prose` |
+| `tests/test_redaction.py::test_does_not_touch_ordinary_prose[sk- short prefix only]` | M2 | redaction before write | `crates/dejafix-core/src/core/redact/tests.rs::does_not_touch_ordinary_prose` |
+| `tests/test_redaction.py::test_does_not_touch_ordinary_prose[ghp_short]` | M2 | redaction before write | `crates/dejafix-core/src/core/redact/tests.rs::does_not_touch_ordinary_prose` |
+| `tests/test_redaction.py::test_does_not_touch_ordinary_prose[Forgot password reset flow needs a token email.]` | M2 | redaction before write | `crates/dejafix-core/src/core/redact/tests.rs::does_not_touch_ordinary_prose` |
+| `tests/test_redaction.py::test_does_not_touch_ordinary_prose[use bearer auth]` | M2 | redaction before write | `crates/dejafix-core/src/core/redact/tests.rs::does_not_touch_ordinary_prose` |
+| `tests/test_redaction.py::test_does_not_touch_ordinary_prose[version eyJsomeshortstring]` | M2 | redaction before write | `crates/dejafix-core/src/core/redact/tests.rs::does_not_touch_ordinary_prose` |
+| `tests/test_redaction.py::test_is_redaction_enabled_default_on` | M2 | redaction before write | `crates/dejafix/tests/cli/write.rs::secrets_are_redacted_with_a_notice_unless_disabled` |
+| `tests/test_redaction.py::test_env_var_disables[1]` | M2 | redaction before write | `crates/dejafix/tests/cli/write.rs::secrets_are_redacted_with_a_notice_unless_disabled` |
+| `tests/test_redaction.py::test_env_var_disables[true]` | M2 | redaction before write | `crates/dejafix/tests/cli/write.rs::secrets_are_redacted_with_a_notice_unless_disabled` |
+| `tests/test_redaction.py::test_env_var_disables[yes]` | M2 | redaction before write | `crates/dejafix/tests/cli/write.rs::secrets_are_redacted_with_a_notice_unless_disabled` |
+| `tests/test_redaction.py::test_redact_event_fields_honours_opt_out` | M2 | redaction before write | `crates/dejafix-core/src/core/write/tests.rs::secrets_in_summary_and_location_are_redacted_unless_disabled` |
+| `tests/test_redaction.py::test_redact_event_fields_default_on` | M2 | redaction before write | `crates/dejafix-core/src/core/write/tests.rs::secrets_in_summary_and_location_are_redacted_unless_disabled` |
+| `tests/test_redaction.py::test_redactable_fields_constant_is_stable` | M2 | redaction before write | `crates/dejafix-core/src/core/redact/tests.rs::redactable_fields_constant_is_stable` |
+| `tests/test_search.py::test_search_finds_matching_events` | M2 | search | `crates/dejafix/tests/cli/read.rs::search_finds_matching_events` |
+| `tests/test_session_issue.py::test_open_issue_ids_are_newest_first_without_fixed` | M2 | open-issue resolution | `crates/dejafix-core/src/core/write/tests.rs::several_open_issues_are_listed_newest_first_and_capped` |
+| `tests/test_session_issue.py::test_sole_open_issue_resolves_the_only_open_issue` | M2 | open-issue resolution | `crates/dejafix-core/src/core/write/tests.rs::several_open_issues_are_listed_newest_first_and_capped` |
+| `tests/test_session_issue.py::test_sole_open_issue_is_none_without_open_issues` | M2 | open-issue resolution | `crates/dejafix-core/src/core/write/tests.rs::several_open_issues_are_listed_newest_first_and_capped` |
+| `tests/test_session_issue.py::test_sole_open_issue_refuses_and_lists_every_open_issue` | M2 | open-issue resolution | `crates/dejafix-core/src/core/write/tests.rs::several_open_issues_are_listed_newest_first_and_capped` |
+| `tests/test_session_issue.py::test_refusal_caps_the_listing` | M2 | open-issue resolution | `crates/dejafix-core/src/core/write/tests.rs::several_open_issues_are_listed_newest_first_and_capped` |
 | `tests/test_session_issue.py::test_two_mcp_processes_do_not_misfile` | M4 | concurrent MCP writers | |
-| `tests/test_session_issue.py::test_one_open_issue_still_needs_no_id` | M2 | open-issue resolution | |
+| `tests/test_session_issue.py::test_one_open_issue_still_needs_no_id` | M2 | open-issue resolution | `crates/dejafix-core/src/core/write/tests.rs::several_open_issues_are_listed_newest_first_and_capped` |
 | `tests/test_session_start.py::test_start_session_contains_rules_summary_and_active_plan` | M4 | MCP `start_session` | |
 | `tests/test_session_start.py::test_start_session_omits_ideas_shipped_and_someday` | M4 | MCP `start_session` | |
 | `tests/test_session_start.py::test_start_session_tolerates_missing_files` | M4 | MCP `start_session` | |
@@ -422,30 +424,30 @@ Rows: 510.
 | `tests/test_structure.py::test_python_imports_resolve_to_internal_files_only` | out of scope | the structure.json cache is removed in 1.0 | |
 | `tests/test_structure.py::test_write_structure_writes_gitignored_cache` | out of scope | the structure.json cache is removed in 1.0 | |
 | `tests/test_structure.py::test_extractor_never_touches_events` | out of scope | the structure.json cache is removed in 1.0 | |
-| `tests/test_summary.py::test_summary_and_issue_file_are_regenerated` | M2 | summary.md and issue files | |
-| `tests/test_summary.py::test_regenerate_preserves_project_purpose` | M2 | summary.md and issue files | |
-| `tests/test_summary.py::test_project_purpose_auto_syncs_from_project_map` | M2 | summary.md and issue files | |
-| `tests/test_summary.py::test_project_purpose_falls_back_when_project_map_is_placeholder` | M2 | summary.md and issue files | |
-| `tests/test_summary.py::test_recent_issues_capped_at_ten` | M2 | summary.md and issue files | |
-| `tests/test_summary.py::test_recent_issues_under_ten_all_listed` | M2 | summary.md and issue files | |
-| `tests/test_summary.py::test_an_old_open_issue_is_never_capped_away` | M2 | summary.md and issue files | |
-| `tests/test_summary.py::test_many_open_issues_are_all_listed` | M2 | summary.md and issue files | |
-| `tests/test_summary.py::test_a_large_open_backlog_is_named_not_dropped` | M2 | summary.md and issue files | |
-| `tests/test_summary.py::test_issue_ids_past_9999_order_numerically` | M2 | summary.md and issue files | |
-| `tests/test_summary.py::test_decisions_capped_at_newest_fifteen` | M2 | summary.md and issue files | |
-| `tests/test_summary.py::test_an_orphan_attempt_does_not_crash_the_summary` | M2 | summary.md and issue files | |
-| `tests/test_summary.py::test_a_fixed_issue_is_listed_by_its_title_alone[auth/redirect.py-auth/middleware.py- [auth/redirect.py]]` | M2 | summary.md and issue files | |
-| `tests/test_summary.py::test_a_fixed_issue_is_listed_by_its_title_alone[None-auth/middleware.py- [auth/middleware.py]]` | M2 | summary.md and issue files | |
-| `tests/test_summary.py::test_a_fixed_issue_is_listed_by_its_title_alone[None-None-]` | M2 | summary.md and issue files | |
-| `tests/test_summary.py::test_long_records_are_clipped_but_keep_their_location` | M2 | summary.md and issue files | |
-| `tests/test_summary.py::test_a_long_path_is_not_clipped_down_to_the_word_before_it` | M2 | summary.md and issue files | |
-| `tests/test_summary.py::test_a_multi_line_record_stays_on_one_summary_line` | M2 | summary.md and issue files | |
-| `tests/test_summary.py::test_a_blank_location_falls_back_to_the_fixs` | M2 | summary.md and issue files | |
-| `tests/test_summary.py::test_key_files_ignore_version_numbers_and_identifiers` | M2 | summary.md and issue files | |
-| `tests/test_summary.py::test_key_files_keep_root_level_files_mentioned_in_text` | M2 | summary.md and issue files | |
-| `tests/test_summary.py::test_key_files_include_locations_that_name_a_file` | M2 | summary.md and issue files | |
-| `tests/test_summary.py::test_key_files_merge_line_suffixes_into_one_file` | M2 | summary.md and issue files | |
-| `tests/test_summary.py::test_key_files_rank_by_event_count_and_skip_memory_files` | M2 | summary.md and issue files | |
+| `tests/test_summary.py::test_summary_and_issue_file_are_regenerated` | M2 | summary.md and issue files | `crates/dejafix-core/src/wiring/tests.rs::log_attempt_fix_keep_the_marker_and_issue_file_in_step` |
+| `tests/test_summary.py::test_regenerate_preserves_project_purpose` | M2 | summary.md and issue files | `crates/dejafix/tests/golden/m2.rs::purpose_extraction_matches_python` |
+| `tests/test_summary.py::test_project_purpose_auto_syncs_from_project_map` | M2 | summary.md and issue files | `crates/dejafix-core/src/core/summary/tests.rs::purpose_comes_from_the_map_then_the_summary` |
+| `tests/test_summary.py::test_project_purpose_falls_back_when_project_map_is_placeholder` | M2 | summary.md and issue files | `crates/dejafix-core/src/core/summary/tests.rs::purpose_comes_from_the_map_then_the_summary` |
+| `tests/test_summary.py::test_recent_issues_capped_at_ten` | M2 | summary.md and issue files | `crates/dejafix-core/src/core/summary/tests.rs::recent_issues_capped_at_ten` |
+| `tests/test_summary.py::test_recent_issues_under_ten_all_listed` | M2 | summary.md and issue files | `crates/dejafix-core/src/core/summary/tests.rs::recent_issues_under_ten_all_listed` |
+| `tests/test_summary.py::test_an_old_open_issue_is_never_capped_away` | M2 | summary.md and issue files | `crates/dejafix-core/src/core/summary/tests.rs::an_old_open_issue_is_never_capped_away` |
+| `tests/test_summary.py::test_many_open_issues_are_all_listed` | M2 | summary.md and issue files | `crates/dejafix-core/src/core/summary/tests.rs::many_open_issues_are_all_listed` |
+| `tests/test_summary.py::test_a_large_open_backlog_is_named_not_dropped` | M2 | summary.md and issue files | `crates/dejafix-core/src/core/summary/tests.rs::a_large_open_backlog_is_named_not_dropped` |
+| `tests/test_summary.py::test_issue_ids_past_9999_order_numerically` | M2 | summary.md and issue files | `crates/dejafix-core/src/core/summary/tests.rs::issue_ids_past_9999_order_numerically` |
+| `tests/test_summary.py::test_decisions_capped_at_newest_fifteen` | M2 | summary.md and issue files | `crates/dejafix-core/src/core/summary/tests.rs::decisions_capped_at_newest_fifteen` |
+| `tests/test_summary.py::test_an_orphan_attempt_does_not_crash_the_summary` | M2 | summary.md and issue files | `crates/dejafix-core/src/core/summary/tests.rs::an_orphan_attempt_does_not_crash_the_summary` |
+| `tests/test_summary.py::test_a_fixed_issue_is_listed_by_its_title_alone[auth/redirect.py-auth/middleware.py- [auth/redirect.py]]` | M2 | summary.md and issue files | `crates/dejafix-core/src/core/summary/tests.rs::a_fixed_issue_is_listed_by_its_title_alone` |
+| `tests/test_summary.py::test_a_fixed_issue_is_listed_by_its_title_alone[None-auth/middleware.py- [auth/middleware.py]]` | M2 | summary.md and issue files | `crates/dejafix-core/src/core/summary/tests.rs::a_fixed_issue_is_listed_by_its_title_alone` |
+| `tests/test_summary.py::test_a_fixed_issue_is_listed_by_its_title_alone[None-None-]` | M2 | summary.md and issue files | `crates/dejafix-core/src/core/summary/tests.rs::a_fixed_issue_is_listed_by_its_title_alone` |
+| `tests/test_summary.py::test_long_records_are_clipped_but_keep_their_location` | M2 | summary.md and issue files | `crates/dejafix-core/src/core/summary/tests.rs::long_records_are_clipped_but_keep_their_location` |
+| `tests/test_summary.py::test_a_long_path_is_not_clipped_down_to_the_word_before_it` | M2 | summary.md and issue files | `crates/dejafix-core/src/core/summary/tests.rs::a_long_path_is_not_clipped_down_to_the_word_before_it` |
+| `tests/test_summary.py::test_a_multi_line_record_stays_on_one_summary_line` | M2 | summary.md and issue files | `crates/dejafix-core/src/core/summary/tests.rs::a_multi_line_record_stays_on_one_summary_line` |
+| `tests/test_summary.py::test_a_blank_location_falls_back_to_the_fixs` | M2 | summary.md and issue files | `crates/dejafix-core/src/core/summary/tests.rs::a_blank_location_falls_back_to_the_fixs` |
+| `tests/test_summary.py::test_key_files_ignore_version_numbers_and_identifiers` | M2 | summary.md and issue files | `crates/dejafix-core/src/core/summary/tests.rs::key_files_ignore_version_numbers_and_identifiers` |
+| `tests/test_summary.py::test_key_files_keep_root_level_files_mentioned_in_text` | M2 | summary.md and issue files | `crates/dejafix-core/src/core/summary/tests.rs::key_files_keep_root_level_files_mentioned_in_text` |
+| `tests/test_summary.py::test_key_files_include_locations_that_name_a_file` | M2 | summary.md and issue files | `crates/dejafix-core/src/core/summary/tests.rs::key_files_include_locations_that_name_a_file` |
+| `tests/test_summary.py::test_key_files_merge_line_suffixes_into_one_file` | M2 | summary.md and issue files | `crates/dejafix-core/src/core/summary/tests.rs::key_files_merge_line_suffixes_into_one_file` |
+| `tests/test_summary.py::test_key_files_rank_by_event_count_and_skip_memory_files` | M2 | summary.md and issue files | `crates/dejafix-core/src/core/summary/tests.rs::key_files_rank_by_event_count_and_skip_memory_files` |
 | `tests/test_tool_replies.py::test_add_note_reply_names_the_event_instead_of_echoing_it` | M4 | MCP reply texts | |
 | `tests/test_tool_replies.py::test_add_decision_reply_names_the_event_and_what_it_retires` | M4 | MCP reply texts | |
 | `tests/test_tool_replies.py::test_issue_writes_reply_with_the_issue_id_only` | M4 | MCP reply texts | |
@@ -456,31 +458,31 @@ Rows: 510.
 | `tests/test_tool_replies.py::test_search_shows_the_part_that_matched_past_the_clip` | M4 | MCP reply texts | |
 | `tests/test_tool_replies.py::test_search_shows_a_match_found_only_in_notes` | M4 | MCP reply texts | |
 | `tests/test_tool_replies.py::test_search_full_keeps_one_match_per_line` | M4 | MCP reply texts | |
-| `tests/test_v014_features.py::test_supersede_hides_old_decision_from_summary` | M2 | supersede, brief, search | |
-| `tests/test_v014_features.py::test_supersede_accepts_unique_prefix` | M2 | supersede, brief, search | |
-| `tests/test_v014_features.py::test_supersede_bad_ref_fails_without_writing` | M2 | supersede, brief, search | |
+| `tests/test_v014_features.py::test_supersede_hides_old_decision_from_summary` | M2 | supersede, brief, search | `crates/dejafix/tests/cli/write.rs::supersede_hides_old_decision_from_summary_and_accepts_a_prefix` |
+| `tests/test_v014_features.py::test_supersede_accepts_unique_prefix` | M2 | supersede, brief, search | `crates/dejafix/tests/cli/write.rs::supersede_hides_old_decision_from_summary_and_accepts_a_prefix` |
+| `tests/test_v014_features.py::test_supersede_bad_ref_fails_without_writing` | M2 | supersede, brief, search | `crates/dejafix/tests/cli/write.rs::supersede_bad_ref_fails_without_writing` |
 | `tests/test_v014_features.py::test_resolve_event_ref_ambiguous_and_missing` | M1 | event reference and location parsing | `crates/dejafix-core/src/core/log/tests.rs::resolve_event_ref_ambiguous_and_missing` |
-| `tests/test_v014_features.py::test_search_tags_superseded` | M2 | supersede, brief, search | |
+| `tests/test_v014_features.py::test_search_tags_superseded` | M2 | supersede, brief, search | `crates/dejafix/tests/cli/read.rs::search_tags_superseded_and_shows_ids` |
 | `tests/test_v014_features.py::test_stale_flags_decision_after_commits` | M3 | precheck, staleness and snooze | |
 | `tests/test_v014_features.py::test_stale_flags_missing_file_and_skips_superseded` | M3 | precheck, staleness and snooze | |
 | `tests/test_v014_features.py::test_location_file_ignores_non_paths` | M1 | event reference and location parsing | `crates/dejafix-core/src/core/path/tests.rs::location_file_ignores_non_paths` |
 | `tests/test_v014_features.py::test_parse_snooze_duration` | M3 | precheck, staleness and snooze | |
 | `tests/test_v014_features.py::test_snooze_silences_and_unsnooze_restores` | M3 | precheck, staleness and snooze | |
 | `tests/test_v014_features.py::test_expired_snooze_self_cleans` | M3 | precheck, staleness and snooze | |
-| `tests/test_v014_features.py::test_brief_shows_all_sections` | M2 | supersede, brief, search | |
-| `tests/test_v014_features.py::test_brief_runs_clean_on_fresh_project` | M2 | supersede, brief, search | |
-| `tests/test_v014_features.py::test_brief_console_helpers_are_cp1252_safe` | M2 | supersede, brief, search | |
+| `tests/test_v014_features.py::test_brief_shows_all_sections` | M4 | `djf brief` needs staleness (M3) and score (M4) | |
+| `tests/test_v014_features.py::test_brief_runs_clean_on_fresh_project` | M4 | `djf brief` needs staleness (M3) and score (M4) | |
+| `tests/test_v014_features.py::test_brief_console_helpers_are_cp1252_safe` | M4 | `djf brief` needs staleness (M3) and score (M4) | |
 | `tests/test_v014_features.py::test_precheck_lists_failed_approaches` | M3 | precheck, staleness and snooze | |
 | `tests/test_v014_features.py::test_precheck_console_helpers_are_cp1252_safe` | M3 | precheck, staleness and snooze | |
 | `tests/test_v014_features.py::test_precheck_named_files_cli` | M3 | precheck, staleness and snooze | |
-| `tests/test_v014_features.py::test_search_matches_location_field` | M2 | supersede, brief, search | |
-| `tests/test_v014_features.py::test_search_failed_only` | M2 | supersede, brief, search | |
+| `tests/test_v014_features.py::test_search_matches_location_field` | M2 | supersede, brief, search | `crates/dejafix/tests/cli/read.rs::search_matches_location_and_filters_failed_attempts` |
+| `tests/test_v014_features.py::test_search_failed_only` | M2 | supersede, brief, search | `crates/dejafix/tests/cli/read.rs::search_matches_location_and_filters_failed_attempts` |
 | `tests/test_v014_features.py::test_export_writes_marked_block` | out of scope | `djf export` is removed in 1.0 | |
 | `tests/test_v014_features.py::test_export_is_idempotent_and_preserves_user_content` | out of scope | `djf export` is removed in 1.0 | |
 | `tests/test_v014_features.py::test_export_excludes_superseded_and_flags_stale` | out of scope | `djf export` is removed in 1.0 | |
 | `tests/test_v014_features.py::test_export_cursor_variant` | out of scope | `djf export` is removed in 1.0 | |
-| `tests/test_v014_features.py::test_walkup_discovery_skips_global_store` | M2 | project discovery | |
-| `tests/test_v014_features.py::test_walkup_discovery_still_finds_real_projects` | M2 | project discovery | |
+| `tests/test_v014_features.py::test_walkup_discovery_skips_global_store` | M2 | project discovery | `crates/dejafix/tests/cli/read.rs::a_subdirectory_finds_the_project_but_the_global_store_is_never_a_project` |
+| `tests/test_v014_features.py::test_walkup_discovery_still_finds_real_projects` | M2 | project discovery | `crates/dejafix/tests/cli/read.rs::a_subdirectory_finds_the_project_but_the_global_store_is_never_a_project` |
 | `tests/test_visualize.py::test_location_path_for_graph_accepts_file_path_without_line` | out of scope | `djf visualize` is removed in 1.0 | |
 | `tests/test_visualize.py::test_location_path_for_graph_accepts_file_path_with_line` | out of scope | `djf visualize` is removed in 1.0 | |
 | `tests/test_visualize.py::test_location_path_for_graph_normalizes_windows_separators` | out of scope | `djf visualize` is removed in 1.0 | |
@@ -517,8 +519,8 @@ Rows: 510.
 | `tests/test_watch.py::test_pid_alive_on_posix_reports_this_process` | out of scope | `djf watch` is removed in 1.0 | |
 | `tests/test_windows_console_encoding.py::test_init_survives_a_cp1252_console` | M2 | CLI output on a cp1252 console | |
 | `tests/test_windows_console_encoding.py::test_init_prints_the_mcp_block_on_cp1252` | M2 | CLI output on a cp1252 console | |
-| `tests/test_windows_console_encoding.py::test_commands_survive_a_cp1252_console[command0]` | M2 | CLI output on a cp1252 console | |
-| `tests/test_windows_console_encoding.py::test_commands_survive_a_cp1252_console[command1]` | M2 | CLI output on a cp1252 console | |
+| `tests/test_windows_console_encoding.py::test_commands_survive_a_cp1252_console[command0]` | out of scope | `djf score` is removed in 1.0 | |
+| `tests/test_windows_console_encoding.py::test_commands_survive_a_cp1252_console[command1]` | M2 | CLI output on a cp1252 console | `crates/dejafix/tests/cli/read.rs::output_is_utf8_without_replacement_characters` |
 | `tests/test_windows_console_encoding.py::test_commands_survive_a_cp1252_console[command2]` | M2 | CLI output on a cp1252 console | |
 | `tests/test_windows_console_encoding.py::test_no_replacement_characters_leak_into_cp1252_output` | M2 | CLI output on a cp1252 console | |
 | `tests/test_windows_console_encoding.py::test_configure_stdio_tolerates_a_stream_it_cannot_reconfigure` | out of scope | Python stream wrapper; Rust writes UTF-8 through std | |
@@ -533,4 +535,4 @@ Rows: 510.
 | `tests/test_windows_hooks_and_context.py::test_get_context_uses_the_resolved_project_not_cwd` | M4 | MCP tools use the resolved project | |
 | `tests/test_windows_hooks_and_context.py::test_precheck_file_uses_the_resolved_project_not_cwd` | M4 | MCP tools use the resolved project | |
 | `tests/test_windows_hooks_and_context.py::test_precheck_churn_counts_the_projects_git_not_the_servers` | M4 | MCP tools use the resolved project | |
-| `tests/test_windows_hooks_and_context.py::test_an_expected_error_prints_no_traceback` | M2 | CLI error output | |
+| `tests/test_windows_hooks_and_context.py::test_an_expected_error_prints_no_traceback` | M2 | CLI error output | `crates/dejafix/tests/cli/write.rs::an_expected_error_prints_no_traceback` |

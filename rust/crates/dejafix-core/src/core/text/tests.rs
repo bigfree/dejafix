@@ -1,5 +1,9 @@
+use std::borrow::Cow;
+
 use super::{
-    is_python_decimal, is_python_space, python_lines, python_strip, python_strip_matches, zfill,
+    casefold, char_len, char_prefix, collapse_whitespace, contains_word, decimal_value,
+    is_python_decimal, is_python_space, is_python_word, python_lines, python_split, python_strip,
+    python_strip_matches, universal_newlines, zfill,
 };
 
 fn lines(bytes: &[u8]) -> Vec<(usize, Vec<u8>)> {
@@ -76,4 +80,86 @@ fn decimal_and_zfill_follow_python() {
     assert_eq!(zfill("7", 4), "0007");
     assert_eq!(zfill("١", 4), "000١");
     assert_eq!(zfill("12345", 4), "12345");
+}
+
+#[test]
+fn casefold_matches_python_on_known_cases() {
+    assert_eq!(casefold("Straße"), "strasse");
+    assert_eq!(casefold("ﬁle"), "file");
+    assert_eq!(casefold("ΣΑΣ"), "σασ");
+    assert_eq!(casefold("İ"), "i\u{307}");
+    assert!(matches!(casefold("plain"), Cow::Borrowed("plain")));
+}
+
+#[test]
+fn split_and_collapse_use_python_whitespace() {
+    assert_eq!(
+        python_split(" a\u{1c}b\u{2028}c  ").collect::<Vec<_>>(),
+        ["a", "b", "c"]
+    );
+    assert_eq!(collapse_whitespace("a \n\t b"), "a b");
+    assert_eq!(collapse_whitespace(" a"), "a");
+    assert_eq!(collapse_whitespace("a  b"), "a b");
+    assert_eq!(collapse_whitespace(""), "");
+    assert!(matches!(
+        collapse_whitespace("a b c"),
+        Cow::Borrowed("a b c")
+    ));
+    assert_eq!(char_prefix("žluťoučký", 4), "žluť");
+    assert_eq!(char_prefix("ab", 9), "ab");
+    assert_eq!(char_len("žluť"), 4);
+}
+
+#[test]
+fn decimal_keys_order_like_python_int() {
+    let key = |text| decimal_value(text).unwrap();
+    assert!(key("10000") > key("9999"));
+    assert_eq!(key("0042"), key("42"));
+    assert_eq!(key("\u{661}\u{662}"), key("12"));
+    assert_eq!(key("\u{1d7d9}"), key("1"));
+    assert!(key("0") < key("1"));
+    assert_eq!(decimal_value("12a"), None);
+    assert_eq!(decimal_value(""), None);
+}
+
+#[test]
+fn python_word_characters() {
+    for c in ['a', 'Ž', '\u{663}', '²', '_', '一', '7'] {
+        assert!(is_python_word(c), "{c}");
+    }
+    for c in ['-', '.', ' ', '\u{301}', '‿', '\u{93e}'] {
+        assert!(!is_python_word(c), "{c}");
+    }
+}
+
+#[test]
+fn decimal_successor_pads_and_carries() {
+    assert_eq!(decimal_value("0009").unwrap().successor(4), "0010");
+    assert_eq!(decimal_value("9999").unwrap().successor(4), "10000");
+    assert_eq!(decimal_value("0").unwrap().successor(4), "0001");
+    assert_eq!(
+        decimal_value("99999999999999999999999999999999999999999")
+            .unwrap()
+            .successor(4),
+        "100000000000000000000000000000000000000000"
+    );
+}
+
+#[test]
+fn universal_newlines_follow_python_text_mode() {
+    assert_eq!(universal_newlines("a\r\nb\rc\n"), "a\nb\nc\n");
+    assert!(matches!(universal_newlines("a\nb"), Cow::Borrowed(_)));
+}
+
+#[test]
+fn contains_word_uses_python_word_boundaries() {
+    assert!(contains_word("use react here", "react"));
+    assert!(!contains_word("imagineering", "gin"));
+    assert!(contains_word("react-dom", "react"));
+    assert!(!contains_word("x @types/node y", "@types/node"));
+    assert!(contains_word("a@types/node", "@types/node"));
+    assert!(!contains_word("reactive", "react"));
+    assert!(!contains_word("préact", "act"));
+    assert!(!contains_word("", "x"));
+    assert!(!contains_word("x", ""));
 }

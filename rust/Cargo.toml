@@ -10,13 +10,17 @@ license = "MIT"
 publish = false
 
 [workspace.dependencies]
+assert_cmd = "=2.2.2"
+clap = { version = "=4.6.7", features = ["derive"] }
 criterion = "=0.8.2"
 dejafix-core = { path = "crates/dejafix-core" }
+getrandom = "=0.4.3"
+insta = "=1.49.0"
 jiff = "=0.2.43"
 proptest = "=1.12.0"
 regex = "=1.13.1"
 serde = "=1.0.229"
-serde_json = { version = "=1.0.154", features = ["float_roundtrip", "raw_value"] }
+serde_json = { version = "=1.0.154", features = ["float_roundtrip", "preserve_order", "raw_value"] }
 sha1 = "=0.11.0"
 tempfile = "=3.27.0"
 thiserror = "=2.0.21"

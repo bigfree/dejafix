@@ -1,6 +1,11 @@
 pub mod event;
+pub mod global;
 pub(crate) mod json;
 pub mod log;
 pub mod path;
+pub mod redact;
+pub mod search;
+pub mod summary;
 pub(crate) mod text;
 pub mod time;
+pub mod write;

@@ -5,8 +5,9 @@ use regex::{Captures, Regex};
 
 use crate::types::Normalizer;
 
-const ID: &str = r"(?P<id>evt_[0-9a-f]{20})";
-const STAMP: &str = r"(?P<stamp>\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}Z)?)";
+const ID: &str = r"(?P<id>evt_[0-9a-f]{20}|(?:pat|got)_[0-9a-f]{12})";
+const STAMP: &str =
+    r"(?P<stamp>\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}(?:\.\d{6})?Z| \d{2}:\d{2})?)";
 
 impl Normalizer {
     pub fn new(roots: &[(&Path, &str)], since: &str) -> Result<Self, regex::Error> {
@@ -31,7 +32,20 @@ impl Normalizer {
             since: since.to_owned(),
             today: since.get(..10).unwrap_or(since).to_owned(),
             ids: HashMap::new(),
+            versions: None,
         })
+    }
+
+    pub fn with_versions(mut self, versions: &[&str]) -> Result<Self, regex::Error> {
+        let alternatives: Vec<String> = versions
+            .iter()
+            .map(|version| regex::escape(version))
+            .collect();
+        self.versions = Some(Regex::new(&format!(
+            r#"(?P<lead>"last_version": "|dejafix |upgraded to |Running )(?:{})\b"#,
+            alternatives.join("|")
+        ))?);
+        Ok(self)
     }
 
     pub fn apply(&mut self, text: &str) -> String {
@@ -41,9 +55,14 @@ impl Normalizer {
             since,
             today,
             ids,
+            versions,
         } = self;
+        let text = match versions {
+            Some(versions) => versions.replace_all(text, "${lead}<VERSION>"),
+            None => std::borrow::Cow::Borrowed(text),
+        };
         pattern
-            .replace_all(text, |caps: &Captures| {
+            .replace_all(&text, |caps: &Captures| {
                 if let Some(root) = caps.name("root") {
                     return labels.get(root.as_str()).cloned().unwrap_or_default();
                 }
@@ -55,10 +74,17 @@ impl Normalizer {
                 let stamp = caps.name("stamp").map_or("", |found| found.as_str());
                 match stamp.len() {
                     10 if stamp >= today.as_str() => "<TODAY>".to_owned(),
-                    20 if stamp >= since.as_str() => "<NOW>".to_owned(),
+                    16 if stamp >= minute(since).as_str() => "<MINUTE>".to_owned(),
+                    20 | 27 if stamp.get(..19) >= since.get(..19) => "<NOW>".to_owned(),
                     _ => stamp.to_owned(),
                 }
             })
             .into_owned()
     }
+}
+
+fn minute(since: &str) -> String {
+    let date = since.get(..10).unwrap_or(since);
+    let time = since.get(11..16).unwrap_or("");
+    format!("{date} {time}")
 }

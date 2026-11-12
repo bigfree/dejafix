@@ -24,7 +24,10 @@ fixtures dir="target/fixtures":
     cargo run -p dejafix-core --features testing --example gen-fixtures -- {{dir}}
 
 bench:
-    cargo bench -p dejafix-core --features testing --bench load
+    cargo bench -p dejafix-core --features testing --bench load --bench summary
 
 smoke:
     @echo "smoke: no installable binary before M3"
+
+casefold:
+    ../.venv/bin/python -I scripts/casefold.py > crates/dejafix-core/src/core/text/casefold_table.rs

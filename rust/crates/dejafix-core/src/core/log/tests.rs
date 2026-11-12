@@ -217,3 +217,82 @@ proptest! {
         prop_assert_eq!(log.events().len(), lines.len());
     }
 }
+
+fn index_snapshot(log: &EventLog<'_>) -> String {
+    let mut files: Vec<String> = log
+        .indexed_files()
+        .map(|path| {
+            let ids: Vec<&str> = log
+                .live_events_for_file(path.as_str())
+                .map(|event| event.id.as_str())
+                .collect();
+            format!("{}={}", path.as_str(), ids.join(","))
+        })
+        .collect();
+    files.sort();
+    let open: Vec<&str> = log.open_issues().map(IssueId::as_str).collect();
+    let mut closed: Vec<&str> = ["0001", "0002", "0003"]
+        .into_iter()
+        .filter(|issue| log.is_closed(&IssueId::from(*issue)))
+        .collect();
+    closed.sort_unstable();
+    let retired: Vec<String> = (0..10)
+        .map(|n| format!("evt_{n}"))
+        .filter(|id| log.is_retired(&EventId::from(id.as_str())))
+        .collect();
+    format!(
+        "open {open:?} closed {closed:?} retired {retired:?} current {:?} files {files:?}",
+        log.current_issue().map(IssueId::as_str)
+    )
+}
+
+proptest! {
+    #[test]
+    fn parse_then_push_equals_parse_all(
+        lines in proptest::collection::vec(
+            r#"\{"type": "(issue|fix|note|attempt)", "summary": "[a-z]{1,4}"(, "issue_id": "000[1-3]")?(, "supersedes": "evt_[0-9]")?(, "id": "evt_[0-9]")?(, "files": \["[a-z]{1,2}\.py"\])?(, "location": "[a-z]{1,2}\.py:[0-9]")?\}"#,
+            0..30,
+        ),
+        split in 0_usize..30,
+    ) {
+        let text: String = lines.iter().flat_map(|line| [line.as_str(), "\n"]).collect();
+        let split = split.min(lines.len());
+        let head: usize = lines.iter().take(split).map(|line| line.len() + 1).sum();
+        let full = EventLog::parse(text.as_bytes(), &clock(), &context(), &NoResolve);
+        let mut pushed = EventLog::parse(&text.as_bytes()[..head], &clock(), &context(), &NoResolve);
+        for event in full.events().iter().skip(pushed.events().len()) {
+            pushed.push(event.clone(), &context(), &NoResolve);
+        }
+        prop_assert_eq!(index_snapshot(&full), index_snapshot(&pushed));
+    }
+}
+
+#[test]
+fn push_keeps_the_index_in_step_with_a_new_fix_and_issue() {
+    let text = concat!(
+        r#"{"id": "evt_1", "issue_id": "0001", "location": "a.py:1", "summary": "a", "timestamp": "2026-01-01T00:00:00Z", "type": "issue"}"#,
+        "\n",
+        r#"{"id": "evt_2", "issue_id": "0002", "summary": "b", "timestamp": "2026-01-01T00:00:01Z", "type": "issue"}"#,
+        "\n",
+        r#"{"id": "evt_3", "issue_id": "0001", "summary": "c", "timestamp": "2026-01-01T00:00:02Z", "type": "fix"}"#,
+        "\n",
+    );
+    let first_two = text.match_indices('\n').nth(1).map_or(0, |(at, _)| at + 1);
+    let full = EventLog::parse(text.as_bytes(), &clock(), &context(), &NoResolve);
+    let mut pushed = EventLog::parse(
+        &text.as_bytes()[..first_two],
+        &clock(),
+        &context(),
+        &NoResolve,
+    );
+    pushed.push(full.events()[2].clone(), &context(), &NoResolve);
+    assert_eq!(index_snapshot(&full), index_snapshot(&pushed));
+    assert_eq!(ids(&pushed, "a.py"), ["evt_1", "evt_3"]);
+    assert_eq!(
+        pushed
+            .open_issues()
+            .map(IssueId::as_str)
+            .collect::<Vec<_>>(),
+        ["0002"]
+    );
+}

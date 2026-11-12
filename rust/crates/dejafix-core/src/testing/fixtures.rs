@@ -6,7 +6,7 @@ use jiff::Timestamp;
 use serde_json::{Map, Value, json};
 
 use super::types::{FixtureError, FixtureState, SplitMix64};
-use crate::core::json::write_python_json;
+use crate::core::json::write_canonical;
 
 pub const FIXTURE_SIZES: [usize; 3] = [100, 3_000, 30_000];
 pub const FIXTURE_SEED: u64 = 0x00de_7afa_0000_0001;
@@ -61,7 +61,7 @@ pub fn write_project(root: &Path, events: usize, seed: u64) -> Result<(), Fixtur
     let step = (WINDOW / events.max(1)).max(1);
     for number in 0..events {
         let event = state.event(number, step)?;
-        write_python_json(&mut out, &event).map_err(|source| FixtureError::Event {
+        write_canonical(&mut out, &event).map_err(|source| FixtureError::Event {
             path: log.clone(),
             source,
         })?;

@@ -1,2 +1,2 @@
 pub(crate) mod fs;
-mod git;
+pub(crate) mod git;

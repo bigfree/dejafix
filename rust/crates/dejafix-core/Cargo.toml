@@ -10,20 +10,27 @@ publish.workspace = true
 testing = []
 
 [dependencies]
+getrandom.workspace = true
 jiff.workspace = true
 regex.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sha1.workspace = true
+tempfile.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
 criterion.workspace = true
+insta.workspace = true
 proptest.workspace = true
-tempfile.workspace = true
 
 [[bench]]
 name = "load"
+harness = false
+required-features = ["testing"]
+
+[[bench]]
+name = "summary"
 harness = false
 required-features = ["testing"]
 

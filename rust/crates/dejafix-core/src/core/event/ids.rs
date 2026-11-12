@@ -29,6 +29,20 @@ impl IssueId<'_> {
     }
 }
 
+impl IssueId<'static> {
+    #[must_use]
+    pub fn from_string(text: String) -> Self {
+        IssueId(Cow::Owned(text))
+    }
+}
+
+impl EventId<'static> {
+    #[must_use]
+    pub fn from_string(text: String) -> Self {
+        EventId(Cow::Owned(text))
+    }
+}
+
 impl<'a> From<&'a str> for IssueId<'a> {
     fn from(text: &'a str) -> Self {
         IssueId(Cow::Borrowed(text))
