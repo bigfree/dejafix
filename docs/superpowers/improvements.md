@@ -280,3 +280,12 @@ Append new entries at the end, one heading each, with this template:
 - Gain: the code rule holds without exception.
 - Compatibility: none, if the matching is reproduced exactly.
 - Status: proposed
+
+## Skip network and removable drives in the default doctor roots on Windows
+
+- Found: 2026-11-13, CI on Windows, `rust/crates/dejafix-core/src/adapters/fs/scan/walk.rs` (`fixed_drives`)
+- Today: Python asks `GetDriveTypeW` and keeps only fixed drives, because an offline mapped network drive can make a plain `exists()` hang for a long time. Rust checks `D:\` to `Z:\` with `try_exists()`, so it lists network and removable drives too and can hang on an offline one.
+- Proposal: ask Windows for the drive type as Python does. `unsafe_code` is forbidden in the workspace, so this needs a safe wrapper crate (for example `windows-sys` through a small vetted crate) or a documented exception.
+- Gain: `djf doctor` without `--path` no longer stalls on an offline network drive and matches Python's roots.
+- Compatibility: restores Python's behaviour; no format change.
+- Status: proposed

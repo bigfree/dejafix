@@ -259,6 +259,30 @@ pinned by a test:
   (`tests/cli/memory/global.rs::import_reports_a_missing_or_invalid_file`,
   `a_corrupt_store_is_an_error_not_a_silent_loss`).
 
+Windows, found when the `Test` workflow first ran there on 2026-11-13 and
+approved by the user the same day, each pinned by a test:
+
+- git hooks are written with `\n` line endings on every platform. Python
+  writes them in text mode, so on Windows they get `\r\n`, which Git for
+  Windows' `sh` reads as part of each line and cannot run. `djf hooks
+  install` and `djf init` also rewrite an existing hook that has `\r\n` with
+  `\n`, even when its dejafix block is current, so hooks installed by Python
+  start working after the upgrade
+  (`adapters/git/hooks.rs::write_hook`,
+  `tests/cli/hooks.rs::a_real_commit_records_the_event_and_is_never_blocked`,
+  `a_hook_written_with_crlf_is_rewritten_with_lf`,
+  `golden/harness.rs::snapshot_git_hooks`);
+- standard output and error use `\n` on every platform; Python's text-mode
+  streams print `\r\n` on Windows. Files keep Python's platform line endings
+  (`golden/harness.rs::console_text`);
+- the lock on `events.jsonl` is mandatory on Windows: while a writer holds it,
+  readers that take the shared lock wait, and the edit hook, which reads
+  without a lock so it never waits, gets no lesson for that one edit
+  (`tests/cli/edit_hook.rs::a_writer_holding_the_log_lock_never_blocks_an_edit`);
+- a timestamp without a zone that Windows' C runtime cannot convert (before
+  1970 or after 3000) is normalised as on Unix; Python 0.4 raises `OSError`
+  there and stops (`golden/m1.rs::scalars_match_python`).
+
 ## Testing
 
 1. Unit tests in `core`, including property tests (`proptest`): any log line

@@ -17,7 +17,7 @@ const CLEAN: &str = r#"{"mcpServers": {"dejafix": {"command": "djf-mcp", "args":
 
 fn home_of(project: &Path) -> Result<PathBuf, Box<dyn Error>> {
     let parent = project.parent().ok_or("the project has no parent")?;
-    Ok(fs::canonicalize(parent.join("home"))?)
+    Ok(dejafix_core::canonical_path(&parent.join("home")).ok_or("the home is missing")?)
 }
 
 fn memory(path: &Path) -> Result<(), Box<dyn Error>> {

@@ -10,6 +10,14 @@ use super::{
 const NOW: &str = "2027-01-15T08:00:00Z";
 const LATER: &str = "2027-01-15T09:00:00Z";
 
+fn p(path: &str) -> String {
+    if cfg!(windows) {
+        format!("C:{}", path.replace('/', "\\"))
+    } else {
+        path.to_owned()
+    }
+}
+
 fn absolute(path: &str) -> bool {
     Path::new(path).is_absolute()
 }
@@ -58,7 +66,7 @@ fn paths_are_normalised_like_pure_posix_path() {
 
 #[test]
 fn a_0_2_x_list_gets_ids_and_is_marked_dirty() {
-    let Loaded::Dirty(registry) = loaded(&json!(["/code/alpha", "/code/beta"]), None) else {
+    let Loaded::Dirty(registry) = loaded(&json!([p("/code/alpha"), p("/code/beta")]), None) else {
         panic!("not dirty");
     };
     assert_eq!(ids(&registry), ["alpha", "beta"]);
@@ -66,11 +74,11 @@ fn a_0_2_x_list_gets_ids_and_is_marked_dirty() {
     assert_eq!(registry.projects[0].default_brain, "coding");
     assert_eq!(
         list_payload(&registry),
-        json!(["/code/alpha", "/code/beta"])
+        json!([p("/code/alpha"), p("/code/beta")])
     );
     let meta = meta_payload(&registry);
     let keys: Vec<&String> = meta["by_path"].as_object().unwrap().keys().collect();
-    assert_eq!(keys, ["/code/alpha", "/code/beta"]);
+    assert_eq!(keys, [&p("/code/alpha"), &p("/code/beta")]);
     let Loaded::Clean(again) = loaded(&list_payload(&registry), Some(&meta)) else {
         panic!("not clean");
     };
@@ -79,20 +87,24 @@ fn a_0_2_x_list_gets_ids_and_is_marked_dirty() {
 
 #[test]
 fn the_sidecar_is_written_in_python_key_order() {
-    let Loaded::Dirty(mut registry) = loaded(&json!(["/code/alpha"]), None) else {
+    let Loaded::Dirty(mut registry) = loaded(&json!([p("/code/alpha")]), None) else {
         panic!("not dirty");
     };
     registry.active_project = Some("alpha".to_owned());
     let text = serde_json::to_string(&meta_payload(&registry)).unwrap();
     assert_eq!(
         text,
-        r#"{"schema_version":1,"active_project":"alpha","by_path":{"/code/alpha":{"id":"alpha","alias":null,"default_brain":"coding","tags":[],"created_at":"2027-01-15T08:00:00Z","updated_at":"2027-01-15T08:00:00Z"}}}"#
+        format!(
+            r#"{{"schema_version":1,"active_project":"alpha","by_path":{{{}:{{"id":"alpha","alias":null,"default_brain":"coding","tags":[],"created_at":"2027-01-15T08:00:00Z","updated_at":"2027-01-15T08:00:00Z"}}}}}}"#,
+            json!(p("/code/alpha"))
+        )
     );
 }
 
 #[test]
 fn ids_do_not_collide_for_same_named_folders() {
-    let Loaded::Dirty(registry) = loaded(&json!(["/a/web", "/b/web", "/c/web"]), None) else {
+    let Loaded::Dirty(registry) = loaded(&json!([p("/a/web"), p("/b/web"), p("/c/web")]), None)
+    else {
         panic!("not dirty");
     };
     assert_eq!(ids(&registry), ["web", "web-2", "web-3"]);
@@ -101,10 +113,10 @@ fn ids_do_not_collide_for_same_named_folders() {
 #[test]
 fn a_duplicate_sidecar_id_is_replaced() {
     let meta = json!({"by_path": {
-        "/a/one": {"id": "same"},
-        "/b/two": {"id": "same", "alias": "t", "tags": ["x", 1], "created_at": "c", "updated_at": "u"}
+        p("/a/one"): {"id": "same"},
+        p("/b/two"): {"id": "same", "alias": "t", "tags": ["x", 1], "created_at": "c", "updated_at": "u"}
     }, "active_project": "same"});
-    let Loaded::Dirty(registry) = loaded(&json!(["/a/one", "/b/two"]), Some(&meta)) else {
+    let Loaded::Dirty(registry) = loaded(&json!([p("/a/one"), p("/b/two")]), Some(&meta)) else {
         panic!("not dirty");
     };
     assert_eq!(ids(&registry), ["same", "two"]);
@@ -116,7 +128,7 @@ fn a_duplicate_sidecar_id_is_replaced() {
 
 #[test]
 fn junk_entries_are_dropped() {
-    let payload = json!(["schema_version", "relative/path", 5, null, "/real/app"]);
+    let payload = json!(["schema_version", "relative/path", 5, null, p("/real/app")]);
     let Loaded::Dirty(registry) = loaded(&payload, Some(&json!("not a dict"))) else {
         panic!("not dirty");
     };
@@ -147,7 +159,7 @@ fn the_dev_format_is_converted() {
         "schema_version": 1,
         "active_project": "alpha",
         "projects": [
-            {"id": "alpha", "path": "/code/alpha", "alias": "a"},
+            {"id": "alpha", "path": p("/code/alpha"), "alias": "a"},
             {"id": "no-path"},
             "junk"
         ]
@@ -159,11 +171,11 @@ fn the_dev_format_is_converted() {
     assert_eq!(registry.active_project.as_deref(), Some("alpha"));
     assert_eq!(registry.projects[0].alias.as_deref(), Some("a"));
     assert_eq!(registry.projects[0].created_at, "");
-    assert_eq!(list_payload(&registry), json!(["/code/alpha"]));
+    assert_eq!(list_payload(&registry), json!([p("/code/alpha")]));
 }
 
 fn registry_of(paths: &[&str]) -> Registry {
-    let payload = Value::Array(paths.iter().map(|path| json!(path)).collect());
+    let payload = Value::Array(paths.iter().map(|path| json!(p(path))).collect());
     loaded(&payload, None).into_registry()
 }
 
@@ -174,33 +186,33 @@ fn registering_is_idempotent_by_path() {
         outcome.map(|(result, record)| (result, record.id.clone()))
     };
     assert_eq!(
-        result(registry.register(PathBuf::from("/code/alpha"), None, LATER)),
+        result(registry.register(PathBuf::from(p("/code/alpha")), None, LATER)),
         Ok((RegisterResult::Existing, "alpha".to_owned()))
     );
     assert_eq!(
-        result(registry.register(PathBuf::from("/other/alpha"), None, LATER)),
+        result(registry.register(PathBuf::from(p("/other/alpha")), None, LATER)),
         Ok((RegisterResult::Added, "alpha-2".to_owned()))
     );
     assert_eq!(ids(&registry), ["alpha", "alpha-2"]);
     assert_eq!(registry.projects[1].created_at, LATER);
     assert_eq!(
-        result(registry.register(PathBuf::from("/code/alpha"), Some("a"), LATER)),
+        result(registry.register(PathBuf::from(p("/code/alpha")), Some("a"), LATER)),
         Ok((RegisterResult::Realiased, "alpha".to_owned()))
     );
     assert_eq!(registry.projects[0].updated_at, LATER);
     assert_eq!(
-        result(registry.register(PathBuf::from("/code/alpha"), Some("a"), NOW)),
+        result(registry.register(PathBuf::from(p("/code/alpha")), Some("a"), NOW)),
         Ok((RegisterResult::Existing, "alpha".to_owned()))
     );
     assert_eq!(
-        result(registry.register(PathBuf::from("/x/new"), Some(""), NOW)),
+        result(registry.register(PathBuf::from(p("/x/new")), Some(""), NOW)),
         Err(RegistryError::BadAlias(String::new()))
     );
     assert_eq!(
-        result(registry.register(PathBuf::from("/x/new"), Some("alpha-2"), NOW)),
+        result(registry.register(PathBuf::from(p("/x/new")), Some("alpha-2"), NOW)),
         Err(RegistryError::AliasTaken {
             alias: "alpha-2".to_owned(),
-            path: PathBuf::from("/other/alpha")
+            path: PathBuf::from(p("/other/alpha"))
         })
     );
 }
@@ -222,11 +234,11 @@ fn lookup_is_case_insensitive_and_accepts_a_path() {
         assert_eq!(registry.find(name, no_resolve), Some(0), "{name}");
     }
     assert_eq!(
-        registry.find("", |_| Some(PathBuf::from("/code/other"))),
+        registry.find("", |_| Some(PathBuf::from(p("/code/other")))),
         None
     );
     assert_eq!(
-        registry.find("./x", |_| Some(PathBuf::from("/code/other"))),
+        registry.find("./x", |_| Some(PathBuf::from(p("/code/other")))),
         Some(1)
     );
     assert_eq!(registry.find("nope", no_resolve), None);
@@ -248,7 +260,7 @@ fn aliases_and_tags_are_validated_and_stamped() {
             .set_alias("alpha", "beta", LATER, no_resolve)
             .unwrap_err()
             .to_string(),
-        "Alias 'beta' is already used by /code/beta."
+        format!("Alias 'beta' is already used by {}.", p("/code/beta"))
     );
     assert_eq!(
         registry
@@ -316,7 +328,8 @@ fn an_older_dejafix_can_only_append_a_path() {
     let mut registry = registry_of(&["/code/alpha"]);
     registry.set_alias("alpha", "a", NOW, no_resolve).unwrap();
     let meta = meta_payload(&registry);
-    let Loaded::Dirty(appended) = loaded(&json!(["/code/alpha", "/code/beta"]), Some(&meta)) else {
+    let Loaded::Dirty(appended) = loaded(&json!([p("/code/alpha"), p("/code/beta")]), Some(&meta))
+    else {
         panic!("not dirty");
     };
     assert_eq!(ids(&appended), ["alpha", "beta"]);

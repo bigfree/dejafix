@@ -1,12 +1,12 @@
 use std::fs;
 
-use crate::support::{Repo, TestResult};
+use crate::support::{Repo, TestResult, text};
 
 #[test]
 fn show_prints_the_summary_with_a_trailing_newline() -> TestResult {
     let repo = Repo::new()?;
     repo.djf(&["note", "startup is slow"]).assert().success();
-    let summary = fs::read_to_string(repo.mem().join("summary.md"))?;
+    let summary = text(&repo.mem().join("summary.md"))?;
     repo.djf(&["show"])
         .assert()
         .success()

@@ -12,17 +12,23 @@ use crate::types::{Implementation, Run};
 type TestResult = Result<(), Box<dyn Error>>;
 
 fn canonical_key_files(text: &str) -> String {
-    let Some(start) = text.find("## Key files\n") else {
+    let newline = if text.contains("## Key files\r\n") {
+        "\r\n"
+    } else {
+        "\n"
+    };
+    let header = format!("## Key files{newline}");
+    let Some(start) = text.find(&header) else {
         return text.to_owned();
     };
-    let body = start + "## Key files\n".len();
+    let body = start + header.len();
     let end = text
         .get(body..)
-        .and_then(|rest| rest.find("\n\n"))
+        .and_then(|rest| rest.find(&newline.repeat(2)))
         .map_or(text.len(), |at| body + at);
     let mut lines: Vec<&str> = text.get(body..end).unwrap_or("").lines().collect();
     lines.sort_unstable();
-    format!("{}{}{}", &text[..body], lines.join("\n"), &text[end..])
+    format!("{}{}{}", &text[..body], lines.join(newline), &text[end..])
 }
 
 const EMPTY_SUMMARY: &str = "Event summary cannot be empty";

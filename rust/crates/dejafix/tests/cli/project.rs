@@ -1,6 +1,6 @@
 use std::fs;
 
-use crate::support::{Repo, TestResult};
+use crate::support::{Repo, TestResult, native};
 
 const NOTICE: &str = concat!(
     "\ndejafix upgraded to ",
@@ -17,7 +17,7 @@ fn registered(repo: &Repo) -> Result<Vec<String>, Box<dyn std::error::Error>> {
 }
 
 fn folder(repo: &Repo, relative: &str) -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
-    let path = repo.home.join(relative);
+    let path = native(&repo.home.join(relative));
     fs::create_dir_all(path.join(".dejafix/issues"))?;
     fs::write(path.join(".dejafix/config.toml"), "recent_days = 30\n")?;
     Ok(path)

@@ -9,7 +9,7 @@ use dejafix_core::{
 };
 use serde_json::{Value, json};
 
-use crate::harness::{diff, fixed, run_scenario};
+use crate::harness::{GIT_NO_MAINTENANCE, diff, fixed, run_scenario};
 use crate::m2::oracle;
 use crate::scenario::canonical;
 use crate::types::{Arguments, Implementation};
@@ -224,6 +224,7 @@ fn manifest_extraction_matches_python() -> TestResult {
 
 fn git(dir: &Path, args: &[&str]) -> Result<(), Box<dyn Error>> {
     let status = Command::new("git")
+        .args(GIT_NO_MAINTENANCE)
         .args(["-c", "user.email=t@example.invalid", "-c", "user.name=t"])
         .args(args)
         .current_dir(dir)

@@ -42,4 +42,4 @@ jobs:
         working-directory: rust
         env:
           DEJAFIX_PYTHON: ${{ steps.python.outputs.python-path }}
-        run: cargo nextest run --workspace --all-features
+        run: cargo nextest run --workspace --all-features --no-fail-fast

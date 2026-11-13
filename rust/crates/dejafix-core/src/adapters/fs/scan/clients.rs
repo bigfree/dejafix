@@ -9,6 +9,12 @@ const DESKTOP_CONFIG: &str = "Claude/claude_desktop_config.json";
 const STORE_PREFIX: &str = "Claude_";
 const PIN_MARKERS: [&str; 4] = ["--root", "\"cwd\"", "cwd =", "DEJAFIX_ROOT"];
 
+fn nested(base: &Path, relative: &str) -> PathBuf {
+    relative
+        .split('/')
+        .fold(base.to_path_buf(), |path, part| path.join(part))
+}
+
 fn store_packages(local: &Path) -> Vec<PathBuf> {
     let Ok(entries) = fs::read_dir(local.join("Packages")) else {
         return Vec::new();
@@ -43,38 +49,37 @@ pub fn client_configs(
     let appdata = paths
         .appdata
         .clone()
-        .unwrap_or_else(|| home.join("AppData/Roaming"));
+        .unwrap_or_else(|| nested(home, "AppData/Roaming"));
     let local = paths
         .local_appdata
         .clone()
-        .unwrap_or_else(|| home.join("AppData/Local"));
+        .unwrap_or_else(|| nested(home, "AppData/Local"));
     let mut entries = vec![
         (
             CLAUDE_DESKTOP,
-            home.join("Library/Application Support")
-                .join(DESKTOP_CONFIG),
+            nested(&nested(home, "Library/Application Support"), DESKTOP_CONFIG),
         ),
-        (CLAUDE_DESKTOP, appdata.join(DESKTOP_CONFIG)),
-        (CLAUDE_DESKTOP, xdg.join(DESKTOP_CONFIG)),
-        ("Cursor", home.join(".cursor/mcp.json")),
+        (CLAUDE_DESKTOP, nested(&appdata, DESKTOP_CONFIG)),
+        (CLAUDE_DESKTOP, nested(&xdg, DESKTOP_CONFIG)),
+        ("Cursor", nested(home, ".cursor/mcp.json")),
         (
             "Antigravity",
-            home.join(".gemini/antigravity/mcp_config.json"),
+            nested(home, ".gemini/antigravity/mcp_config.json"),
         ),
-        ("Codex", home.join(".codex/config.toml")),
+        ("Codex", nested(home, ".codex/config.toml")),
         ("Claude Code", home.join(".claude.json")),
     ];
     entries.extend(store_packages(&local).into_iter().map(|package| {
         (
             "Claude Desktop (Store)",
-            package.join("LocalCache/Roaming").join(DESKTOP_CONFIG),
+            nested(&nested(&package, "LocalCache/Roaming"), DESKTOP_CONFIG),
         )
     }));
     if let Some(root) = project_root {
         entries.push(("This project (.mcp.json)", root.join(".mcp.json")));
         entries.push((
             "This project (.cursor/mcp.json)",
-            root.join(".cursor/mcp.json"),
+            nested(root, ".cursor/mcp.json"),
         ));
     }
     entries

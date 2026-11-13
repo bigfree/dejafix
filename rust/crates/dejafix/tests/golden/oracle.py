@@ -82,6 +82,9 @@ def scalars(kind: str, root: Path | None) -> None:
                 raise SystemExit(f"unknown kind {kind}")
         except (ValueError, OverflowError):
             result = "!!"
+        except OSError:
+            # Windows: the C runtime cannot convert a date outside 1970-3000.
+            result = "!os"
         print(json.dumps(result))
 
 
@@ -108,4 +111,6 @@ def main(argv: list[str]) -> int:
 
 
 if __name__ == "__main__":
+    # Print \n on every platform: Windows text mode would print \r\n.
+    sys.stdout.reconfigure(newline="\n")
     sys.exit(main(sys.argv[1:]))

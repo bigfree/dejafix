@@ -9,6 +9,7 @@ use super::{
     repository_state, resolve_djf_binary, staged_files, status_files, working_files, write_hook,
 };
 use crate::core::capture::Change;
+use crate::core::hooks::shell_path;
 
 fn git(dir: &std::path::Path, args: &[&str]) {
     let status = Command::new("git")
@@ -50,16 +51,12 @@ fn git_returns_nothing_outside_a_repository_or_on_failure() {
 fn git_reads_large_output_without_blocking() {
     let dir = tempfile::tempdir().unwrap();
     git(dir.path(), &["init", "-q"]);
+    let message = dir.path().join(".git/message");
     for index in 0..3 {
+        fs::write(&message, "x".repeat(40_000 + index)).unwrap();
         git(
             dir.path(),
-            &[
-                "commit",
-                "-q",
-                "--allow-empty",
-                "-m",
-                &"x".repeat(40_000 + index),
-            ],
+            &["commit", "-q", "--allow-empty", "-F", ".git/message"],
         );
     }
     let log = super::git(dir.path(), &["log", "--format=%B"]).unwrap();
@@ -103,7 +100,7 @@ fn the_djf_next_to_the_executable_beats_path() {
     fake_binary(&dir.path().join("other"), "djf", 0o755);
     let path_var = path_of(&dir.path().join("other"));
     let resolved = resolve_djf_binary(adjacent.parent(), Some(&path_var), false);
-    assert_eq!(resolved, adjacent.to_string_lossy());
+    assert_eq!(resolved, shell_path(&adjacent.to_string_lossy()));
 }
 
 #[test]
@@ -111,7 +108,7 @@ fn the_dejafix_alias_is_the_second_choice_next_to_the_executable() {
     let dir = tempfile::tempdir().unwrap();
     let alias = fake_binary(dir.path(), "dejafix", 0o755);
     let resolved = resolve_djf_binary(Some(dir.path()), None, false);
-    assert_eq!(resolved, alias.to_string_lossy());
+    assert_eq!(resolved, shell_path(&alias.to_string_lossy()));
 }
 
 #[cfg(unix)]
@@ -122,7 +119,7 @@ fn a_djf_that_is_not_executable_is_skipped() {
     let on_path = fake_binary(&dir.path().join("local"), "djf", 0o755);
     let path_var = path_of(on_path.parent().unwrap());
     let resolved = resolve_djf_binary(adjacent.parent(), Some(&path_var), false);
-    assert_eq!(resolved, on_path.to_string_lossy());
+    assert_eq!(resolved, shell_path(&on_path.to_string_lossy()));
 }
 
 #[test]
@@ -132,7 +129,7 @@ fn path_answers_when_nothing_is_adjacent() {
     let on_path = fake_binary(&dir.path().join("local"), "djf", 0o755);
     let path_var = path_of(on_path.parent().unwrap());
     let resolved = resolve_djf_binary(Some(&dir.path().join("venv")), Some(&path_var), false);
-    assert_eq!(resolved, on_path.to_string_lossy());
+    assert_eq!(resolved, shell_path(&on_path.to_string_lossy()));
 }
 
 #[test]
@@ -144,7 +141,7 @@ fn path_prefers_djf_over_the_alias_in_any_directory() {
         std::env::join_paths([first.parent().unwrap(), second.parent().unwrap()]).unwrap();
     assert_eq!(
         resolve_djf_binary(None, Some(&path_var), false),
-        second.to_string_lossy()
+        shell_path(&second.to_string_lossy())
     );
 }
 

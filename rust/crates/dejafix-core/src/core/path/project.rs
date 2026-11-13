@@ -204,10 +204,12 @@ fn relative_to(path: &str, root: &str, fold_case: bool) -> Option<String> {
         }
     }
     let rest: Vec<&str> = path_parts.collect();
-    Some(if rest.is_empty() {
-        ".".to_owned()
-    } else {
-        rest.join("/")
+    Some(match rest.first() {
+        None => ".".to_owned(),
+        Some(first) if cfg!(windows) && first.chars().nth(1) == Some(':') => {
+            format!("./{}", rest.join("/"))
+        }
+        Some(_) => rest.join("/"),
     })
 }
 

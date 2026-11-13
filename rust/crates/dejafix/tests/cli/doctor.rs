@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::support::{Repo, TestResult};
+use crate::support::{Repo, TestResult, native};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -17,7 +17,7 @@ fn memory(path: &Path) -> Result<PathBuf, Box<dyn std::error::Error>> {
     fs::create_dir_all(path.join(".dejafix/issues"))?;
     fs::write(path.join(".dejafix/config.toml"), "recent_days = 30\n")?;
     fs::write(path.join(".dejafix/events.jsonl"), "")?;
-    Ok(path.to_path_buf())
+    Ok(native(path))
 }
 
 fn version_block() -> String {
@@ -106,7 +106,7 @@ fn doctor_prunes_entries_whose_memory_is_gone() -> TestResult {
 #[test]
 fn doctor_tells_you_to_quit_the_client_before_editing_and_notices_a_revert() -> TestResult {
     let repo = Repo::bare()?;
-    let config = repo.home.join(".cursor/mcp.json");
+    let config = repo.home.join(".cursor").join("mcp.json");
     fs::create_dir_all(repo.home.join(".cursor"))?;
     fs::write(&config, r#"{"mcpServers":{"dejafix":{"args":[]}}}"#)?;
     let empty = repo.home.join("nothing").display().to_string();
@@ -133,7 +133,7 @@ fn doctor_tells_you_to_quit_the_client_before_editing_and_notices_a_revert() -> 
 #[test]
 fn doctor_reports_unreadable_configs_and_corrupt_lines() -> TestResult {
     let repo = Repo::new()?;
-    fs::create_dir_all(repo.home.join(".codex/config.toml"))?;
+    fs::create_dir_all(repo.home.join(".codex").join("config.toml"))?;
     fs::write(
         repo.mem().join("events.jsonl"),
         "{broken\n2\n3\n4\n5\n6\n7\n",
@@ -144,7 +144,7 @@ fn doctor_reports_unreadable_configs_and_corrupt_lines() -> TestResult {
     let events = repo.mem().join("events.jsonl");
     assert!(out.contains(&format!(
         "\n  ⚠ Could not read some client config(s) — not checked\n      Codex  {}\n      A config that cannot be read is not a config that is fine.\n",
-        repo.home.join(".codex/config.toml").display()
+        repo.home.join(".codex").join("config.toml").display()
     )));
     assert!(out.contains(&format!(
         "\n  ⚠ 7 line(s) of {} could not be read\n      line 1: line is not valid JSON\n      line 2: line is not a JSON object\n      line 3: line is not a JSON object\n      line 4: line is not a JSON object\n      line 5: line is not a JSON object\n      … and 2 more\n      The log is never rewritten; fix or remove those lines by hand.\n\n  ✓ Running ",

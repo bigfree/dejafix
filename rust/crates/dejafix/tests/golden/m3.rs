@@ -8,7 +8,7 @@ use dejafix_core::testing::{FIXTURE_SEED, write_project};
 use regex::Regex;
 use serde_json::{Value, json};
 
-use crate::harness::{diff, fixed, run_actions};
+use crate::harness::{GIT_NO_MAINTENANCE, diff, fixed, run_actions};
 use crate::scenario::canonical;
 use crate::types::{Action, Implementation, Run};
 
@@ -63,6 +63,7 @@ pub(crate) fn djf(list: &'static [&'static str]) -> Action<'static> {
 
 pub(crate) fn git(dir: &Path, list: &[&str], date: &str) -> Result<String, Box<dyn Error>> {
     let output = Command::new("git")
+        .args(GIT_NO_MAINTENANCE)
         .args(["-c", "user.name=t", "-c", "user.email=t@example.invalid"])
         .args([
             "-c",

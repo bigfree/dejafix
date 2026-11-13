@@ -14,10 +14,9 @@ impl Normalizer {
     pub fn new(roots: &[(&Path, &str)], since: &str) -> Result<Self, regex::Error> {
         let mut labels = HashMap::new();
         for (path, label) in roots {
-            if let Ok(canonical) = std::fs::canonicalize(path) {
-                labels.insert(canonical.display().to_string(), (*label).to_owned());
+            for spelling in spellings(path) {
+                labels.insert(spelling, (*label).to_owned());
             }
-            labels.insert(path.display().to_string(), (*label).to_owned());
         }
         let mut paths: Vec<&String> = labels.keys().collect();
         paths.sort_by_key(|path| std::cmp::Reverse(path.len()));
@@ -85,6 +84,24 @@ impl Normalizer {
             })
             .into_owned()
     }
+}
+
+fn spellings(path: &Path) -> Vec<String> {
+    let mut forms = vec![path.display().to_string()];
+    if let Ok(canonical) = std::fs::canonicalize(path) {
+        forms.push(canonical.display().to_string());
+    }
+    if let Some(canonical) = dejafix_core::canonical_path(path) {
+        forms.push(canonical.display().to_string());
+    }
+    if cfg!(windows) {
+        let extra: Vec<String> = forms
+            .iter()
+            .flat_map(|form| [form.replace('\\', "/"), form.replace('\\', "\\\\")])
+            .collect();
+        forms.extend(extra);
+    }
+    forms
 }
 
 fn minute(since: &str) -> String {

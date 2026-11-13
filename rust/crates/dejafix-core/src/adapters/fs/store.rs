@@ -2,6 +2,7 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
+use super::registry::canonical_path;
 use super::types::{MemoryDir, StoreError};
 use crate::core::text::universal_newlines;
 
@@ -23,7 +24,7 @@ pub fn find_memory_dir(cwd: &Path) -> Result<MemoryDir, StoreError> {
     if is_project_memory(&cwd.join(MEMORY_DIR)) {
         return Ok(memory_at(cwd));
     }
-    let resolved = fs::canonicalize(cwd).unwrap_or_else(|_| cwd.to_path_buf());
+    let resolved = canonical_path(cwd).unwrap_or_else(|| cwd.to_path_buf());
     resolved
         .ancestors()
         .find(|ancestor| is_project_memory(&ancestor.join(MEMORY_DIR)))
