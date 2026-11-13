@@ -172,3 +172,57 @@ Append new entries at the end, one heading each, with this template:
 - Gain: about 9 ms less per pre-commit run, which would bring precheck near the original 20 ms target.
 - Compatibility: none in output; a new dependency or an index parser to maintain, and edge cases (sparse checkout, split index, `core.fsmonitor`) to test against git.
 - Status: proposed
+
+## Remember git answers per repository state in the MCP server
+
+- Found: 2026-11-13, M4, `wiring/mcp`, `wiring/hooks/precheck.rs`
+- Today: `precheck_file` on a file that has events runs `git log --since=30.days.ago --oneline -- FILE` (churn) and `git log --format=%cI -- FILE` (staleness) on every call, as Python does. On the 3,000-event fixture the warm call takes 12.5 ms, of which one `git log` is 10.9 ms; a file without events takes 0.1 ms and a cold call 3 ms. The 5 ms budget cannot be met for cited files while git runs on every call.
+- Proposal: keep the two answers per `(root, file)` in the MCP state, keyed by the repository state read without a process (the `HEAD` file, the ref it names or `packed-refs`, through the `.git` file of a worktree), and give the churn answer a short lifetime (for example 60 s), because `--since=30.days.ago` moves with the clock.
+- Gain: a cited file drops from about 12.5 ms to about 1.5 ms per warm call.
+- Compatibility: changes MCP replies only near the 30-day boundary, for at most the memo's lifetime; needs a line in the compatibility contract.
+- Status: proposed
+
+## Keep the first line of `git status` intact in `get_context`
+
+- Found: 2026-11-13, M4, `adapters/git/status.rs`
+- Today: Python strips the whole `git status --porcelain` output before splitting it, so when the first entry is modified only in the working tree (` M a.py`) its leading space is lost and `line[3:]` drops the first letter of the path (`racked.txt`). Rust reproduces this, so that file never gets the git-status boost.
+- Proposal: split first, then take `line[3:]` of each unstripped line.
+- Gain: the file being edited right now ranks as Python intended.
+- Compatibility: changes `get_context` output when the first `git status` line starts with a space.
+- Status: proposed
+
+## Refuse memory files that are symlinks out of the project in MCP reads
+
+- Found: 2026-11-13, M4, `wiring/mcp/tools.rs`
+- Today: `get_instructions`, `get_summary`, `get_project_map`, `get_plan`, `start_session` and `get_issue` read `.dejafix/*` through symlinks, as Python does, so a symlink planted in a cloned repository can hand any file the user can read to the agent.
+- Proposal: read these files with `read_text_within(path, root)` (M2), as `djf plan` already does, and reply with the "not found" text when the target leaves the project.
+- Gain: a hostile repository cannot leak files through the memory tools.
+- Compatibility: changes replies only for symlinks that leave the project.
+- Status: proposed
+
+## Bound `precheck_files`
+
+- Found: 2026-11-13, M4, `wiring/mcp`
+- Today: `precheck_files` accepts any number of paths, as Python does; each path with events costs one or two git processes (at most 8 at a time).
+- Proposal: refuse lists beyond a fixed length (for example 200 paths) with a reply that says so.
+- Gain: one tool call cannot start thousands of git processes or produce a reply of megabytes.
+- Compatibility: changes the reply for very long lists only.
+- Status: proposed
+
+## Refuse network paths in the MCP `project` argument
+
+- Found: 2026-11-13, M4 security review, `core/resolve/decide.rs`, `wiring/mcp/probe.rs`
+- Today: the `project` argument reaches `fs::canonicalize` and `is_dir` (also in pinned mode, through the registry lookup, before the mismatch is refused), as Python's `Path(...).resolve()` does. On Windows a UNC value such as `\\host\share` makes the server open an SMB connection and send the user's NetNTLM hash; a prompt-injected agent call can trigger it.
+- Proposal: reject a `project` value that `is_network_path` (M2, already used by `FsResolver`) matches at the start of `resolve`, in every branch.
+- Gain: no credential leak through a crafted tool argument on Windows.
+- Compatibility: a UNC `project` value is refused with the "No project" error.
+- Status: proposed
+
+## Run git with repository-config hardening from the MCP server
+
+- Found: 2026-11-13, M4 security review, `adapters/git/run.rs`
+- Today: `get_context` runs `git status` and precheck runs `git log` in the project the `project` argument names, with the repository's own config, as Python does. A planted repository whose `.dejafix/` sits in a bare repository with `core.fsmonitor` set could run that command through `git status`.
+- Proposal: pass `-c core.fsmonitor=false` (and consider `-c safe.bareRepository=explicit`) on every git call the server makes.
+- Gain: a tool argument cannot reach a command configured by a cloned repository.
+- Compatibility: none in output.
+- Status: proposed
