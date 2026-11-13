@@ -1,0 +1,21 @@
+---
+source: crates/dejafix-core/src/core/global/tests.rs
+expression: "global_report(&outcome, true)"
+---
+
+  [2m================================================[0m
+  [1m  dejafix Global Memory[0m
+  [2m================================================[0m
+  [2mLocation: /home/x/.dejafix/global[0m
+
+    Patterns:           [1m2[0m
+    Library gotchas:     [1m2[0m
+    Stack preferences:   [1myes[0m
+    Unique tags:         [1m2[0m
+    Libraries tracked:   [1m1[0m
+    Source projects:     [1m2[0m
+
+  [2mTags:[0m python, web
+  [2mLibraries:[0m sqlalchemy
+  [2mProjects:[0m alpha, beta
+  [2m================================================[0m

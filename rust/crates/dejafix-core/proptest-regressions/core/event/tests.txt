@@ -1,0 +1,8 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 06bcdb1437a5175331d6fd5f5f766f155df1bedfdfdff1dc5782aaeac228d5fd # shrinks to input = "# ١"
+cc 4858b498f8a6c9bdf7ff8bb209a34e1b9ef32b54eab2154b7670f90ad54bc955 # shrinks to line = "{\"id\": \"evt_0a0a0a0000000a00a0a0\", \"summary\": \"0a\", \"timestamp\": \"2026-05-12T21:07:46Z\", \"type\": \"issue\", \"x_a\": {\"a\": -6.036067520484704e+298}}"

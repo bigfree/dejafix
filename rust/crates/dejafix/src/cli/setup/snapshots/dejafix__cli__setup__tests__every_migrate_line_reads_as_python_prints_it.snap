@@ -1,0 +1,29 @@
+---
+source: crates/dejafix/src/cli/setup/tests.rs
+expression: text
+---
+Dry run — nothing is changed. Re-run with --apply to migrate.
+
+Home: /h/.projectmem -> /h/.dejafix
+  skip global: /h/.dejafix/global already has data, merge it by hand
+  move projects.json
+Project repo (/work/repo): the memory folder is a symlink, migrate it by hand.
+Project repo (/work/repo): both .projectmem/ and .dejafix/ exist, merge them by hand.
+Project repo (/work/repo): no .projectmem/ found, skipped.
+Project repo (/work/repo): the old watcher (pid 42) is still running. Stop it with `pjm watch --stop` in that project, then re-run.
+Project repo (/work/repo): already migrated.
+Project repo (/work/repo):
+  rename .projectmem/ -> .dejafix/
+  reinstall git hooks: pre-commit
+  AGENTS.md: created with dejafix bridge.
+dejafix git hooks refreshed: pre-commit
+
+Still pointing at projectmem — update these by hand:
+  Codex: /h/.codex/config.toml
+  environment variable PROJECTMEM_ROOT
+  MCP server: `djf-mcp` or `python -m dejafix.mcp_server` (`djf init` prints a block to copy). Edit hook: `djf-edit-hook`, log variable DJF_EDIT_HOOK_LOG. Variables PROJECTMEM_* become DEJAFIX_*.
+Close running agent sessions (Claude Code, Codex, Cursor, Claude Desktop) first: a projectmem server still running writes to the old folders.
+
+Home: /h/.projectmem not found, nothing to move.
+
+Done. Commit the renamed .dejafix/ folder in each project, and uninstall projectmem once your clients point at dejafix.

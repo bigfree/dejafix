@@ -1,0 +1,91 @@
+set shell := ["bash", "-euo", "pipefail", "-c"]
+
+export RUSTC_WRAPPER := env("RUSTC_WRAPPER", `command -v sccache || true`)
+
+default: verify
+
+verify: fmt clippy cov
+
+fmt:
+    cargo fmt --all --check
+
+clippy:
+    cargo clippy --workspace --all-targets --all-features -- -D warnings
+
+cov:
+    cargo llvm-cov nextest --workspace --all-features --no-report
+    cargo llvm-cov report --ignore-filename-regex 'crates/dejafix/' --fail-under-lines 90
+    cargo llvm-cov report --ignore-filename-regex 'crates/dejafix-core/' --fail-under-lines 80
+
+golden:
+    cargo nextest run -p dejafix --test golden
+
+fixtures dir="target/fixtures":
+    cargo run -p dejafix-core --features testing --example gen-fixtures -- {{dir}}
+
+bench:
+    cargo bench -p dejafix-core --features testing --bench load --bench summary
+    cargo bench -p dejafix --bench hooks --bench mcp
+
+smoke:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    work="$(mktemp -d)"
+    trap 'rm -rf "$work"' EXIT
+    cargo install --quiet --locked --path crates/dejafix --root "$work/install"
+    for binary in djf dejafix djf-mcp djf-edit-hook; do test -x "$work/install/bin/$binary"; done
+    export PATH="$work/install/bin:$PATH" HOME="$work/home" DEJAFIX_HOME="$work/home/.dejafix"
+    mkdir -p "$work/home" "$work/repo"
+    cd "$work/repo"
+    git init -q
+    git -c user.email=smoke@example.invalid -c user.name=smoke commit -q --allow-empty -m init
+    expect() { local out; out="$("${@:2}")"; grep -q -- "$1" <<<"$out"; }
+    expect "djf-mcp" djf init --no-hooks
+    expect "^dejafix git hooks installed: post-commit, post-merge, pre-commit$" djf hooks install
+    grep -q "DJF_BIN=\"$work/install/bin/djf\"" .git/hooks/pre-commit
+    expect "^Logged issue #0001$" djf log "Smoke issue" --at src/smoke.py:1
+    expect "^Recorded failed attempt on #0001$" djf attempt "Smoke attempt" --failed
+    expect "^Fixed issue #0001$" djf fix "Smoke fix"
+    expect "\\[DONE\\] #0001 Smoke issue" djf show
+    test "$(wc -l < .dejafix/events.jsonl)" -eq 3
+    test -f .dejafix/issues/0001-smoke-issue.md
+    grep -q "dejafix bridge" CLAUDE.md AGENTS.md
+    expect "repo" djf project list
+    expect "^Dry run — nothing is changed. Re-run with --apply to migrate.$" djf migrate
+    mkdir -p src && echo "print('login')" > src/login.py && git add src/login.py
+    PATH=/usr/bin:/bin git -c user.email=smoke@example.invalid -c user.name=smoke commit -q -m "fix: guard the login submit"
+    for _ in $(seq 50); do grep -q '"capture_source": "git_post_commit"' .dejafix/events.jsonl && break; sleep 0.1; done
+    grep -q '"summary": "Fix: fix: guard the login submit"' .dejafix/events.jsonl
+    expect "What already failed here" djf precheck src/smoke.py
+    printf '{"session_id": "smoke", "tool_name": "Edit", "tool_input": {"file_path": "%s/src/smoke.py"}}' "$PWD" > payload.json
+    expect "dejafix lessons for src/smoke.py" djf-edit-hook < payload.json
+    coproc MCP { djf-mcp; }
+    send() { printf '%s\n' "$1" >&"${MCP[1]}"; }
+    reply() { local line; IFS= read -r -t 20 line <&"${MCP[0]}"; grep -q -- "$1" <<<"$line" || { echo "djf-mcp: no '$1' in $line"; exit 1; }; }
+    call() { send "{\"jsonrpc\":\"2.0\",\"id\":$1,\"method\":\"tools/call\",\"params\":{\"name\":\"$2\",\"arguments\":$3}}"; reply "$4"; }
+    send '{"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"smoke","version":"1"}}}'
+    reply "call start_session() once"
+    send '{"jsonrpc":"2.0","method":"notifications/initialized"}'
+    send '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+    reply '"current_project"'
+    call 2 start_session '{}' "start_session() has already returned"
+    call 3 log_issue '{"summary":"MCP smoke issue","location":"src/smoke.py:2"}' "Logged issue #0002 → repo"
+    call 4 precheck_file '{"file_path":"src/smoke.py"}' "dejafix precheck: src/smoke.py"
+    call 5 get_score '{}' "dejafix Prevention Score"
+    call 6 search_events '{"query":"MCP smoke"}' "Found 1 match"
+    mcp_pid="$MCP_PID"
+    exec {MCP[1]}>&-
+    wait "$mcp_pid"
+    grep -q "MCP smoke issue" .dejafix/events.jsonl
+    echo "smoke: ok"
+
+release-check:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    export RUSTUP_TOOLCHAIN="$(rustup show active-toolchain | cut -d' ' -f1)"
+    (cd .. && dist plan)
+    (cd .. && dist build --artifacts=local --target "$(rustc -vV | sed -n 's/^host: //p')")
+    maturin build --locked --manifest-path crates/dejafix/Cargo.toml --out target/wheels
+
+casefold:
+    ../.venv/bin/python -I scripts/casefold.py > crates/dejafix-core/src/core/text/casefold_table.rs

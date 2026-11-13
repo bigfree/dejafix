@@ -1,4 +1,4 @@
-"""Tests for the Showoff tab (animated story scenes + recorder) in `pjm visualize`.
+"""Tests for the Showoff tab (animated story scenes + recorder) in `djf visualize`.
 
 The Showoff feature is template-only: it adds a sidebar tab, a canvas stage,
 three animated scenes (Story Replay / Orbit / Universe) and a MediaRecorder
@@ -10,8 +10,8 @@ from __future__ import annotations
 
 import json
 
-from projectmem.commands.visualize import VIZ_TEMPLATE, build_graph_data
-from projectmem.models import Event
+from dejafix.commands.visualize import VIZ_TEMPLATE, build_graph_data
+from dejafix.models import Event
 
 
 def test_template_has_showoff_nav_and_panel() -> None:
@@ -39,7 +39,7 @@ def test_template_has_recorder_controls() -> None:
 
 def test_template_has_watermark_toggle() -> None:
     assert 'id="so-wm"' in VIZ_TEMPLATE
-    assert "made with projectmem" in VIZ_TEMPLATE
+    assert "made with dejafix" in VIZ_TEMPLATE
 
 
 def test_showoff_uses_existing_data_only() -> None:

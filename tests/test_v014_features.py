@@ -1,7 +1,7 @@
 """Tests for the 0.1.4 "Accountable Judgment" feature set.
 
 Covers: supersede marking, stale-memory detection, precheck snooze,
-`pjm brief`, failed-approach surfacing, and `pjm export --claude-md`.
+`djf brief`, failed-approach surfacing, and `djf export --claude-md`.
 """
 from __future__ import annotations
 
@@ -13,9 +13,9 @@ import pytest
 from typer.testing import CliRunner
 
 from conftest import set_fake_home
-from projectmem.cli import app
-from projectmem.models import Event, resolve_event_ref, superseded_ids
-from projectmem.storage import append_event, read_events
+from dejafix.cli import app
+from dejafix.models import Event, resolve_event_ref, superseded_ids
+from dejafix.storage import append_event, read_events
 
 
 runner = CliRunner()
@@ -24,7 +24,7 @@ runner = CliRunner()
 def _init(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     # Isolate the machine-wide global store so auto-promotion from test
-    # events never touches the real ~/.projectmem.
+    # events never touches the real ~/.dejafix.
     set_fake_home(monkeypatch, str(tmp_path))
     result = runner.invoke(app, ["init"], catch_exceptions=False)
     assert result.exit_code == 0
@@ -32,7 +32,7 @@ def _init(tmp_path, monkeypatch):
 
 
 def _event_ids(tmp_path) -> list[str]:
-    lines = (tmp_path / ".projectmem" / "events.jsonl").read_text(
+    lines = (tmp_path / ".dejafix" / "events.jsonl").read_text(
         encoding="utf-8"
     ).splitlines()
     return [json.loads(line)["id"] for line in lines if line.strip()]
@@ -71,7 +71,7 @@ def test_supersede_hides_old_decision_from_summary(tmp_path, monkeypatch):
     assert result.exit_code == 0
     assert "supersedes" in result.output
 
-    summary = (tmp_path / ".projectmem" / "summary.md").read_text(encoding="utf-8")
+    summary = (tmp_path / ".dejafix" / "summary.md").read_text(encoding="utf-8")
     assert "switch to argon2" in summary
     assert "use bcrypt rounds=12" not in summary
 
@@ -159,7 +159,7 @@ def test_stale_flags_decision_after_commits(tmp_path, monkeypatch):
         _git(tmp_path, "add", "-A")
         _git(tmp_path, "commit", "-m", f"change {i + 1}")
 
-    from projectmem.staleness import find_stale_events
+    from dejafix.staleness import find_stale_events
 
     flagged = find_stale_events(read_events(tmp_path), tmp_path)
     assert any(
@@ -177,7 +177,7 @@ def test_stale_flags_missing_file_and_skips_superseded(tmp_path, monkeypatch):
     )
     gone_id = _event_ids(tmp_path)[-1]
 
-    from projectmem.staleness import find_stale_events
+    from dejafix.staleness import find_stale_events
 
     flagged = find_stale_events(read_events(tmp_path), tmp_path)
     assert any(
@@ -195,7 +195,7 @@ def test_stale_flags_missing_file_and_skips_superseded(tmp_path, monkeypatch):
 
 
 def test_location_file_ignores_non_paths():
-    from projectmem.staleness import location_file
+    from dejafix.staleness import location_file
 
     assert location_file(Event(type="note", summary="s", location="src/a.py:42")) == "src/a.py"
     assert location_file(Event(type="note", summary="s", location="deploy pipeline")) is None
@@ -206,7 +206,7 @@ def test_location_file_ignores_non_paths():
 
 
 def test_parse_snooze_duration():
-    from projectmem.commands.precheck import parse_snooze_duration
+    from dejafix.commands.precheck import parse_snooze_duration
 
     assert parse_snooze_duration("30m") == timedelta(minutes=30)
     assert parse_snooze_duration("2h") == timedelta(hours=2)
@@ -223,7 +223,7 @@ def test_snooze_silences_and_unsnooze_restores(tmp_path, monkeypatch):
     result = runner.invoke(app, ["precheck", "--snooze", "2h"], catch_exceptions=False)
     assert result.exit_code == 0
     assert "snoozed" in result.output
-    assert (tmp_path / ".projectmem" / "precheck.snooze").exists()
+    assert (tmp_path / ".dejafix" / "precheck.snooze").exists()
 
     # The snooze itself is audited as an event.
     events = read_events(tmp_path)
@@ -235,21 +235,21 @@ def test_snooze_silences_and_unsnooze_restores(tmp_path, monkeypatch):
 
     result = runner.invoke(app, ["precheck", "--unsnooze"], catch_exceptions=False)
     assert "re-enabled" in result.output
-    assert not (tmp_path / ".projectmem" / "precheck.snooze").exists()
+    assert not (tmp_path / ".dejafix" / "precheck.snooze").exists()
 
 
 def test_expired_snooze_self_cleans(tmp_path, monkeypatch):
     _init(tmp_path, monkeypatch)
-    from projectmem.commands.precheck import active_snooze
+    from dejafix.commands.precheck import active_snooze
 
-    marker = tmp_path / ".projectmem" / "precheck.snooze"
+    marker = tmp_path / ".dejafix" / "precheck.snooze"
     past = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
     marker.write_text(past, encoding="utf-8")
     assert active_snooze(tmp_path) is None
     assert not marker.exists()
 
 
-# ── 4. pjm brief ─────────────────────────────────────────────────────
+# ── 4. djf brief ─────────────────────────────────────────────────────
 
 
 def test_brief_shows_all_sections(tmp_path, monkeypatch):
@@ -282,7 +282,7 @@ def test_brief_runs_clean_on_fresh_project(tmp_path, monkeypatch):
 
 
 def test_brief_console_helpers_are_cp1252_safe(monkeypatch):
-    from projectmem.commands import brief
+    from dejafix.commands import brief
 
     class Cp1252Stdout:
         encoding = "cp1252"
@@ -290,7 +290,7 @@ def test_brief_console_helpers_are_cp1252_safe(monkeypatch):
     monkeypatch.setattr(brief.sys, "stdout", Cp1252Stdout())
 
     assert brief._rule() == "-" * 60
-    text = brief._console_safe("⚠ ─ projectmem brief — projectmem 📈")
+    text = brief._console_safe("⚠ ─ dejafix brief — dejafix 📈")
     text.encode("cp1252")
 
 
@@ -298,7 +298,7 @@ def test_brief_console_helpers_are_cp1252_safe(monkeypatch):
 
 
 def test_precheck_lists_failed_approaches():
-    from projectmem.commands.precheck import _analyze_files
+    from dejafix.commands.precheck import _analyze_files
 
     events = [
         Event(type="attempt", summary="tried CSS contain:layout",
@@ -316,7 +316,7 @@ def test_precheck_lists_failed_approaches():
 
 
 def test_precheck_console_helpers_are_cp1252_safe(monkeypatch):
-    from projectmem.commands import precheck
+    from dejafix.commands import precheck
 
     class Cp1252Stdout:
         encoding = "cp1252"
@@ -329,7 +329,7 @@ def test_precheck_console_helpers_are_cp1252_safe(monkeypatch):
 
 
 def test_precheck_named_files_cli(tmp_path, monkeypatch):
-    """`pjm precheck payment.py` — positional files were advertised in the
+    """`djf precheck payment.py` — positional files were advertised in the
     module docstring but never wired into the CLI (caught by the 0.1.4
     testing playground)."""
     _init(tmp_path, monkeypatch)
@@ -344,7 +344,7 @@ def test_precheck_named_files_cli(tmp_path, monkeypatch):
 
 
 def test_search_matches_location_field(tmp_path, monkeypatch):
-    """`pjm search payment.py` must find events logged with --at payment.py
+    """`djf search payment.py` must find events logged with --at payment.py
     (search previously ignored the location field)."""
     _init(tmp_path, monkeypatch)
     runner.invoke(app, ["log", "form jumps"], catch_exceptions=False)
@@ -381,7 +381,7 @@ def test_search_failed_only(tmp_path, monkeypatch):
     assert "tried contain layout fix" in result.output
 
 
-# ── 6. pjm export --claude-md ────────────────────────────────────────
+# ── 6. djf export --claude-md ────────────────────────────────────────
 
 
 def test_export_writes_marked_block(tmp_path, monkeypatch):
@@ -399,13 +399,13 @@ def test_export_writes_marked_block(tmp_path, monkeypatch):
     assert result.exit_code == 0
 
     content = (tmp_path / "CLAUDE.md").read_text(encoding="utf-8")
-    assert "projectmem memory" in content
+    assert "dejafix memory" in content
     assert "use pnpm not npm" in content
     assert "fastapi BackgroundTasks" in content
     assert "Do NOT retry" in content
     assert "tried CSS contain:layout" in content
     # The init-time MCP bridge block must survive untouched.
-    assert "projectmem bridge" in content
+    assert "dejafix bridge" in content
 
 
 def test_export_is_idempotent_and_preserves_user_content(tmp_path, monkeypatch):
@@ -421,7 +421,7 @@ def test_export_is_idempotent_and_preserves_user_content(tmp_path, monkeypatch):
 
     content = claude.read_text(encoding="utf-8")
     assert "My own instructions stay." in content
-    assert content.count("projectmem memory (auto-generated") == 1  # replaced, not stacked
+    assert content.count("dejafix memory (auto-generated") == 1  # replaced, not stacked
     assert "second decision" in content
 
 
@@ -455,13 +455,13 @@ def test_export_cursor_variant(tmp_path, monkeypatch):
 
 
 def test_walkup_discovery_skips_global_store(tmp_path, monkeypatch):
-    """Regression: running pjm under $HOME with no project used to land on
-    ~/.projectmem (the machine-wide global store, which has no config.toml)
+    """Regression: running djf under $HOME with no project used to land on
+    ~/.dejafix (the machine-wide global store, which has no config.toml)
     and silently accrete events into it."""
-    from projectmem.storage import ProjectMemError, require_mem_dir
+    from dejafix.storage import DejafixError, require_mem_dir
 
     home = tmp_path / "home"
-    fake_global = home / ".projectmem"
+    fake_global = home / ".dejafix"
     (fake_global / "global").mkdir(parents=True)
     (fake_global / "events.jsonl").write_text("", encoding="utf-8")
     (fake_global / "summary.md").write_text("# accreted\n", encoding="utf-8")
@@ -472,12 +472,12 @@ def test_walkup_discovery_skips_global_store(tmp_path, monkeypatch):
     set_fake_home(monkeypatch, str(home))
     monkeypatch.chdir(workdir)
 
-    with pytest.raises(ProjectMemError):
+    with pytest.raises(DejafixError):
         require_mem_dir(None)
 
 
 def test_walkup_discovery_still_finds_real_projects(tmp_path, monkeypatch):
-    from projectmem.storage import require_mem_dir
+    from dejafix.storage import require_mem_dir
 
     project = tmp_path / "proj"
     project.mkdir()
@@ -489,4 +489,4 @@ def test_walkup_discovery_still_finds_real_projects(tmp_path, monkeypatch):
     sub.mkdir(parents=True)
     monkeypatch.chdir(sub)
     found = require_mem_dir(None)
-    assert found == project / ".projectmem"
+    assert found == project / ".dejafix"

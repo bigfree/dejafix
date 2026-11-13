@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.4.0 — dejafix
+
+**First release as dejafix, a fork of [projectmem](https://github.com/riponcm/projectmem) 0.3.5.** Everything projectmem wrote is renamed, and `djf migrate` carries an existing install across.
+
+### Changed
+
+- **New name.** The package, Python module and commands are `dejafix` and `djf` (was `projectmem` and `pjm`); the MCP server is `djf-mcp` / `python -m dejafix.mcp_server` under the key `dejafix`; the edit hook is `djf-edit-hook`. Memory lives in `.dejafix/` and `~/.dejafix/`, and the environment variables are `DEJAFIX_*` and `DJF_*`.
+- **`AI_INSTRUCTIONS.md` template version 3.** It names the dejafix tools; `djf init` or `djf migrate` refreshes it and keeps the previous copy as `.bak`.
+- **Tool replies are terse.** Write tools confirm with the id and project instead of echoing the summary back; `search_events` marks retired decisions and shows what matched.
+
+### Added
+
+- **`djf migrate`** moves `~/.projectmem/`, each project's `.projectmem/`, its `.gitignore` entries, the bridge blocks in `CLAUDE.md` / `AGENTS.md` and the git hooks to dejafix. Dry run by default, `--apply` to perform, never overwrites existing dejafix data, and lists client configs and environment variables that still name projectmem.
+- **Edit hook for Claude Code and Codex** (`djf-edit-hook`): shows a file's failed and partial attempts, open issues and decisions right before the agent edits it, once per session and again after compaction. `DJF_EDIT_HOOK_LOG` logs every call.
+- **`start_session`** returns the rules, summary and plan in one MCP call.
+- **`precheck_files`** checks several files in one call; attempts inherit their issue's file, and partial and old failures still warn.
+
+### Fixed
+
+- `record_attempt` and `record_fix` require `issue_id` while several issues are open, instead of guessing.
+- The summary's key files are real files, ranked by how often memory cites them.
+- A decision that lists its files is matched only by those files.
+
+History below this line is projectmem's.
+
 ## 0.3.5
 
 **Two community fixes: precheck recognises a file however its path is spelled, and the summary stays small even when entries are long.**

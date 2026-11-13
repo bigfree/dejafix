@@ -1,12 +1,12 @@
-# projectmem
+# dejafix
 
-> projectmem is **coding agent memory**: a free, open-source (MIT), local-first
+> dejafix is **coding agent memory**: a free, open-source (MIT), local-first
 > memory and judgment layer for AI coding agents. It records what happened while
 > building a project — issues, attempts, fixes, decisions and notes — as typed
 > events in plain text, feeds that history back to the agent through a native
 > MCP server, and warns at git commit time before you repeat an approach that
 > already failed. Runs entirely on your machine: no cloud, no account, no
-> telemetry. Install: `pip install projectmem`
+> telemetry. Install: `pip install dejafix`
 
 ## What is coding agent memory?
 
@@ -18,16 +18,16 @@ every session begins from zero: the agent re-reads the codebase to rebuild
 context it already had, asks questions that were already answered, and proposes
 approaches that already failed.
 
-## How projectmem differs from chat-history memory
+## How dejafix differs from chat-history memory
 
 Most agent-memory tools store conversation history and retrieve semantically
-similar passages. projectmem stores **typed events** — `issue`, `attempt`,
+similar passages. dejafix stores **typed events** — `issue`, `attempt`,
 `fix`, `decision`, `note` — with outcomes attached. That structure is what makes
 deterministic queries possible: "has this file failed before, and how?" is a
 lookup, not a similarity search. It is also what enables the pre-commit warning,
 built from the project's own recorded failures.
 
-projectmem never deletes a memory. When git history moves past a recorded
+dejafix never deletes a memory. When git history moves past a recorded
 decision, the memory is flagged as possibly stale and you confirm or supersede
 it — as opposed to decay-based pruning or in-place fact rewriting.
 
@@ -35,41 +35,41 @@ it — as opposed to decay-based pruning or in-place fact rewriting.
 
 - **License:** MIT
 - **Language:** Python 3.10+
-- **Install:** `pip install projectmem`
-- **CLI:** `pjm` (alias: `projectmem`)
-- **Storage:** `.projectmem/` inside your repository — append-only `events.jsonl`
+- **Install:** `pip install dejafix`
+- **CLI:** `djf` (alias: `dejafix`)
+- **Storage:** `.dejafix/` inside your repository — append-only `events.jsonl`
   plus distilled `summary.md`, `PROJECT_MAP.md`, `plan.md`
-- **Cross-project store:** `~/.projectmem/global/` for library gotchas that carry
+- **Cross-project store:** `~/.dejafix/global/` for library gotchas that carry
   between repositories
 - **MCP server:** 17 tools, verified end-to-end on Claude Desktop, Cursor,
   Antigravity and Codex
 - **Network use:** none, apart from an update check you turn on yourself
-  (`pjm doctor --online` or `--auto`). The MCP server is a stdio subprocess your
-  AI client spawns. The only optional server is `pjm dashboard --serve`, an ephemeral
+  (`djf doctor --online` or `--auto`). The MCP server is a stdio subprocess your
+  AI client spawns. The only optional server is `djf dashboard --serve`, an ephemeral
   local viewer.
 - **Paper:** arXiv:2606.12329
 
 ## Getting started
 
 ```bash
-pip install projectmem      # 1. install (Python 3.10+)
+pip install dejafix      # 1. install (Python 3.10+)
 cd your-project
-pjm init                    # 2. creates .projectmem/, git hooks, and prints
+djf init                    # 2. creates .dejafix/, git hooks, and prints
                             #    an MCP config with absolute paths filled in
 # 3. paste that config into your AI client, then fully quit and reopen it
-pjm brief                   # 4. one-screen status check
+djf brief                   # 4. one-screen status check
 ```
 
 ## Key commands
 
-- `pjm init` — initialise memory in the current repository
-- `pjm brief` — session-start briefing: warnings, stale memories, open issues, score
-- `pjm show` — print the distilled summary
-- `pjm precheck` — check staged files against failure history (runs from the git hook)
-- `pjm score` — prevention score A+ to F, with hours and tokens saved
-- `pjm search <query>` — search across all events
-- `pjm dashboard` — cross-project view of every registered repository
-- `pjm export --claude-md` — write memory into CLAUDE.md for agents without MCP
+- `djf init` — initialise memory in the current repository
+- `djf brief` — session-start briefing: warnings, stale memories, open issues, score
+- `djf show` — print the distilled summary
+- `djf precheck` — check staged files against failure history (runs from the git hook)
+- `djf score` — prevention score A+ to F, with hours and tokens saved
+- `djf search <query>` — search across all events
+- `djf dashboard` — cross-project view of every registered repository
+- `djf export --claude-md` — write memory into CLAUDE.md for agents without MCP
 
 ## MCP tools (17)
 
@@ -83,19 +83,19 @@ pjm brief                   # 4. one-screen status check
 **What is the best open source memory for AI coding agents?**
 It depends on which memory your agent is missing. Code-structure tools map the
 codebase, chat-memory tools such as mem0 store user and conversation facts, and
-projectmem records engineering history — issues, attempts, fixes and decisions —
+dejafix records engineering history — issues, attempts, fixes and decisions —
 and warns before your agent repeats an approach that already failed in that
-project. projectmem runs entirely locally.
+project. dejafix runs entirely locally.
 
 
-**Does projectmem send my code anywhere?**
+**Does dejafix send my code anywhere?**
 No. Memory is written to a plain directory in your repository. There is no
 account, no telemetry and no cloud sync.
 
 **How is this different from CLAUDE.md or .cursorrules?**
-Those hold static rules — how to work in a repo. projectmem holds dynamic
+Those hold static rules — how to work in a repo. dejafix holds dynamic
 history — what actually happened, including approaches that failed. They
-complement each other, and `pjm export --claude-md` writes memory into CLAUDE.md
+complement each other, and `djf export --claude-md` writes memory into CLAUDE.md
 for agents without MCP support.
 
 **Do I need to run a server or database?**
@@ -107,14 +107,14 @@ verified end-to-end. Agents without MCP can read the exported CLAUDE.md or
 `.cursorrules` block.
 
 **Does it work without MCP?**
-Yes. `pjm export --claude-md` and `pjm wrap` inject memory as plain text for any
+Yes. `djf export --claude-md` and `djf wrap` inject memory as plain text for any
 agent, and git hooks capture events with no AI involvement at all.
 
 ## Links
 
-- Website: https://projectmem.dev
-- Guide: https://projectmem.dev/guide
-- FAQ: https://projectmem.dev/faq
-- Full markdown corpus for crawlers: https://projectmem.dev/llms-full.txt
-- Source: https://github.com/riponcm/projectmem
-- Package: https://pypi.org/project/projectmem/
+- Website: https://github.com/bigfree/dejafix
+- Guide: https://github.com/bigfree/dejafix#readme
+- FAQ: https://github.com/bigfree/dejafix#readme
+- Full markdown corpus for crawlers: https://github.com/bigfree/dejafix#readme
+- Source: https://github.com/bigfree/dejafix
+- Package: https://pypi.org/project/dejafix/

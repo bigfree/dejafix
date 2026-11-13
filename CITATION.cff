@@ -1,31 +1,39 @@
 cff-version: 1.2.0
 message: >-
-  If you use projectmem in your research or writing, please cite the paper
-  below. To cite a specific release of the software, use the metadata in this
-  file.
-title: "projectmem"
+  dejafix is a fork of projectmem. If you use it in research or writing, please
+  cite the original projectmem paper below.
+title: "dejafix"
 type: software
 abstract: >-
-  projectmem is coding agent memory: a local-first memory and judgment layer
-  for AI coding agents. It records issues, attempts, fixes, decisions and notes
-  as typed events in plain text, serves them to agents through a native MCP
-  server, and warns at git commit time before an approach that already failed
-  is repeated.
+  dejafix is a local-first memory and judgment layer for AI coding agents,
+  forked from projectmem 0.3.5. It records issues, attempts, fixes, decisions
+  and notes as typed events in plain text, serves them to agents through a
+  native MCP server, and warns before an approach that already failed is
+  repeated.
 authors:
+  - name: dejafix contributors
   - family-names: Malo
     given-names: Ripon Chandra
     affiliation: University of Utah
-version: 0.3.5
-date-released: 2026-10-30
+version: 0.4.0
 license: MIT
-repository-code: "https://github.com/riponcm/projectmem"
-url: "https://projectmem.dev"
+repository-code: "https://github.com/bigfree/dejafix"
+url: "https://github.com/bigfree/dejafix"
 keywords:
   - coding agent memory
   - memory for AI coding agents
   - AI coding agents
   - model context protocol
   - local-first
+references:
+  - type: software
+    title: projectmem
+    authors:
+      - family-names: Malo
+        given-names: Ripon Chandra
+    version: 0.3.5
+    repository-code: "https://github.com/riponcm/projectmem"
+    license: MIT
 preferred-citation:
   type: article
   title: >-

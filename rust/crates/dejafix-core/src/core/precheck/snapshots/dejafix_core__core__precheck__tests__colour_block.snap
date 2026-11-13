@@ -1,0 +1,27 @@
+---
+source: crates/dejafix-core/src/core/precheck/tests.rs
+expression: "render_warnings(&warnings, \"block\", true).unwrap()"
+---
+
+[1mdejafix: Pre-Commit Check[0m
+[2m────────────────────────────────────────────────────────────[0m
+
+  [1mpayment.py[0m
+    [31mBLOCK[0m  What already failed here (3 attempts):
+           [2mx Reverted: drop the cache (3w ago)[0m
+           [2mx debounced the handler (5d ago)[0m
+           [2mx tried CSS contain:layout (yesterday)[0m
+    [33mWARN[0m  1 unresolved issue on this file
+           [2m#0007: payment form jumps[0m
+    [33mWARN[0m  HIGH CHURN: 6 changes in last 30 days
+           [2mMay indicate unresolved architectural issue[0m
+    [33mWARN[0m  Recent revert affected this file
+           [2mReverted: Revert "drop the cache"[0m
+           [2m  (3w ago)[0m
+    [33mWARN[0m  1 possibly-stale memory cites this file
+           [2mdecision [evt_d] "payments go through one gateway" — predates 5 commits to this file[0m
+           [2mConfirm it still holds, or retire it: djf decision "..." --supersedes <id>[0m
+
+[2m────────────────────────────────────────────────────────────[0m
+[31mBlocked: 1 critical warning(s).[0m
+  Bypass once: git commit --no-verify

@@ -1,0 +1,12 @@
+mod doctor;
+mod edit_hook;
+mod guidance;
+mod hooks;
+mod init;
+mod memory;
+mod migrate;
+mod precheck;
+mod project;
+mod read;
+mod support;
+mod write;

@@ -1,6 +1,6 @@
 """Tests for the plan.md intent-file feature."""
-from projectmem.storage import initialize, plan_path
-from projectmem.commands import plan as plan_command
+from dejafix.storage import initialize, plan_path
+from dejafix.commands import plan as plan_command
 
 
 def test_init_creates_plan_md(tmp_path):
@@ -24,7 +24,7 @@ def test_plan_md_is_committed_not_gitignored(tmp_path, monkeypatch):
     assert "plan.md" not in gitignore
 
 
-def test_pjm_plan_add_appends_to_ideas(tmp_path):
+def test_djf_plan_add_appends_to_ideas(tmp_path):
     initialize(tmp_path)
     plan_command.run(add="add an export/migration adapter", root=tmp_path)
     text = plan_path(tmp_path).read_text(encoding="utf-8")
@@ -37,7 +37,7 @@ def test_pjm_plan_add_appends_to_ideas(tmp_path):
 def test_plan_add_does_not_touch_events(tmp_path):
     """A plan is intent, not memory — it must never become an event."""
     initialize(tmp_path)
-    events = tmp_path / ".projectmem" / "events.jsonl"
+    events = tmp_path / ".dejafix" / "events.jsonl"
     before = events.read_text(encoding="utf-8")
     plan_command.run(add="ship the plan.md feature", root=tmp_path)
     assert events.read_text(encoding="utf-8") == before
@@ -46,6 +46,6 @@ def test_plan_add_does_not_touch_events(tmp_path):
 def test_get_plan_mcp_reads_the_file(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     initialize(tmp_path)
-    from projectmem import mcp_server
+    from dejafix import mcp_server
     out = mcp_server.get_plan()
     assert "— plan" in out and "## Ideas" in out

@@ -1,0 +1,26 @@
+---
+source: crates/dejafix-core/src/core/precheck/tests.rs
+expression: "render_warnings(&warnings, \"warn\", false).unwrap()"
+---
+
+dejafix: Pre-Commit Check
+────────────────────────────────────────────────────────────
+
+  payment.py
+    BLOCK  What already failed here (3 attempts):
+           x Reverted: drop the cache (3w ago)
+           x debounced the handler (5d ago)
+           x tried CSS contain:layout (yesterday)
+    WARN  1 unresolved issue on this file
+           #0007: payment form jumps
+    WARN  HIGH CHURN: 6 changes in last 30 days
+           May indicate unresolved architectural issue
+    WARN  Recent revert affected this file
+           Reverted: Revert "drop the cache"
+             (3w ago)
+    WARN  1 possibly-stale memory cites this file
+           decision [evt_d] "payments go through one gateway" — predates 5 commits to this file
+           Confirm it still holds, or retire it: djf decision "..." --supersedes <id>
+
+────────────────────────────────────────────────────────────
+5 warning(s). Review before committing.

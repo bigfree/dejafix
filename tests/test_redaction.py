@@ -2,7 +2,7 @@
 
 Two priorities:
   1. Real high-confidence secret patterns get redacted.
-  2. Ordinary projectmem prose ("tried `contain: layout`", file paths,
+  2. Ordinary dejafix prose ("tried `contain: layout`", file paths,
      plain English about auth) is left untouched.
 
 False positives are the failure mode that matters most here — they would
@@ -25,7 +25,7 @@ import os
 
 import pytest
 
-from projectmem.redaction import (
+from dejafix.redaction import (
     REDACTABLE_FIELDS,
     redact,
     is_redaction_enabled,
@@ -145,7 +145,7 @@ def test_redacts_known_secret_shapes(input_text_fn, kind: str) -> None:
         # Looks superficially like an env var but is plain English.
         "OPENAI_API_KEY is required in the environment for this script to run.",
         # File paths
-        ".projectmem/events.jsonl",
+        ".dejafix/events.jsonl",
         # Short tokens that look prefix-y but are too short to be real keys
         "sk- short prefix only",
         "ghp_short",
@@ -167,27 +167,27 @@ def test_does_not_touch_ordinary_prose(safe_text: str) -> None:
 
 
 def test_is_redaction_enabled_default_on(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("PROJECTMEM_NO_REDACT", raising=False)
+    monkeypatch.delenv("DEJAFIX_NO_REDACT", raising=False)
     assert is_redaction_enabled() is True
 
 
 @pytest.mark.parametrize("value", ["1", "true", "yes"])
 def test_env_var_disables(monkeypatch: pytest.MonkeyPatch, value: str) -> None:
-    monkeypatch.setenv("PROJECTMEM_NO_REDACT", value)
+    monkeypatch.setenv("DEJAFIX_NO_REDACT", value)
     assert is_redaction_enabled() is False
 
 
 def test_redact_event_fields_honours_opt_out(monkeypatch: pytest.MonkeyPatch) -> None:
     from dataclasses import dataclass
 
-    from projectmem.redaction import redact_event_fields
+    from dejafix.redaction import redact_event_fields
 
     @dataclass
     class Fake:
         summary: str = ""
         notes: str | None = None
 
-    monkeypatch.setenv("PROJECTMEM_NO_REDACT", "1")
+    monkeypatch.setenv("DEJAFIX_NO_REDACT", "1")
     leaked = "leaked " + _openai_key() + " key"
     fake = Fake(summary=leaked)
     fired = redact_event_fields(fake)
@@ -198,7 +198,7 @@ def test_redact_event_fields_honours_opt_out(monkeypatch: pytest.MonkeyPatch) ->
 def test_redact_event_fields_default_on(monkeypatch: pytest.MonkeyPatch) -> None:
     from dataclasses import dataclass
 
-    from projectmem.redaction import redact_event_fields
+    from dejafix.redaction import redact_event_fields
 
     @dataclass
     class Fake:
@@ -208,7 +208,7 @@ def test_redact_event_fields_default_on(monkeypatch: pytest.MonkeyPatch) -> None
         git_message: str | None = None
         location: str | None = None
 
-    monkeypatch.delenv("PROJECTMEM_NO_REDACT", raising=False)
+    monkeypatch.delenv("DEJAFIX_NO_REDACT", raising=False)
     fake = Fake(
         summary="see " + _openai_key(),
         notes="harmless note about auth",

@@ -1,11 +1,11 @@
-# projectmem — Tutorial
+# dejafix — Tutorial
 
 > **Watch the full screen-recorded tutorial:** [youtu.be/pELGdXHj_Ls](https://youtu.be/pELGdXHj_Ls)
 > (or the [60-second promo](https://youtu.be/YCqfJ8-XVqY)). This written version
 > covers the same flow step-by-step so you can follow along on your own
 > project.
 
-This is the 15-minute tour. By the end you'll have set up projectmem on
+This is the 15-minute tour. By the end you'll have set up dejafix on
 a real project, watched the AI agent log a bug → record a failed attempt
 → record the fix, and seen the **pre-commit warning** catch you the next
 time you almost repeat the same mistake.
@@ -27,10 +27,10 @@ single MCP server serves every project you register.
 ## Step 1 — Install
 
 ```bash
-pip install projectmem
+pip install dejafix
 ```
 
-Two console commands ship: `pjm` (the CLI) and `pjm-mcp` (the MCP server
+Two console commands ship: `djf` (the CLI) and `djf-mcp` (the MCP server
 that your AI client talks to).
 
 ---
@@ -39,15 +39,15 @@ that your AI client talks to).
 
 ```bash
 cd path/to/your/project
-pjm init
+djf init
 ```
 
 You should see, in order:
 
-1. `.projectmem/` directory created with `events.jsonl`, `summary.md`,
+1. `.dejafix/` directory created with `events.jsonl`, `summary.md`,
    `PROJECT_MAP.md`, `AI_INSTRUCTIONS.md`.
 2. `CLAUDE.md` created at the repo root — the rules-file bridge that
-   instructs AI clients to call projectmem's MCP tools before reading
+   instructs AI clients to call dejafix's MCP tools before reading
    source.
 3. `PROJECT_MAP.md` **pre-populated** from your `pyproject.toml` /
    `package.json` / `Cargo.toml` / `go.mod` — no manual stack tour needed.
@@ -69,7 +69,7 @@ Paste the printed config block into your client's MCP config file:
 | Claude Desktop | `~/Library/Application Support/Claude/claude_desktop_config.json` — `%APPDATA%\Claude\` on Windows, `~/.config/Claude/` on Linux |
 | Cursor | `~/.cursor/mcp.json` (global — one entry covers every project) |
 | Antigravity (legacy) | `~/.gemini/antigravity/mcp_config.json` |
-| Codex | `~/.codex/config.toml` (TOML, not JSON — `pjm init` prints both forms) |
+| Codex | `~/.codex/config.toml` (TOML, not JSON — `djf init` prints both forms) |
 
 The block carries **no `--root` and no `cwd`**. That is what makes one server
 serve every project you have registered; adding either pins it to a single repo.
@@ -78,12 +78,12 @@ Then **fully quit and restart the client** (cold start — closing the
 window isn't enough; MCP servers initialize only on launch).
 
 **Verify the connection:** open your client's tools panel. You should see
-**17 projectmem tools**. Ask your AI to `call list_projects` and it will name
+**17 dejafix tools**. Ask your AI to `call list_projects` and it will name
 every project this one server can reach.
 
 > **Upgrading from 0.2.x?** Your old `--root` entry still works, but only for the
 > repo it points at — a project you init today is invisible to it. Replace it with
-> the block above, then run `pjm doctor`, which flags any client still pinned.
+> the block above, then run `djf doctor`, which flags any client still pinned.
 
 ---
 
@@ -91,7 +91,7 @@ every project this one server can reach.
 
 Open a new chat in your AI client. Paste:
 
-> *I just added projectmem to this project. Please get the project
+> *I just added dejafix to this project. Please get the project
 > summary, and since the memory is still empty, read the source files
 > and set it up: capture what this project is, its stack, and any
 > architectural decisions worth recording. Then regenerate the summary.*
@@ -110,7 +110,7 @@ You're now in **Setup Mode → done.** Memory is populated.
 
 Pick any real bug in your project. In your AI chat:
 
-> *Bug: \<describe the symptom\>. Log this as an issue in projectmem,
+> *Bug: \<describe the symptom\>. Log this as an issue in dejafix,
 > then investigate the cause.*
 
 Expect: `log_issue` followed by the agent reading the relevant files.
@@ -122,7 +122,7 @@ Try a fix that you think might be wrong:
 
 When it doesn't fix the bug:
 
-> *That didn't work. Record it as a failed attempt in projectmem, then
+> *That didn't work. Record it as a failed attempt in dejafix, then
 > revert it.*
 
 Expect: `record_attempt` with `outcome="failed"`. **This is the seed
@@ -135,7 +135,7 @@ Now apply the real fix:
 
 Expect: `record_fix` — the issue closes, memory is sealed.
 
-Run `pjm show` in your terminal — you'll see the full audit trail:
+Run `djf show` in your terminal — you'll see the full audit trail:
 issue → failed attempt → fix.
 
 ---
@@ -150,10 +150,10 @@ thinking, stage it, and:
 git commit -m "fix: try approach A"
 ```
 
-projectmem's pre-commit hook intercepts and prints:
+dejafix's pre-commit hook intercepts and prints:
 
 ```
-projectmem: Pre-Commit Check
+dejafix: Pre-Commit Check
   <file>
     WARN  1 failed attempt on this file
     Last failure: tried approach A — didn't fix the bug
@@ -162,7 +162,7 @@ projectmem: Pre-Commit Check
 You pivot before committing the same dead end. **That's the judgment
 layer.** Memory + warning at the moment of action.
 
-> If the warning doesn't fire, run `pjm hooks install` — `pjm init`
+> If the warning doesn't fire, run `djf hooks install` — `djf init`
 > auto-installs hooks but only when `.git/hooks/` exists at the moment
 > of init.
 
@@ -184,8 +184,8 @@ action: a fresh session inherits everything the previous one learned.
 ## Step 8 — See your value
 
 ```bash
-pjm score        # A–F grade + hours saved + tokens saved + USD saved
-pjm visualize    # interactive D3 dashboard in your browser
+djf score        # A–F grade + hours saved + tokens saved + USD saved
+djf visualize    # interactive D3 dashboard in your browser
 ```
 
 The score is your concrete answer to *"is this thing actually saving me
@@ -195,7 +195,7 @@ time?"*
 
 ## What just happened
 
-In about 15 minutes you exercised every part of projectmem:
+In about 15 minutes you exercised every part of dejafix:
 
 | Feature | Where you saw it |
 |---|---|
@@ -203,7 +203,7 @@ In about 15 minutes you exercised every part of projectmem:
 | Issue → attempt → fix lifecycle (Step 5) | `log_issue`, `record_attempt`, `record_fix` |
 | Pre-commit warning (Step 6) | `git commit` printed the warning |
 | Maintenance Mode (Step 7) | Fresh chat answered from memory, no file scan |
-| Token savings (Step 7 + 8) | `pjm score` reports the saved-token estimate |
+| Token savings (Step 7 + 8) | `djf score` reports the saved-token estimate |
 | Secret redaction | Any API key you accidentally pasted is auto-scrubbed before disk |
 
 ---
@@ -212,18 +212,18 @@ In about 15 minutes you exercised every part of projectmem:
 
 - **"No project selected"** → the call named no project and none could be
   inferred. Ask your AI to pass `project="<name>"`, or set a default with
-  `pjm project use <name>`. `pjm doctor` shows what is registered.
+  `djf project use <name>`. `djf doctor` shows what is registered.
 - **A project your AI cannot see** → it was probably never registered (the
-  registry only exists since 0.2.0). `pjm doctor` finds projects with memory
-  that are missing, and `pjm doctor --fix` adds them.
+  registry only exists since 0.2.0). `djf doctor` finds projects with memory
+  that are missing, and `djf doctor --fix` adds them.
 - **Pre-commit warning doesn't fire** → `.git/hooks/pre-commit` doesn't
-  exist. Run `pjm hooks install`. Under conda/venv the hook bakes in the
-  absolute pjm path — confirm with `head .git/hooks/pre-commit`.
+  exist. Run `djf hooks install`. Under conda/venv the hook bakes in the
+  absolute djf path — confirm with `head .git/hooks/pre-commit`.
 - **Agent re-reads files instead of using memory** → your client may not
-  surface the MCP `instructions=` field strongly. projectmem also writes
+  surface the MCP `instructions=` field strongly. dejafix also writes
   a `CLAUDE.md` rules file at the repo root for exactly this — open
   that file and confirm the bridge block is intact.
-- **Multiple machines / team members** → `.projectmem/` is meant to be
+- **Multiple machines / team members** → `.dejafix/` is meant to be
   **committed** to git. Each clone inherits the memory. Don't
   `.gitignore` it.
 
@@ -231,17 +231,17 @@ In about 15 minutes you exercised every part of projectmem:
 
 ## Where to go next
 
-- **Add the projects you already have:** `pjm doctor` finds repos with memory
+- **Add the projects you already have:** `djf doctor` finds repos with memory
   that were never registered — anything from before 0.2.0 — and `--fix` adds
   them, so one server reaches everything.
 - **Cross-project memory:** lessons learned in one repo can surface in
-  others with the same stack (`~/.projectmem/global/`). Try
-  `pjm global show` to see what's accumulated across your machine.
-- **See it all at once:** `pjm dashboard` opens every project in one view,
+  others with the same stack (`~/.dejafix/global/`). Try
+  `djf global show` to see what's accumulated across your machine.
+- **See it all at once:** `djf dashboard` opens every project in one view,
   starting with where you left off.
-- **Issues + feature requests:** [github.com/riponcm/projectmem/issues](https://github.com/riponcm/projectmem/issues).
+- **Issues + feature requests:** [github.com/bigfree/dejafix/issues](https://github.com/bigfree/dejafix/issues).
 
 ---
 
-*Last updated for projectmem 0.3.5 — see the [changelog](CHANGELOG.md) for what
+*Last updated for dejafix 0.3.5 — see the [changelog](CHANGELOG.md) for what
 changed since.*

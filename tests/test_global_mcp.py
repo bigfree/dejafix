@@ -13,10 +13,10 @@ import pytest
 from typer.testing import CliRunner
 
 from conftest import set_fake_home
-from projectmem import project_registry as reg
-from projectmem.cli import app
-from projectmem.resolver import ResolutionError, resolve
-from projectmem.storage import initialize, registered_projects
+from dejafix import project_registry as reg
+from dejafix.cli import app
+from dejafix.resolver import ResolutionError, resolve
+from dejafix.storage import initialize, registered_projects
 
 
 def _project(tmp_path: Path, name: str) -> Path:
@@ -32,7 +32,7 @@ def test_a_0_2_x_registry_is_read_without_being_rewritten(tmp_path, monkeypatch)
     """projects.json keeps the format every version understands."""
     home = tmp_path / "home"
     home.mkdir()
-    monkeypatch.setenv("PROJECTMEM_HOME", str(home))
+    monkeypatch.setenv("DEJAFIX_HOME", str(home))
     alpha, beta = _project(tmp_path, "alpha"), _project(tmp_path, "beta")
     # exactly what v0.2.0 wrote
     (home / "projects.json").write_text(
@@ -43,7 +43,7 @@ def test_a_0_2_x_registry_is_read_without_being_rewritten(tmp_path, monkeypatch)
 
     assert [r.id for r in registry.projects] == ["alpha", "beta"]
     assert [r.path for r in registry.projects] == [alpha, beta]
-    # still a list — an older projectmem can still read and append to it
+    # still a list — an older dejafix can still read and append to it
     payload = json.loads((home / "projects.json").read_text(encoding="utf-8"))
     assert payload == [str(alpha), str(beta)]
     # ids and aliases live beside it, where an old version cannot reach them
@@ -54,7 +54,7 @@ def test_a_0_2_x_registry_is_read_without_being_rewritten(tmp_path, monkeypatch)
 def test_dashboard_still_reads_the_registry_after_migration(tmp_path, monkeypatch):
     home = tmp_path / "home"
     home.mkdir()
-    monkeypatch.setenv("PROJECTMEM_HOME", str(home))
+    monkeypatch.setenv("DEJAFIX_HOME", str(home))
     alpha = _project(tmp_path, "alpha")
     gone = tmp_path / "deleted"
     (home / "projects.json").write_text(
@@ -67,7 +67,7 @@ def test_dashboard_still_reads_the_registry_after_migration(tmp_path, monkeypatc
 
 
 def test_ids_do_not_collide_for_same_named_folders(tmp_path, monkeypatch):
-    monkeypatch.setenv("PROJECTMEM_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("DEJAFIX_HOME", str(tmp_path / "home"))
     (tmp_path / "a").mkdir()
     (tmp_path / "b").mkdir()
 
@@ -79,7 +79,7 @@ def test_ids_do_not_collide_for_same_named_folders(tmp_path, monkeypatch):
 
 
 def test_unknown_project_errors_with_the_known_ones(tmp_path, monkeypatch):
-    monkeypatch.setenv("PROJECTMEM_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("DEJAFIX_HOME", str(tmp_path / "home"))
     reg.register(_project(tmp_path, "alpha"))
 
     with pytest.raises(reg.RegistryError) as excinfo:
@@ -91,7 +91,7 @@ def test_unknown_project_errors_with_the_known_ones(tmp_path, monkeypatch):
 # ── resolver ────────────────────────────────────────────────────────────
 
 def test_explicit_selection_wins(tmp_path, monkeypatch):
-    monkeypatch.setenv("PROJECTMEM_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("DEJAFIX_HOME", str(tmp_path / "home"))
     alpha, beta = _project(tmp_path, "alpha"), _project(tmp_path, "beta")
     reg.register(alpha)
     reg.register(beta)
@@ -101,7 +101,7 @@ def test_explicit_selection_wins(tmp_path, monkeypatch):
 
 
 def test_active_project_is_used_when_no_selection(tmp_path, monkeypatch):
-    monkeypatch.setenv("PROJECTMEM_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("DEJAFIX_HOME", str(tmp_path / "home"))
     monkeypatch.chdir(tmp_path)
     reg.register(_project(tmp_path, "alpha"))
     beta = _project(tmp_path, "beta")
@@ -116,7 +116,7 @@ def test_active_project_is_used_when_no_selection(tmp_path, monkeypatch):
 
 def test_client_roots_outrank_a_stale_active_project(tmp_path, monkeypatch):
     """Where the developer is now beats a mode they set days ago."""
-    monkeypatch.setenv("PROJECTMEM_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("DEJAFIX_HOME", str(tmp_path / "home"))
     alpha, beta = _project(tmp_path, "alpha"), _project(tmp_path, "beta")
     reg.register(alpha)
     reg.register(beta)
@@ -129,7 +129,7 @@ def test_client_roots_outrank_a_stale_active_project(tmp_path, monkeypatch):
 
 
 def test_two_usable_roots_is_an_error_not_a_coin_flip(tmp_path, monkeypatch):
-    monkeypatch.setenv("PROJECTMEM_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("DEJAFIX_HOME", str(tmp_path / "home"))
     alpha, beta = _project(tmp_path, "alpha"), _project(tmp_path, "beta")
 
     with pytest.raises(ResolutionError) as excinfo:
@@ -140,7 +140,7 @@ def test_two_usable_roots_is_an_error_not_a_coin_flip(tmp_path, monkeypatch):
 
 def test_nothing_selected_refuses_rather_than_guessing(tmp_path, monkeypatch):
     """With more than one candidate, no selection is an error — never a pick."""
-    monkeypatch.setenv("PROJECTMEM_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("DEJAFIX_HOME", str(tmp_path / "home"))
     monkeypatch.chdir(tmp_path)
     reg.register(_project(tmp_path, "alpha"))
     reg.register(_project(tmp_path, "beta"))
@@ -151,7 +151,7 @@ def test_nothing_selected_refuses_rather_than_guessing(tmp_path, monkeypatch):
 
 def test_pinned_root_is_a_boundary_not_a_default(tmp_path, monkeypatch):
     """A server started with --root must never write outside that repo."""
-    monkeypatch.setenv("PROJECTMEM_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("DEJAFIX_HOME", str(tmp_path / "home"))
     alpha, beta = _project(tmp_path, "alpha"), _project(tmp_path, "beta")
     reg.register(alpha)
     reg.register(beta)
@@ -167,7 +167,7 @@ def test_pinned_root_is_a_boundary_not_a_default(tmp_path, monkeypatch):
 # ── CLI ─────────────────────────────────────────────────────────────────
 
 def test_project_cli_round_trip(tmp_path, monkeypatch):
-    monkeypatch.setenv("PROJECTMEM_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("DEJAFIX_HOME", str(tmp_path / "home"))
     alpha = _project(tmp_path, "alpha")
     runner = CliRunner()
 
@@ -180,63 +180,63 @@ def test_project_cli_round_trip(tmp_path, monkeypatch):
     assert removal.exit_code == 0
     assert reg.projects() == ()
     # removing from the registry never touches the repo
-    assert (alpha / ".projectmem").is_dir()
+    assert (alpha / ".dejafix").is_dir()
 
 
 def test_registering_an_uninitialised_folder_is_refused(tmp_path, monkeypatch):
-    monkeypatch.setenv("PROJECTMEM_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("DEJAFIX_HOME", str(tmp_path / "home"))
     plain = tmp_path / "not-a-project"
     plain.mkdir()
 
     result = CliRunner().invoke(app, ["project", "register", str(plain)])
 
     assert result.exit_code == 1
-    assert "pjm init" in result.stdout
+    assert "djf init" in result.stdout
 
 
 # ── MCP routing ─────────────────────────────────────────────────────────
 
 def test_one_server_writes_to_the_project_it_was_told(tmp_path, monkeypatch):
     """The whole point of global mode, and its worst failure mode."""
-    monkeypatch.setenv("PROJECTMEM_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("DEJAFIX_HOME", str(tmp_path / "home"))
     monkeypatch.chdir(tmp_path)
     alpha, beta = _project(tmp_path, "alpha"), _project(tmp_path, "beta")
     reg.register(alpha)
     reg.register(beta)
 
-    import projectmem.mcp_server as server
+    import dejafix.mcp_server as server
 
     monkeypatch.setattr(server, "_PROJECT_ROOT", None)
 
     assert "→ alpha" in server.log_issue(summary="alpha bug", project="alpha")
     assert "→ beta" in server.log_issue(summary="beta bug", project="beta")
 
-    alpha_events = (alpha / ".projectmem" / "events.jsonl").read_text(encoding="utf-8")
-    beta_events = (beta / ".projectmem" / "events.jsonl").read_text(encoding="utf-8")
+    alpha_events = (alpha / ".dejafix" / "events.jsonl").read_text(encoding="utf-8")
+    beta_events = (beta / ".dejafix" / "events.jsonl").read_text(encoding="utf-8")
     assert "alpha bug" in alpha_events and "beta bug" not in alpha_events
     assert "beta bug" in beta_events and "alpha bug" not in beta_events
 
 
 def test_write_without_a_project_fails_visibly(tmp_path, monkeypatch):
-    monkeypatch.setenv("PROJECTMEM_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("DEJAFIX_HOME", str(tmp_path / "home"))
     monkeypatch.chdir(tmp_path)
     reg.register(_project(tmp_path, "alpha"))
     reg.register(_project(tmp_path, "beta"))
 
-    import projectmem.mcp_server as server
+    import dejafix.mcp_server as server
 
     monkeypatch.setattr(server, "_PROJECT_ROOT", None)
     result = server.add_note(summary="unrouted")
 
     # safe_tool turns it into readable text rather than killing the session
     assert "No project selected" in result
-    events = (tmp_path / "alpha" / ".projectmem" / "events.jsonl").read_text(encoding="utf-8")
+    events = (tmp_path / "alpha" / ".dejafix" / "events.jsonl").read_text(encoding="utf-8")
     assert "unrouted" not in events
 
 
 def test_a_single_registered_project_needs_no_selection(tmp_path, monkeypatch):
-    """The common case: one repo, shared config, no `pjm project use`."""
-    monkeypatch.setenv("PROJECTMEM_HOME", str(tmp_path / "home"))
+    """The common case: one repo, shared config, no `djf project use`."""
+    monkeypatch.setenv("DEJAFIX_HOME", str(tmp_path / "home"))
     monkeypatch.chdir(tmp_path)
     alpha = _project(tmp_path, "alpha")
     reg.register(alpha)
@@ -252,7 +252,7 @@ def test_a_single_registered_project_needs_no_selection(tmp_path, monkeypatch):
         resolve()
 
 
-def test_an_older_projectmem_can_only_append_a_path(tmp_path, monkeypatch):
+def test_an_older_dejafix_can_only_append_a_path(tmp_path, monkeypatch):
     """The scenario that used to destroy the registry, replayed exactly.
 
     0.2.x does `[p for p in data if isinstance(p, str)]` and writes the result
@@ -262,19 +262,19 @@ def test_an_older_projectmem_can_only_append_a_path(tmp_path, monkeypatch):
     """
     home = tmp_path / "home"
     home.mkdir()
-    monkeypatch.setenv("PROJECTMEM_HOME", str(home))
+    monkeypatch.setenv("DEJAFIX_HOME", str(home))
     # initialize() registers, so create alpha first and beta only after we have
-    # captured what an old projectmem would see.
+    # captured what an old dejafix would see.
     alpha = _project(tmp_path, "alpha")
     reg.set_alias("alpha", "a")
 
     old_view = json.loads((home / "projects.json").read_text(encoding="utf-8"))
     assert old_view == [str(alpha)]           # it understands the file
 
-    # …now an old projectmem in another environment registers another project
+    # …now an old dejafix in another environment registers another project
     beta = tmp_path / "beta"
     beta.mkdir()
-    from projectmem.storage import initialize
+    from dejafix.storage import initialize
 
     initialize(beta)
     old_view = json.loads((home / "projects.json").read_text(encoding="utf-8"))
@@ -291,7 +291,7 @@ def test_a_dev_format_registry_is_converted_and_backed_up(tmp_path, monkeypatch)
     """0.3.0 dev builds wrote records inline; convert them back to a list."""
     home = tmp_path / "home"
     home.mkdir()
-    monkeypatch.setenv("PROJECTMEM_HOME", str(home))
+    monkeypatch.setenv("DEJAFIX_HOME", str(home))
     alpha = _project(tmp_path, "alpha")
     (home / "projects.json").write_text(
         json.dumps(
@@ -323,7 +323,7 @@ def test_windows_paths_survive_migration(tmp_path, monkeypatch):
     """
     home = tmp_path / "home"
     home.mkdir()
-    monkeypatch.setenv("PROJECTMEM_HOME", str(home))
+    monkeypatch.setenv("DEJAFIX_HOME", str(home))
     (home / "projects.json").write_text(
         json.dumps(
             [
@@ -355,7 +355,7 @@ def test_absolute_check_is_used_rather_than_a_slash_test():
     """
     import inspect
 
-    from projectmem import project_registry
+    from dejafix import project_registry
 
     code = "\n".join(
         line.split("#", 1)[0]
@@ -374,7 +374,7 @@ def test_a_utf8_bom_does_not_empty_the_registry(tmp_path, monkeypatch):
     """
     home = tmp_path / "home"
     home.mkdir()
-    monkeypatch.setenv("PROJECTMEM_HOME", str(home))
+    monkeypatch.setenv("DEJAFIX_HOME", str(home))
     alpha = _project(tmp_path, "alpha")
     (home / "projects.json").write_bytes(
         b"\xef\xbb\xbf" + json.dumps([str(alpha)]).encode("utf-8")
@@ -385,8 +385,8 @@ def test_a_utf8_bom_does_not_empty_the_registry(tmp_path, monkeypatch):
 
 def test_a_utf8_bom_does_not_break_the_event_log(tmp_path):
     """Same three bytes at the top of events.jsonl used to raise on line 1."""
-    from projectmem.models import Event
-    from projectmem.storage import append_event, events_path, read_events
+    from dejafix.models import Event
+    from dejafix.storage import append_event, events_path, read_events
 
     project = _project(tmp_path, "alpha")
     append_event(Event(type="note", summary="first"), root=project)
@@ -397,12 +397,12 @@ def test_a_utf8_bom_does_not_break_the_event_log(tmp_path):
 
 
 def test_scan_finds_projects_the_registry_never_knew_about(tmp_path, monkeypatch):
-    """The upgrade path: the registry only holds what `pjm init` recorded.
+    """The upgrade path: the registry only holds what `djf init` recorded.
 
     A 0.1.x user has projects with memory and an empty registry, so global mode
     would have nothing to route to until they re-inited everything by hand.
     """
-    monkeypatch.setenv("PROJECTMEM_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("DEJAFIX_HOME", str(tmp_path / "home"))
     work = tmp_path / "work"
     work.mkdir()
     (work / "one").mkdir()
@@ -434,7 +434,7 @@ def test_scan_finds_projects_the_registry_never_knew_about(tmp_path, monkeypatch
 
 
 def test_scan_is_idempotent(tmp_path, monkeypatch):
-    monkeypatch.setenv("PROJECTMEM_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("DEJAFIX_HOME", str(tmp_path / "home"))
     work = tmp_path / "work"
     work.mkdir()
     (work / "one").mkdir()
@@ -452,7 +452,7 @@ def test_scan_is_idempotent(tmp_path, monkeypatch):
 
 def test_scan_accepts_several_roots(tmp_path, monkeypatch):
     """Projects are rarely in one place — on Windows they span drives."""
-    monkeypatch.setenv("PROJECTMEM_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("DEJAFIX_HOME", str(tmp_path / "home"))
     first, second = tmp_path / "d-drive", tmp_path / "e-drive"
     for base, name in ((first, "alpha"), (second, "beta")):
         (base / name).mkdir(parents=True)
@@ -469,20 +469,20 @@ def test_scan_accepts_several_roots(tmp_path, monkeypatch):
 
 
 def test_package_version_matches_pyproject():
-    """These drift silently: `pjm doctor` printed 0.2.0 while shipping 0.3.0."""
+    """These drift silently: `djf doctor` printed 0.2.0 while shipping 0.3.0."""
     import re
     from pathlib import Path as _Path
 
-    import projectmem
+    import dejafix
 
     pyproject = _Path(__file__).resolve().parents[1] / "pyproject.toml"
     declared = re.search(r'^version = "([^"]+)"', pyproject.read_text(), re.M).group(1)
-    assert projectmem.__version__ == declared
+    assert dejafix.__version__ == declared
 
 
 def test_doctor_registers_what_it_finds(tmp_path, monkeypatch):
     """The upgrade path in one command."""
-    monkeypatch.setenv("PROJECTMEM_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("DEJAFIX_HOME", str(tmp_path / "home"))
     set_fake_home(monkeypatch, str(tmp_path / "fake-home"))
     work = tmp_path / "work"
     (work / "one").mkdir(parents=True)
@@ -504,14 +504,14 @@ def test_doctor_registers_what_it_finds(tmp_path, monkeypatch):
 
 
 def test_doctor_prunes_entries_whose_memory_is_gone(tmp_path, monkeypatch):
-    monkeypatch.setenv("PROJECTMEM_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("DEJAFIX_HOME", str(tmp_path / "home"))
     set_fake_home(monkeypatch, str(tmp_path / "fake-home"))
     gone = tmp_path / "deleted"
     gone.mkdir()
     initialize(gone)
     import shutil
 
-    shutil.rmtree(gone / ".projectmem")
+    shutil.rmtree(gone / ".dejafix")
 
     result = CliRunner().invoke(
         app, ["doctor", "--fix", "--path", str(tmp_path / "empty-dir"), "--depth", "1"]
@@ -519,7 +519,7 @@ def test_doctor_prunes_entries_whose_memory_is_gone(tmp_path, monkeypatch):
 
     # a scan path that does not exist is fine; the stale check still runs
     assert reg.projects() == () or all(
-        (r.path / ".projectmem").is_dir() for r in reg.projects()
+        (r.path / ".dejafix").is_dir() for r in reg.projects()
     )
 
 
@@ -527,28 +527,28 @@ def test_upgrade_notice_fires_once(tmp_path, monkeypatch, capsys):
     """A wheel install runs no code of ours, so the CLI notices — but only once."""
     home = tmp_path / "home"
     home.mkdir()
-    monkeypatch.setenv("PROJECTMEM_HOME", str(home))
+    monkeypatch.setenv("DEJAFIX_HOME", str(home))
     (home / "projects.json").write_text("[]", encoding="utf-8")
     (home / "projects.meta.json").write_text(
         json.dumps({"by_path": {}, "last_version": "0.2.0"}), encoding="utf-8"
     )
 
-    from projectmem.cli import _upgrade_notice
+    from dejafix.cli import _upgrade_notice
 
     _upgrade_notice()
     first = capsys.readouterr().out
     _upgrade_notice()
     second = capsys.readouterr().out
 
-    assert "upgraded to" in first and "pjm doctor" in first
+    assert "upgraded to" in first and "djf doctor" in first
     assert second == ""
 
 
 def test_no_notice_on_a_first_ever_run(tmp_path, monkeypatch, capsys):
-    """Nothing to upgrade from — `pjm init` already explains itself."""
-    monkeypatch.setenv("PROJECTMEM_HOME", str(tmp_path / "home"))
+    """Nothing to upgrade from — `djf init` already explains itself."""
+    monkeypatch.setenv("DEJAFIX_HOME", str(tmp_path / "home"))
 
-    from projectmem.cli import _upgrade_notice
+    from dejafix.cli import _upgrade_notice
 
     _upgrade_notice()
 
@@ -557,7 +557,7 @@ def test_no_notice_on_a_first_ever_run(tmp_path, monkeypatch, capsys):
 
 def test_default_depth_reaches_a_nested_repo_folder(tmp_path, monkeypatch):
     """D:\\repo\\Group\\Project is three levels down — a common Windows layout."""
-    monkeypatch.setenv("PROJECTMEM_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("DEJAFIX_HOME", str(tmp_path / "home"))
     deep = tmp_path / "drive" / "repo" / "Group" / "Project"
     deep.mkdir(parents=True)
     initialize(deep)
@@ -579,7 +579,7 @@ def test_cloud_folders_are_included_by_default(tmp_path, monkeypatch):
     set_fake_home(monkeypatch, str(home))
     monkeypatch.setenv("USERPROFILE", str(home))
 
-    from projectmem.commands.doctor import default_roots
+    from dejafix.commands.doctor import default_roots
 
     assert home / "OneDrive - Some University" in default_roots()
 
@@ -592,7 +592,7 @@ def test_cloud_roots_are_deduped_by_what_they_resolve_to(tmp_path, monkeypatch):
     (home / "OneDrive - Uni").symlink_to(real)
     set_fake_home(monkeypatch, str(home))
 
-    from projectmem.commands.doctor import default_roots
+    from dejafix.commands.doctor import default_roots
 
     roots = default_roots()
     resolved = [r.resolve() for r in roots]
@@ -607,7 +607,7 @@ def test_several_cloud_clients_are_covered(tmp_path, monkeypatch):
         (home / name).mkdir(parents=True)
     set_fake_home(monkeypatch, str(home))
 
-    from projectmem.commands.doctor import default_roots
+    from dejafix.commands.doctor import default_roots
 
     names = {r.name for r in default_roots()}
 
@@ -616,7 +616,7 @@ def test_several_cloud_clients_are_covered(tmp_path, monkeypatch):
 
 def test_project_lookup_is_case_insensitive(tmp_path, monkeypatch):
     """Ids are lowercased on the way in; agents pass back what they saw."""
-    monkeypatch.setenv("PROJECTMEM_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("DEJAFIX_HOME", str(tmp_path / "home"))
     project = tmp_path / "MatilyRec"
     project.mkdir()
     initialize(project)
@@ -632,7 +632,7 @@ def test_the_same_folder_reached_twice_registers_once(tmp_path, monkeypatch):
     Both are in the default scan list, and comparing paths as text registered
     every project inside twice — as `api` and `api-2`.
     """
-    monkeypatch.setenv("PROJECTMEM_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("DEJAFIX_HOME", str(tmp_path / "home"))
     work = tmp_path / "work"
     (work / "api").mkdir(parents=True)
     initialize(work / "api")
@@ -652,7 +652,7 @@ def test_the_same_folder_reached_twice_registers_once(tmp_path, monkeypatch):
 
 
 def test_dedupe_paths_uses_identity_not_text(tmp_path):
-    from projectmem.commands.doctor import dedupe_paths
+    from dejafix.commands.doctor import dedupe_paths
 
     real = tmp_path / "dir"
     real.mkdir()
@@ -665,9 +665,9 @@ def test_dedupe_paths_uses_identity_not_text(tmp_path):
 
 def test_no_network_unless_asked(tmp_path, monkeypatch, capsys):
     """The promise is no telemetry — so a version check is opt-in, always."""
-    monkeypatch.setenv("PROJECTMEM_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("DEJAFIX_HOME", str(tmp_path / "home"))
     set_fake_home(monkeypatch, str(tmp_path / "fake-home"))
-    from projectmem.commands import doctor
+    from dejafix.commands import doctor
 
     def explode(*args, **kwargs):  # any network access fails the test
         raise AssertionError("doctor reached the network without being asked")
@@ -676,13 +676,13 @@ def test_no_network_unless_asked(tmp_path, monkeypatch, capsys):
     doctor.run(depth=1, roots=[tmp_path])
 
     out = capsys.readouterr().out
-    assert "pjm doctor --online" in out
+    assert "djf doctor --online" in out
 
 
 def test_online_flag_reports_a_newer_release(tmp_path, monkeypatch, capsys):
-    monkeypatch.setenv("PROJECTMEM_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("DEJAFIX_HOME", str(tmp_path / "home"))
     set_fake_home(monkeypatch, str(tmp_path / "fake-home"))
-    from projectmem.commands import doctor
+    from dejafix.commands import doctor
 
     monkeypatch.setattr(doctor, "latest_version", lambda *a, **k: "99.0.0")
     doctor.run(depth=1, roots=[tmp_path], online=True)
@@ -691,10 +691,10 @@ def test_online_flag_reports_a_newer_release(tmp_path, monkeypatch, capsys):
 
 
 def test_auto_check_is_remembered_and_can_be_turned_off(tmp_path, monkeypatch, capsys):
-    monkeypatch.setenv("PROJECTMEM_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("DEJAFIX_HOME", str(tmp_path / "home"))
     set_fake_home(monkeypatch, str(tmp_path / "fake-home"))
-    from projectmem.commands import doctor
-    from projectmem.project_registry import load_meta
+    from dejafix.commands import doctor
+    from dejafix.project_registry import load_meta
 
     monkeypatch.setattr(doctor, "latest_version", lambda *a, **k: "0.0.1")
     doctor.run(depth=1, roots=[tmp_path], auto=True)
@@ -705,7 +705,7 @@ def test_auto_check_is_remembered_and_can_be_turned_off(tmp_path, monkeypatch, c
 
 
 def test_version_comparison_ignores_suffixes():
-    from projectmem.commands.doctor import _as_tuple
+    from dejafix.commands.doctor import _as_tuple
 
     assert _as_tuple("0.3.1") > _as_tuple("0.3.0")
     assert _as_tuple("0.10.0") > _as_tuple("0.9.9")
@@ -714,7 +714,7 @@ def test_version_comparison_ignores_suffixes():
 
 # ── doctor: a fix that does not stick ────────────────────────────────────────
 #
-# Reported from a real Windows session. `pjm doctor` went green after the user
+# Reported from a real Windows session. `djf doctor` went green after the user
 # removed --root from Claude Desktop's config; minutes later the same command
 # reported the pin was back. Both runs were honest — that file also stores the
 # desktop app's own preferences, so the running app rewrote the whole thing from
@@ -726,17 +726,17 @@ def test_version_comparison_ignores_suffixes():
 def test_doctor_remembers_a_config_that_was_clean_and_is_pinned_again(
     tmp_path, monkeypatch
 ):
-    from projectmem.commands import doctor
+    from dejafix.commands import doctor
 
     set_fake_home(monkeypatch, tmp_path / "home")
-    monkeypatch.setenv("PROJECTMEM_HOME", str(tmp_path / "pm"))
+    monkeypatch.setenv("DEJAFIX_HOME", str(tmp_path / "pm"))
     cfg = tmp_path / "home" / ".cursor" / "mcp.json"
     cfg.parent.mkdir(parents=True)
-    # The file has to actually mention projectmem — an unrelated config is not
+    # The file has to actually mention dejafix — an unrelated config is not
     # ours to track, and writing "{}" here made this pass for the wrong reason.
-    pinned_text = ('{"mcpServers":{"projectmem":{"args":'
-                   '["-m","projectmem.mcp_server","--root","/x"]}}}')
-    clean_text = '{"mcpServers":{"projectmem":{"args":["-m","projectmem.mcp_server"]}}}'
+    pinned_text = ('{"mcpServers":{"dejafix":{"args":'
+                   '["-m","dejafix.mcp_server","--root","/x"]}}}')
+    clean_text = '{"mcpServers":{"dejafix":{"args":["-m","dejafix.mcp_server"]}}}'
 
     # Seen pinned, then cleaned by the user, then pinned again by the client.
     cfg.write_text(pinned_text, encoding="utf-8")
@@ -754,14 +754,14 @@ def test_doctor_does_not_cry_revert_for_a_config_pinned_all_along(
     tmp_path, monkeypatch
 ):
     """Pinned twice in a row is someone who has not fixed it yet, not a clobber."""
-    from projectmem.commands import doctor
+    from dejafix.commands import doctor
 
     set_fake_home(monkeypatch, tmp_path / "home")
-    monkeypatch.setenv("PROJECTMEM_HOME", str(tmp_path / "pm"))
+    monkeypatch.setenv("DEJAFIX_HOME", str(tmp_path / "pm"))
     cfg = tmp_path / "home" / ".cursor" / "mcp.json"
     cfg.parent.mkdir(parents=True)
-    cfg.write_text('{"mcpServers":{"projectmem":{"args":'
-                   '["-m","projectmem.mcp_server","--root","/x"]}}}', encoding="utf-8")
+    cfg.write_text('{"mcpServers":{"dejafix":{"args":'
+                   '["-m","dejafix.mcp_server","--root","/x"]}}}', encoding="utf-8")
 
     assert doctor._reverted_configs([("Cursor", cfg)]) == []
     assert doctor._reverted_configs([("Cursor", cfg)]) == []
@@ -769,10 +769,10 @@ def test_doctor_does_not_cry_revert_for_a_config_pinned_all_along(
 
 def test_doctor_state_survives_an_unwritable_home(tmp_path, monkeypatch):
     """Advisory only — never fail a check because the note could not be saved."""
-    from projectmem.commands import doctor
+    from dejafix.commands import doctor
 
     set_fake_home(monkeypatch, tmp_path / "home")
-    monkeypatch.setenv("PROJECTMEM_HOME", str(tmp_path / "pm"))
+    monkeypatch.setenv("DEJAFIX_HOME", str(tmp_path / "pm"))
     monkeypatch.setattr(doctor, "_save_state", lambda state: (_ for _ in ()).throw(OSError))
 
     with pytest.raises(OSError):
@@ -785,7 +785,7 @@ def test_doctor_state_survives_an_unwritable_home(tmp_path, monkeypatch):
 def test_doctor_tells_you_to_quit_the_client_before_editing(tmp_path, monkeypatch):
     """The one-line fix for the whole failure mode."""
     import inspect
-    from projectmem.commands import doctor
+    from dejafix.commands import doctor
 
     src = inspect.getsource(doctor.run)
     assert "Quit the client completely before editing" in src
@@ -800,17 +800,17 @@ def test_doctor_records_a_clean_config_it_has_never_seen_before(tmp_path, monkey
     exactly the case for a user whose config is fine when they upgrade, i.e.
     everyone this feature was built for.
     """
-    from projectmem.commands import doctor
+    from dejafix.commands import doctor
 
     home = tmp_path / "home"
     cfg = home / ".cursor" / "mcp.json"
     cfg.parent.mkdir(parents=True)
     set_fake_home(monkeypatch, home)
-    monkeypatch.setenv("PROJECTMEM_HOME", str(tmp_path / "pm"))
+    monkeypatch.setenv("DEJAFIX_HOME", str(tmp_path / "pm"))
 
-    clean = '{"mcpServers":{"projectmem":{"args":["-m","projectmem.mcp_server"]}}}'
-    pinned = ('{"mcpServers":{"projectmem":{"args":'
-              '["-m","projectmem.mcp_server","--root","/x"]}}}')
+    clean = '{"mcpServers":{"dejafix":{"args":["-m","dejafix.mcp_server"]}}}'
+    pinned = ('{"mcpServers":{"dejafix":{"args":'
+              '["-m","dejafix.mcp_server","--root","/x"]}}}')
 
     cfg.write_text(clean, encoding="utf-8")
     assert doctor._reverted_configs([]) == []          # first sight, nothing to report
@@ -824,9 +824,9 @@ def test_doctor_records_a_clean_config_it_has_never_seen_before(tmp_path, monkey
     assert [c for c, _ in reverted] == ["Cursor"]
 
 
-def test_doctor_ignores_configs_that_never_mention_projectmem(tmp_path, monkeypatch):
+def test_doctor_ignores_configs_that_never_mention_dejafix(tmp_path, monkeypatch):
     """Someone else's MCP server is not ours to track."""
-    from projectmem.commands import doctor
+    from dejafix.commands import doctor
 
     home = tmp_path / "home"
     cfg = home / ".cursor" / "mcp.json"
@@ -834,7 +834,7 @@ def test_doctor_ignores_configs_that_never_mention_projectmem(tmp_path, monkeypa
     cfg.write_text('{"mcpServers":{"other":{"args":["-m","something.else"]}}}',
                    encoding="utf-8")
     set_fake_home(monkeypatch, home)
-    monkeypatch.setenv("PROJECTMEM_HOME", str(tmp_path / "pm"))
+    monkeypatch.setenv("DEJAFIX_HOME", str(tmp_path / "pm"))
 
     doctor._reverted_configs([])
     assert str(cfg) not in doctor._load_state()

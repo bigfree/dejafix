@@ -1,0 +1,40 @@
+---
+source: crates/dejafix/src/cli/tests.rs
+expression: "block(Platform::Mac, false, &[], false)"
+---
+
+══════════════════════════════════════════════════════════════
+  MCP client configuration — paste this ONCE for all projects:
+
+    {
+      "mcpServers": {
+        "dejafix": {
+          "command": "/opt/djf/bin/djf-mcp",
+          "args": []
+        }
+      }
+    }
+
+  You already have 2 other project(s) registered. The config
+  above reaches all of them from one server.
+
+  This project is registered as 'myproj'. Your AI can
+  pass project="<name>" on any call, or you can set a default:
+    djf project use myproj
+
+  Codex uses TOML, not JSON — for ~/.codex/config.toml:
+
+    [mcp_servers.dejafix]
+    command = "/opt/djf/bin/djf-mcp"
+    args = []
+
+  Client config file locations:
+    Claude Desktop  ~/Library/Application Support/Claude/claude_desktop_config.json
+    Cursor          ~/.cursor/mcp.json  (global; per-project is <repo>/.cursor/mcp.json)
+    Antigravity     ~/.gemini/antigravity/mcp_config.json  (legacy IDE; v2 path may differ)
+    Codex (TOML!)   ~/.codex/config.toml
+    Claude Code     claude mcp add  (or ~/.claude.json)
+
+  After pasting: fully quit and restart your client (cold start).
+  Pinned to one repo instead:  djf init --mcp-config-single
+══════════════════════════════════════════════════════════════

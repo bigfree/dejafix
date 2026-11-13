@@ -7,8 +7,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 from typer.testing import CliRunner
 
-from projectmem.cli import app
-from projectmem.commands import watch as watch_command
+from dejafix.cli import app
+from dejafix.commands import watch as watch_command
 
 
 def test_watch_status_not_running(tmp_path, monkeypatch):
@@ -49,7 +49,7 @@ def test_watch_daemon_spawns_subprocess(tmp_path, monkeypatch):
         cmd = mock_popen.call_args[0][0]
         assert "watch" in cmd
         assert "--worker" in cmd
-        pid_file = tmp_path / ".projectmem" / "watch.pid"
+        pid_file = tmp_path / ".dejafix" / "watch.pid"
         assert pid_file.is_file()
         assert pid_file.read_text(encoding="utf-8").strip() == "4242"
 
@@ -147,7 +147,7 @@ def test_running_pid_keeps_the_pid_file_for_a_live_daemon_on_windows(
     tmp_path, monkeypatch
 ):
     """The regression. The file used to be deleted while the worker ran on."""
-    mem = tmp_path / ".projectmem"
+    mem = tmp_path / ".dejafix"
     mem.mkdir()
     (mem / "watch.pid").write_text("4242", encoding="utf-8")
 
@@ -159,7 +159,7 @@ def test_running_pid_keeps_the_pid_file_for_a_live_daemon_on_windows(
 
 
 def test_running_pid_cleans_up_a_genuinely_stale_pid_file(tmp_path, monkeypatch):
-    mem = tmp_path / ".projectmem"
+    mem = tmp_path / ".dejafix"
     mem.mkdir()
     (mem / "watch.pid").write_text("9999", encoding="utf-8")
 

@@ -15,7 +15,7 @@ import pytest
 
 from conftest import set_fake_home
 
-WIN_PJM = r"C:\Users\ripon\AppData\Local\Programs\Python\Python312\Scripts\pjm.exe"
+WIN_PJM = r"C:\Users\ripon\AppData\Local\Programs\Python\Python312\Scripts\djf.exe"
 
 
 # ── #16: git hooks blocked commits from GitHub Desktop ──────────────────────
@@ -27,7 +27,7 @@ def test_hook_shebang_is_posix_sh_not_bash():
     not there — git then aborts the commit rather than skipping the hook. The
     snippet body uses only [ ], command -v and $( ), so nothing needs bash.
     """
-    from projectmem.commands import hooks
+    from dejafix.commands import hooks
 
     assert hooks.HOOK_SHEBANG == "#!/bin/sh\n"
 
@@ -39,35 +39,35 @@ def test_baked_binary_path_has_no_backslashes(monkeypatch, tmp_path):
     test then fails and the hook silently falls through to its PATH lookup, so
     it only ever worked by accident.
     """
-    from projectmem.commands import hooks
+    from dejafix.commands import hooks
 
-    # An empty prefix, so PATH is what answers: the interpreter-adjacent pjm
+    # An empty prefix, so PATH is what answers: the interpreter-adjacent djf
     # (the venv this suite runs in) would otherwise win, correctly.
     monkeypatch.setattr(sys, "prefix", str(tmp_path))
     monkeypatch.setattr(shutil, "which", lambda name: WIN_PJM)
-    resolved = hooks._resolve_pjm_binary()
+    resolved = hooks._resolve_djf_binary()
 
     assert "\\" not in resolved
-    assert resolved == "C:/Users/ripon/AppData/Local/Programs/Python/Python312/Scripts/pjm.exe"
+    assert resolved == "C:/Users/ripon/AppData/Local/Programs/Python/Python312/Scripts/djf.exe"
 
 
 def test_baked_path_survives_a_real_shell(tmp_path, monkeypatch):
     """The end the user actually feels: what the hook reads back."""
-    from projectmem.commands import hooks
+    from dejafix.commands import hooks
 
     monkeypatch.setattr(sys, "prefix", str(tmp_path))
     monkeypatch.setattr(shutil, "which", lambda name: WIN_PJM)
     script = tmp_path / "h.sh"
-    script.write_text(f'PJM_BIN="{hooks._resolve_pjm_binary()}"\nprintf %s "$PJM_BIN"\n')
+    script.write_text(f'DJF_BIN="{hooks._resolve_djf_binary()}"\nprintf %s "$DJF_BIN"\n')
     out = subprocess.run(["sh", str(script)], capture_output=True, text=True).stdout
 
-    assert out == "C:/Users/ripon/AppData/Local/Programs/Python/Python312/Scripts/pjm.exe"
+    assert out == "C:/Users/ripon/AppData/Local/Programs/Python/Python312/Scripts/djf.exe"
     assert "Usersipon" not in out, "backslash escapes ate part of the path"
 
 
 def test_windows_falls_back_to_scripts_not_bin(monkeypatch, tmp_path):
-    """`<prefix>/bin/pjm` can never exist on Windows; it is Scripts/pjm.exe."""
-    from projectmem.commands import hooks
+    """`<prefix>/bin/djf` can never exist on Windows; it is Scripts/djf.exe."""
+    from dejafix.commands import hooks
 
     import types
 
@@ -79,19 +79,19 @@ def test_windows_falls_back_to_scripts_not_bin(monkeypatch, tmp_path):
     monkeypatch.setattr(sys, "prefix", str(tmp_path))
     scripts = tmp_path / "Scripts"
     scripts.mkdir()
-    (scripts / "pjm.exe").write_text("")
+    (scripts / "djf.exe").write_text("")
 
-    assert hooks._resolve_pjm_binary() == f"{tmp_path.as_posix()}/Scripts/pjm.exe"
+    assert hooks._resolve_djf_binary() == f"{tmp_path.as_posix()}/Scripts/djf.exe"
 
 
 def test_installed_hook_does_not_block_a_commit(tmp_path, monkeypatch):
     """The reported symptom, end to end."""
-    from projectmem.commands.hooks import install_hooks
+    from dejafix.commands.hooks import install_hooks
 
     set_fake_home(monkeypatch, tmp_path / "home")
-    monkeypatch.setenv("PROJECTMEM_HOME", str(tmp_path / "pm"))
+    monkeypatch.setenv("DEJAFIX_HOME", str(tmp_path / "pm"))
     repo = tmp_path / "repo"
-    (repo / ".projectmem").mkdir(parents=True)
+    (repo / ".dejafix").mkdir(parents=True)
     subprocess.run(["git", "init", "-q", str(repo)], check=True)
     install_hooks(repo / ".git" / "hooks")
 
@@ -114,8 +114,8 @@ def test_get_context_uses_the_resolved_project_not_cwd(tmp_path, monkeypatch):
     harness directory. The events came from the right project but the git
     status and architecture came from somewhere else entirely.
     """
-    from projectmem import mcp_server
-    from projectmem.commands import context as context_mod
+    from dejafix import mcp_server
+    from dejafix.commands import context as context_mod
 
     seen = {}
 
@@ -142,8 +142,8 @@ def test_precheck_file_uses_the_resolved_project_not_cwd(tmp_path, monkeypatch):
     project but the server's own looked deleted — and the churn count
     came from whatever git repo the server happened to sit in.
     """
-    from projectmem import mcp_server
-    from projectmem.commands import precheck as precheck_mod
+    from dejafix import mcp_server
+    from dejafix.commands import precheck as precheck_mod
 
     seen = {}
 
@@ -169,8 +169,8 @@ def test_precheck_churn_counts_the_projects_git_not_the_servers(tmp_path, monkey
     the count silently fell back to the event log, inventing churn the
     project does not have.
     """
-    from projectmem.commands import precheck as precheck_mod
-    from projectmem.models import Event
+    from dejafix.commands import precheck as precheck_mod
+    from dejafix.models import Event
 
     seen = {}
 
@@ -190,16 +190,16 @@ def test_precheck_churn_counts_the_projects_git_not_the_servers(tmp_path, monkey
 # ── expected errors were reported as crashes ────────────────────────────────
 
 def test_an_expected_error_prints_no_traceback(tmp_path):
-    """`pjm fix` with no open issue is a normal condition, not a crash."""
+    """`djf fix` with no open issue is a normal condition, not a crash."""
     env = {**os.environ,
            "HOME": str(tmp_path), "USERPROFILE": str(tmp_path),
-           "PROJECTMEM_HOME": str(tmp_path / "pm"),
+           "DEJAFIX_HOME": str(tmp_path / "pm"),
            "PYTHONPATH": str(Path(__file__).resolve().parent.parent / "src")}
     repo = tmp_path / "repo"
     repo.mkdir()
-    subprocess.run([sys.executable, "-m", "projectmem.cli", "init"],
+    subprocess.run([sys.executable, "-m", "dejafix.cli", "init"],
                    cwd=repo, env=env, capture_output=True)
-    r = subprocess.run([sys.executable, "-m", "projectmem.cli", "fix", "nothing open"],
+    r = subprocess.run([sys.executable, "-m", "dejafix.cli", "fix", "nothing open"],
                        cwd=repo, env=env, capture_output=True, text=True)
 
     combined = r.stdout + r.stderr

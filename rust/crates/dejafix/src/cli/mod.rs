@@ -1,0 +1,214 @@
+mod args;
+mod hooks;
+mod init;
+mod memory;
+mod notice;
+mod output;
+mod project;
+mod read;
+mod setup;
+mod types;
+mod write;
+
+#[cfg(test)]
+mod tests;
+
+use std::ffi::OsString;
+use std::io::{self, Write};
+use std::process::ExitCode;
+
+use clap::Parser;
+use std::time::Duration;
+
+use dejafix_core::{
+    Clock, LEGACY_DIR, MemoryFile, MigrateOptions, Project, SearchQuery, Settings, StoreError,
+    WiringError, latest_version,
+};
+
+use crate::config::Config;
+use args::{Cli, Commands};
+use types::Outcome;
+
+pub(super) const USER_ERROR: u8 = 1;
+const IO_ERROR: u8 = 3;
+const PYPI_JSON: &str = "https://pypi.org/pypi/dejafix/json";
+const PYPI_TIMEOUT: Duration = Duration::from_secs(3);
+
+pub fn run(
+    arguments: impl IntoIterator<Item = OsString>,
+    out: &mut impl Write,
+    err: &mut impl Write,
+) -> ExitCode {
+    let config = match Config::from_env() {
+        Ok(config) => config,
+        Err(error) => {
+            return report(
+                err,
+                &format!("Error: cannot read the environment: {error}"),
+                IO_ERROR,
+            );
+        }
+    };
+    let settings = settings(&config);
+    if let Some(settings) = &settings {
+        let _ = notice::print(settings, env!("CARGO_PKG_VERSION"), out, config.color);
+    }
+    let cli = match Cli::try_parse_from(arguments) {
+        Ok(cli) => cli,
+        Err(error) => {
+            let rendered = error.render().to_string();
+            let written = if error.use_stderr() {
+                err.write_all(rendered.as_bytes())
+            } else {
+                out.write_all(rendered.as_bytes())
+            };
+            return match (written, u8::try_from(error.exit_code())) {
+                (Ok(()), Ok(code)) => ExitCode::from(code),
+                _ => ExitCode::from(IO_ERROR),
+            };
+        }
+    };
+    let cwd = &config.cwd;
+    let outcome = match cli.command {
+        Commands::Instructions => {
+            read::memory_file(cwd, MemoryFile::Instructions, out).map(Outcome::from)
+        }
+        Commands::Map => read::memory_file(cwd, MemoryFile::ProjectMap, out).map(Outcome::from),
+        Commands::Plan { add } => read::plan(cwd, add.as_deref(), out).map(Outcome::from),
+        command => {
+            let Some(settings) = settings else {
+                return report(err, "Error: cannot determine the home directory", IO_ERROR);
+            };
+            dispatch(command, &config, &settings, out, err)
+        }
+    };
+    match outcome {
+        Ok(Outcome::Done) => ExitCode::SUCCESS,
+        Ok(Outcome::Exit(code)) => ExitCode::from(code),
+        Ok(Outcome::Failed(error)) => fail(err, &error),
+        Err(_) => ExitCode::from(IO_ERROR),
+    }
+}
+
+fn report(err: &mut impl Write, message: &str, code: u8) -> ExitCode {
+    let _ = writeln!(err, "{message}");
+    ExitCode::from(code)
+}
+
+fn fail(err: &mut impl Write, error: &WiringError) -> ExitCode {
+    match error {
+        WiringError::Validation(_)
+        | WiringError::Registry(_)
+        | WiringError::Store(StoreError::NotFound { .. }) => {
+            report(err, &format!("Error: {error}"), USER_ERROR)
+        }
+        WiringError::Store(store) => {
+            let detail = std::error::Error::source(store)
+                .map(|source| format!(": {source}"))
+                .unwrap_or_default();
+            report(err, &format!("Error: {store}{detail}"), IO_ERROR)
+        }
+    }
+}
+
+fn settings(config: &Config) -> Option<Settings> {
+    Some(Settings {
+        dejafix_home: config.dejafix_home.clone()?,
+        redact: config.redact,
+        clock: Clock {
+            now: jiff::Timestamp::now(),
+            zone: config.zone.clone(),
+        },
+    })
+}
+
+fn dispatch(
+    command: Commands,
+    config: &Config,
+    settings: &Settings,
+    out: &mut impl Write,
+    err: &mut impl Write,
+) -> io::Result<Outcome> {
+    let cwd = &config.cwd;
+    match command {
+        Commands::Init(args) => return init::run(args, config, settings, out, err),
+        Commands::Hooks { action } => return hooks::run_hooks(action, config, out, err),
+        Commands::AutoCapture { trigger } => {
+            return hooks::run_capture(&trigger, config, settings, out, err);
+        }
+        Commands::Precheck(args) => return hooks::run_precheck(args, config, settings, out, err),
+        Commands::Brief => return memory::run_brief(config, settings, out),
+        Commands::Global(args) => return memory::run_global(args, config, settings, out),
+        Commands::Project { action } => return project::run(action, config, settings, out),
+        Commands::Doctor {
+            fix,
+            depth,
+            path,
+            online,
+            auto,
+            no_auto,
+        } => {
+            let Some(paths) = config.client_paths() else {
+                writeln!(err, "Error: cannot determine the home directory")?;
+                return Ok(Outcome::Exit(IO_ERROR));
+            };
+            let run = setup::DoctorRun {
+                fix,
+                depth,
+                roots: path,
+                online,
+                auto: (auto || no_auto).then_some(auto),
+            };
+            return setup::run_doctor(run, &paths, config, settings, out, || {
+                latest_version(
+                    PYPI_JSON,
+                    &format!("dejafix/{}", env!("CARGO_PKG_VERSION")),
+                    PYPI_TIMEOUT,
+                )
+            });
+        }
+        Commands::Migrate { apply, path } => {
+            let Some(clients) = config.client_paths() else {
+                writeln!(err, "Error: cannot determine the home directory")?;
+                return Ok(Outcome::Exit(IO_ERROR));
+            };
+            let options = MigrateOptions {
+                apply,
+                old_home: clients.home.join(LEGACY_DIR),
+                cwd: cwd.clone(),
+                extra_roots: path,
+                clients,
+                legacy_env: config.legacy_env.clone(),
+                djf: hooks::djf_binary(config),
+            };
+            return setup::run_migrate(&options, settings, out, err);
+        }
+        _ => {}
+    }
+    let project = match Project::open(cwd, settings.clone()) {
+        Ok(project) => project,
+        Err(error) => return Ok(Outcome::Failed(error)),
+    };
+    let result = match command {
+        Commands::Show => read::show_summary(&project, out),
+        Commands::Search {
+            query,
+            regex,
+            failed_only,
+        } => read::search(
+            &project,
+            &SearchQuery {
+                text: &query,
+                regex,
+                failed_only,
+            },
+            out,
+        ),
+        Commands::Regenerate => read::rebuild(&project, out),
+        other => match write::command(other) {
+            Some(command) => write::run(&project, command, out, err),
+            None => Ok(Ok(())),
+        },
+    };
+    result.map(Outcome::from)
+}

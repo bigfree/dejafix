@@ -1,0 +1,906 @@
+[
+  {
+    "description": "Start a session: rules, memory summary and current plan in one call.\n\nMANDATORY: call this once at session start, before answering any\nquestion about the project. It already contains what get_instructions,\nget_summary and get_plan return (the plan without ideas, someday items\nand shipped work), so do not call those as well.\n\nRead-only; does not modify memory.",
+    "inputSchema": {
+      "properties": {
+        "project": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Which project this call is about — a registered id, alias, or absolute path (e.g. 'ossdrop'). Omit it when the server was started for a single repo, or when an active project is set with `djf project use`. Call list_projects to see the registered names.",
+          "title": "Project"
+        }
+      },
+      "type": "object",
+      "title": "start_sessionArguments"
+    },
+    "name": "start_session",
+    "outputSchema": {
+      "properties": {
+        "result": {
+          "title": "Result",
+          "type": "string"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "type": "object",
+      "title": "start_sessionOutput"
+    }
+  },
+  {
+    "description": "Read the project's mandatory AI instructions.\n\nAlready part of start_session(); call this only to re-read the rules\nlater in a session. The instructions describe the workflow rules you\nMUST follow while working in this project — they are not advisory.\n\nRead-only; does not modify memory.",
+    "inputSchema": {
+      "properties": {
+        "project": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Which project this call is about — a registered id, alias, or absolute path (e.g. 'ossdrop'). Omit it when the server was started for a single repo, or when an active project is set with `djf project use`. Call list_projects to see the registered names.",
+          "title": "Project"
+        }
+      },
+      "type": "object",
+      "title": "get_instructionsArguments"
+    },
+    "name": "get_instructions",
+    "outputSchema": {
+      "properties": {
+        "result": {
+          "title": "Result",
+          "type": "string"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "type": "object",
+      "title": "get_instructionsOutput"
+    }
+  },
+  {
+    "description": "Read the project memory summary.\n\nAlready part of start_session(); call this to re-read the summary\nlater in a session, for example before ending it.\n\nDo NOT answer from conversation history alone.\nDo NOT re-scan source files (package.json, README, src/) to understand\nthe project — `summary.md` is the distilled authoritative source and\nstays bounded as the project ages (a few hundred tokens on a young\nproject, a few thousand on an aged one), far less than re-deriving it.\n\nYour prior assumptions about this project may be stale. Call this\ncheaply at session start (and again before ending) to verify your\nwork is recorded.\n\nRead-only; does not modify memory or trigger event logging.",
+    "inputSchema": {
+      "properties": {
+        "project": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Which project this call is about — a registered id, alias, or absolute path (e.g. 'ossdrop'). Omit it when the server was started for a single repo, or when an active project is set with `djf project use`. Call list_projects to see the registered names.",
+          "title": "Project"
+        }
+      },
+      "type": "object",
+      "title": "get_summaryArguments"
+    },
+    "name": "get_summary",
+    "outputSchema": {
+      "properties": {
+        "result": {
+          "title": "Result",
+          "type": "string"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "type": "object",
+      "title": "get_summaryOutput"
+    }
+  },
+  {
+    "description": "Read PROJECT_MAP.md to understand the repo structure.\n\nCall this when structure matters (file layout, entry points,\nownership). Cheaper than scanning the filesystem.\n\nRead-only. Returns 'No project map found.' if PROJECT_MAP.md hasn't\nbeen initialized — run `djf init` first if so.",
+    "inputSchema": {
+      "properties": {
+        "project": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Which project this call is about — a registered id, alias, or absolute path (e.g. 'ossdrop'). Omit it when the server was started for a single repo, or when an active project is set with `djf project use`. Call list_projects to see the registered names.",
+          "title": "Project"
+        }
+      },
+      "type": "object",
+      "title": "get_project_mapArguments"
+    },
+    "name": "get_project_map",
+    "outputSchema": {
+      "properties": {
+        "result": {
+          "title": "Result",
+          "type": "string"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "type": "object",
+      "title": "get_project_mapOutput"
+    }
+  },
+  {
+    "description": "Read plan.md — the project's INTENT file (ideas + plans).\n\nstart_session() already includes the active plans and next steps; call\nthis for the whole file (ideas, someday, shipped). plan.md records what\nthe team MEANS to do (ideas, active plans, next steps) — distinct from\nthe event log, which records what HAPPENED. When the user shares an idea\nor a plan, edit plan.md directly (add a bullet, check items off, move\ndone work to Shipped); do NOT log plans as events.\n\nRead-only. Returns 'No plan found.' if plan.md hasn't been initialized.",
+    "inputSchema": {
+      "properties": {
+        "project": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Which project this call is about — a registered id, alias, or absolute path (e.g. 'ossdrop'). Omit it when the server was started for a single repo, or when an active project is set with `djf project use`. Call list_projects to see the registered names.",
+          "title": "Project"
+        }
+      },
+      "type": "object",
+      "title": "get_planArguments"
+    },
+    "name": "get_plan",
+    "outputSchema": {
+      "properties": {
+        "result": {
+          "title": "Result",
+          "type": "string"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "type": "object",
+      "title": "get_planOutput"
+    }
+  },
+  {
+    "description": "Check a file's failure history BEFORE modifying it.\n\nMANDATORY: call this BEFORE proposing any change to a file.\nSurfaces failed past approaches, unresolved issues, and high churn\nso you don't repeat known dead-ends. Cheap (~100 tokens) and prevents\nexpensive re-debugging cycles.\n\nRead-only; does not modify memory.",
+    "inputSchema": {
+      "properties": {
+        "file_path": {
+          "description": "Project-relative or absolute file path to check (e.g., 'src/auth.py'). Matched against the `location` field of logged events — no file content is read from disk. Returns 'no warnings' if the file has no failure history.",
+          "title": "File Path",
+          "type": "string"
+        },
+        "project": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Which project this call is about — a registered id, alias, or absolute path (e.g. 'ossdrop'). Omit it when the server was started for a single repo, or when an active project is set with `djf project use`. Call list_projects to see the registered names.",
+          "title": "Project"
+        }
+      },
+      "required": [
+        "file_path"
+      ],
+      "type": "object",
+      "title": "precheck_fileArguments"
+    },
+    "name": "precheck_file",
+    "outputSchema": {
+      "properties": {
+        "result": {
+          "title": "Result",
+          "type": "string"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "type": "object",
+      "title": "precheck_fileOutput"
+    }
+  },
+  {
+    "description": "Check several files' failure history in one call, BEFORE modifying them.\n\nSame report as precheck_file, one block per file. Prefer this when a\nchange touches more than one file.\n\nRead-only; does not modify memory.",
+    "inputSchema": {
+      "properties": {
+        "file_paths": {
+          "description": "Project-relative or absolute paths of every file you are about to modify (e.g., ['src/auth.py', 'src/db.py']).",
+          "items": {
+            "type": "string"
+          },
+          "title": "File Paths",
+          "type": "array"
+        },
+        "project": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Which project this call is about — a registered id, alias, or absolute path (e.g. 'ossdrop'). Omit it when the server was started for a single repo, or when an active project is set with `djf project use`. Call list_projects to see the registered names.",
+          "title": "Project"
+        }
+      },
+      "required": [
+        "file_paths"
+      ],
+      "type": "object",
+      "title": "precheck_filesArguments"
+    },
+    "name": "precheck_files",
+    "outputSchema": {
+      "properties": {
+        "result": {
+          "title": "Result",
+          "type": "string"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "type": "object",
+      "title": "precheck_filesOutput"
+    }
+  },
+  {
+    "description": "Read one specific issue's full history by ID (token-efficient).\n\nUse this when you only need one issue's context instead of the whole\nsummary. Example: get_issue('0042').\n\nRead-only.",
+    "inputSchema": {
+      "properties": {
+        "issue_id": {
+          "description": "Zero-padded 4-digit issue ID returned by log_issue (e.g., '0042'). Numeric strings without padding (e.g., '42') are also accepted.",
+          "title": "Issue Id",
+          "type": "string"
+        },
+        "project": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Which project this call is about — a registered id, alias, or absolute path (e.g. 'ossdrop'). Omit it when the server was started for a single repo, or when an active project is set with `djf project use`. Call list_projects to see the registered names.",
+          "title": "Project"
+        }
+      },
+      "required": [
+        "issue_id"
+      ],
+      "type": "object",
+      "title": "get_issueArguments"
+    },
+    "name": "get_issue",
+    "outputSchema": {
+      "properties": {
+        "result": {
+          "title": "Result",
+          "type": "string"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "type": "object",
+      "title": "get_issueOutput"
+    }
+  },
+  {
+    "description": "Plain-text search across all logged events.\n\nToken-efficient alternative to get_summary when you only need events\nmatching a keyword. Each match shows its type, issue, event id (what\nadd_decision's `supersedes` takes) and date, and its text clipped to\nRECORD_CHARS around the match; a match found only in notes shows the\nnotes. Retired decisions are marked (superseded). Pass `full=True` for\nwhole texts once the query is narrow.\n\nRead-only. Empty result returns a friendly message, not an error.",
+    "inputSchema": {
+      "properties": {
+        "query": {
+          "description": "Case-insensitive substring matched against each event's summary, notes, location and files. Plain text only — no regex or boolean operators.",
+          "title": "Query",
+          "type": "string"
+        },
+        "limit": {
+          "default": 10,
+          "description": "How many of the most recent matches to return, listed oldest first. Defaults to 10. Recommended range: 1-100.",
+          "maximum": 100,
+          "minimum": 1,
+          "title": "Limit",
+          "type": "integer"
+        },
+        "full": {
+          "default": false,
+          "description": "Return each match's whole text. By default a match is clipped to 300 characters; ask for full text once the query is narrow.",
+          "title": "Full",
+          "type": "boolean"
+        },
+        "project": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Which project this call is about — a registered id, alias, or absolute path (e.g. 'ossdrop'). Omit it when the server was started for a single repo, or when an active project is set with `djf project use`. Call list_projects to see the registered names.",
+          "title": "Project"
+        }
+      },
+      "required": [
+        "query"
+      ],
+      "type": "object",
+      "title": "search_eventsArguments"
+    },
+    "name": "search_events",
+    "outputSchema": {
+      "properties": {
+        "result": {
+          "title": "Result",
+          "type": "string"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "type": "object",
+      "title": "search_eventsOutput"
+    }
+  },
+  {
+    "description": "Get the project's failure-prevention score.\n\nReturns an A+→F grade with concrete ROI numbers: debugging hours\nsaved, tokens prevented, dollars protected. Use when the user asks\nabout progress or value.\n\nRead-only; computes the score from events.jsonl on each call.",
+    "inputSchema": {
+      "properties": {
+        "project": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Which project this call is about — a registered id, alias, or absolute path (e.g. 'ossdrop'). Omit it when the server was started for a single repo, or when an active project is set with `djf project use`. Call list_projects to see the registered names.",
+          "title": "Project"
+        }
+      },
+      "type": "object",
+      "title": "get_scoreArguments"
+    },
+    "name": "get_score",
+    "outputSchema": {
+      "properties": {
+        "result": {
+          "title": "Result",
+          "type": "string"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "type": "object",
+      "title": "get_scoreOutput"
+    }
+  },
+  {
+    "description": "Generate a token-budgeted memory context block.\n\nUse when you don't want to read the full summary. ``focus`` (e.g.\n'src/auth/') biases the context toward a specific area.\n\nRead-only; assembles a freshly-budgeted context block from\nevents.jsonl.",
+    "inputSchema": {
+      "properties": {
+        "tokens": {
+          "default": 2000,
+          "description": "Approximate target token budget for the returned markdown (default 2000). Output may be slightly over or under as events are included as whole units. Recommended range: 500-8000.",
+          "maximum": 20000,
+          "minimum": 100,
+          "title": "Tokens",
+          "type": "integer"
+        },
+        "focus": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional path prefix or keyword to bias selection toward (e.g., 'src/auth/'). When omitted, the context is project-wide.",
+          "title": "Focus"
+        },
+        "project": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Which project this call is about — a registered id, alias, or absolute path (e.g. 'ossdrop'). Omit it when the server was started for a single repo, or when an active project is set with `djf project use`. Call list_projects to see the registered names.",
+          "title": "Project"
+        }
+      },
+      "type": "object",
+      "title": "get_contextArguments"
+    },
+    "name": "get_context",
+    "outputSchema": {
+      "properties": {
+        "result": {
+          "title": "Result",
+          "type": "string"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "type": "object",
+      "title": "get_contextOutput"
+    }
+  },
+  {
+    "description": "Query cross-project library gotchas from ~/.dejafix/global/.\n\nReturns lessons learned in past projects that apply to the libraries\nyou're about to use. Call whenever working with an unfamiliar library\nor starting a new feature.\n\nRead-only. Reads from ~/.dejafix/global/ (cross-project memory,\nnot this repo's .dejafix/).",
+    "inputSchema": {
+      "properties": {
+        "library": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional library name to filter by (case-insensitive substring match — 'react' also matches 'react-router'). When omitted, returns all gotchas across every library — useful when starting a new feature to scan for any relevant past lessons.",
+          "title": "Library"
+        },
+        "project": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Which project this call is about — a registered id, alias, or absolute path (e.g. 'ossdrop'). Omit it when the server was started for a single repo, or when an active project is set with `djf project use`. Call list_projects to see the registered names.",
+          "title": "Project"
+        }
+      },
+      "type": "object",
+      "title": "get_global_gotchasArguments"
+    },
+    "name": "get_global_gotchas",
+    "outputSchema": {
+      "properties": {
+        "result": {
+          "title": "Result",
+          "type": "string"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "type": "object",
+      "title": "get_global_gotchasOutput"
+    }
+  },
+  {
+    "description": "Open a new issue. Returns the issue ID.\n\nMANDATORY: call this IMMEDIATELY when you encounter a bug, regression,\nor unexpected behavior — BEFORE writing fix code. Logging up-front\nmeans the issue survives interruptions and session boundaries.\n\nSide effects: appends an `issue` event to .dejafix/events.jsonl,\ncreates an issue file in .dejafix/issues/, updates summary.md,\nand marks this issue as the active one for subsequent\nrecord_attempt calls.",
+    "inputSchema": {
+      "properties": {
+        "summary": {
+          "description": "One-line description of the bug or unexpected behavior. Becomes the issue title and is matched by search_events. Keep it under 140 characters.",
+          "title": "Summary",
+          "type": "string"
+        },
+        "location": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional file path or component where the issue manifests (e.g., 'src/auth.py' or 'login/double-submit'). Used by precheck_file to surface this history later.",
+          "title": "Location"
+        },
+        "project": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Which project this call is about — a registered id, alias, or absolute path (e.g. 'ossdrop'). Omit it when the server was started for a single repo, or when an active project is set with `djf project use`. Call list_projects to see the registered names.",
+          "title": "Project"
+        }
+      },
+      "required": [
+        "summary"
+      ],
+      "type": "object",
+      "title": "log_issueArguments"
+    },
+    "name": "log_issue",
+    "outputSchema": {
+      "properties": {
+        "result": {
+          "title": "Result",
+          "type": "string"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "type": "object",
+      "title": "log_issueOutput"
+    }
+  },
+  {
+    "description": "Record a fix attempt on the current issue.\n\nMANDATORY: call IMMEDIATELY after each distinct fix attempt — do NOT\nbatch multiple attempts into one call.\n\n`outcome` must be 'worked', 'failed', or 'partial'. Pass the `issue_id`\nthat log_issue returned. It may be omitted only while exactly one issue\nis open; with several open the call is refused and lists them, because\nparallel sessions and subagents would otherwise write onto each other's\nissues. With no open issue, an implicit parent issue is auto-created\nfrom this attempt's text (L-008).\n\nSide effects: appends an `attempt` event and updates the issue file.\nDoes NOT close the issue — call record_fix for that.",
+    "inputSchema": {
+      "properties": {
+        "summary": {
+          "description": "One-line description of what you tried (e.g., 'tried contain: layout — preview still jumps'). Put further evidence into another attempt, not this one. Keep it under 300 characters: summary.md clips longer text.",
+          "title": "Summary",
+          "type": "string"
+        },
+        "outcome": {
+          "default": "failed",
+          "description": "Result of the attempt. Must be exactly one of 'worked', 'failed', or 'partial'. Defaults to 'failed' — the safer default when an outcome is uncertain.",
+          "pattern": "^(worked|failed|partial)$",
+          "title": "Outcome",
+          "type": "string"
+        },
+        "location": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional file path or component touched by this attempt.",
+          "title": "Location"
+        },
+        "issue_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional zero-padded issue ID (e.g., '0042') to attach this attempt to. When omitted, attaches to the active issue; if no active issue exists, an implicit parent issue is auto-created from this attempt's text.",
+          "title": "Issue Id"
+        },
+        "project": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Which project this call is about — a registered id, alias, or absolute path (e.g. 'ossdrop'). Omit it when the server was started for a single repo, or when an active project is set with `djf project use`. Call list_projects to see the registered names.",
+          "title": "Project"
+        }
+      },
+      "required": [
+        "summary"
+      ],
+      "type": "object",
+      "title": "record_attemptArguments"
+    },
+    "name": "record_attempt",
+    "outputSchema": {
+      "properties": {
+        "result": {
+          "title": "Result",
+          "type": "string"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "type": "object",
+      "title": "record_attemptOutput"
+    }
+  },
+  {
+    "description": "Record a confirmed fix and close an issue.\n\nOnly call AFTER you have evidence the fix works: test passes, error is gone,\nor the user confirmed.\n\nIf `issue_id` is provided, the fix is attached to that specific issue.\n`issue_id` may be omitted only while exactly one issue is open; with\nseveral open the call is refused and lists them.\n\nSide effects: appends a `fix` event and updates summary.md. The active-issue\nmarker is cleared only when the active issue is the issue being fixed.",
+    "inputSchema": {
+      "properties": {
+        "summary": {
+          "description": "One-line description of the confirmed fix (e.g., 'guarded submit handler with isSubmitting ref'). Keep it under 300 characters.",
+          "title": "Summary",
+          "type": "string"
+        },
+        "location": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional file path or component where the fix was applied.",
+          "title": "Location"
+        },
+        "issue_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional zero-padded issue ID (e.g., '0042') to close. When omitted, closes the active issue. Numeric strings without padding are accepted.",
+          "title": "Issue Id"
+        },
+        "project": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Which project this call is about — a registered id, alias, or absolute path (e.g. 'ossdrop'). Omit it when the server was started for a single repo, or when an active project is set with `djf project use`. Call list_projects to see the registered names.",
+          "title": "Project"
+        }
+      },
+      "required": [
+        "summary"
+      ],
+      "type": "object",
+      "title": "record_fixArguments"
+    },
+    "name": "record_fix",
+    "outputSchema": {
+      "properties": {
+        "result": {
+          "title": "Result",
+          "type": "string"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "type": "object",
+      "title": "record_fixOutput"
+    }
+  },
+  {
+    "description": "Record an architectural or product decision permanently.\n\nCall when you make a choice that future sessions or contributors\nshould know about. Decisions show up in `summary.md` and in\n`djf wrap` context blocks.\n\nReplies with the new decision's event id, the id a later `supersedes`\ntakes. Side effects: appends a `decision` event and updates summary.md.\nDecisions are append-only — to revise, pass `supersedes` with the old\ndecision's event id instead of editing history.",
+    "inputSchema": {
+      "properties": {
+        "summary": {
+          "description": "One-line description of the architectural or product decision (e.g., 'use bcrypt rounds=12 for password hashing'). Becomes part of the project's permanent record — write it for a future contributor. Keep it under 300 characters: summary.md clips longer text.",
+          "title": "Summary",
+          "type": "string"
+        },
+        "location": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional file path or scope where the decision applies (e.g., 'src/auth/' for a module-level choice). Helps precheck_file cite the decision when the file is later touched.",
+          "title": "Location"
+        },
+        "supersedes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional event id (evt_...) of a prior decision this one retires. The old event stays in the log tagged (superseded); only the new decision appears in summary.md. Use when precheck_file flags a decision as possibly stale and you are revising it.",
+          "title": "Supersedes"
+        },
+        "project": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Which project this call is about — a registered id, alias, or absolute path (e.g. 'ossdrop'). Omit it when the server was started for a single repo, or when an active project is set with `djf project use`. Call list_projects to see the registered names.",
+          "title": "Project"
+        }
+      },
+      "required": [
+        "summary"
+      ],
+      "type": "object",
+      "title": "add_decisionArguments"
+    },
+    "name": "add_decision",
+    "outputSchema": {
+      "properties": {
+        "result": {
+          "title": "Result",
+          "type": "string"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "type": "object",
+      "title": "add_decisionOutput"
+    }
+  },
+  {
+    "description": "Record a gotcha, setup detail, or other durable context.\n\nUse when you discover something important that doesn't fit as an\nissue or decision. Notes survive across sessions and appear in\nwrap context blocks.\n\nReplies with the note's event id. Side effects: appends a `note`\nevent. Notes prefixed `gotcha:`,\n`lesson:`, or `warning:` are eligible for auto-promotion to\n~/.dejafix/global/ for cross-project recall (L-046).",
+    "inputSchema": {
+      "properties": {
+        "summary": {
+          "description": "One-line description of the gotcha, setup detail, or context worth preserving. Prefix with 'gotcha:' or 'lesson:' to enable cross-project promotion — e.g., 'gotcha: bcrypt v4 silently truncates passwords longer than 72 bytes'. Keep it under 300 characters: summary.md clips longer text.",
+          "title": "Summary",
+          "type": "string"
+        },
+        "location": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional file path or library this note applies to (e.g., 'bcrypt' for a library-specific gotcha).",
+          "title": "Location"
+        },
+        "project": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Which project this call is about — a registered id, alias, or absolute path (e.g. 'ossdrop'). Omit it when the server was started for a single repo, or when an active project is set with `djf project use`. Call list_projects to see the registered names.",
+          "title": "Project"
+        }
+      },
+      "required": [
+        "summary"
+      ],
+      "type": "object",
+      "title": "add_noteArguments"
+    },
+    "name": "add_note",
+    "outputSchema": {
+      "properties": {
+        "result": {
+          "title": "Result",
+          "type": "string"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "type": "object",
+      "title": "add_noteOutput"
+    }
+  },
+  {
+    "description": "List the projects this server can reach, and which one is active.\n\nCall this when a tool answers \"No project selected\", or when you need the\nexact name to pass as `project`. Read-only; touches no project memory.",
+    "inputSchema": {
+      "properties": {},
+      "type": "object",
+      "title": "list_projectsArguments"
+    },
+    "name": "list_projects",
+    "outputSchema": {
+      "properties": {
+        "result": {
+          "title": "Result",
+          "type": "string"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "type": "object",
+      "title": "list_projectsOutput"
+    }
+  },
+  {
+    "description": "Show which project a call would resolve to, without writing anything.\n\nUse this before a write when several projects are in play — it answers\n\"where would this land?\" cheaply. Read-only.",
+    "inputSchema": {
+      "properties": {
+        "project": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Which project this call is about — a registered id, alias, or absolute path (e.g. 'ossdrop'). Omit it when the server was started for a single repo, or when an active project is set with `djf project use`. Call list_projects to see the registered names.",
+          "title": "Project"
+        }
+      },
+      "type": "object",
+      "title": "current_projectArguments"
+    },
+    "name": "current_project",
+    "outputSchema": {
+      "properties": {
+        "result": {
+          "title": "Result",
+          "type": "string"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "type": "object",
+      "title": "current_projectOutput"
+    }
+  }
+]

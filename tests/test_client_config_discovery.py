@@ -3,7 +3,7 @@
 A Microsoft Store (MSIX) install of Claude Desktop runs in an AppContainer,
 where the app's writes to %APPDATA% are redirected into the package's
 LocalCache. Inside the container the config still appears at %APPDATA%\\Claude;
-from any ordinary process it does not exist there at all. `pjm doctor` found
+from any ordinary process it does not exist there at all. `djf doctor` found
 nothing and printed a clean bill of health while two pinned servers were
 running — which is worse than missing the problem, because it ends the
 investigation.
@@ -19,15 +19,15 @@ from pathlib import Path
 import pytest
 
 from conftest import set_fake_home
-from projectmem.commands.init import (
+from dejafix.commands.init import (
     _client_configs,
     _pinned_client_configs,
-    _projectmem_client_configs,
+    _dejafix_client_configs,
 )
 
-PINNED = ('{"mcpServers":{"projectmem":{"command":"py","args":'
-          '["-m","projectmem.mcp_server","--root","D:/repo/Thing"]}}}')
-CLEAN = '{"mcpServers":{"projectmem":{"command":"py","args":["-m","projectmem.mcp_server"]}}}'
+PINNED = ('{"mcpServers":{"dejafix":{"command":"py","args":'
+          '["-m","dejafix.mcp_server","--root","D:/repo/Thing"]}}}')
+CLEAN = '{"mcpServers":{"dejafix":{"command":"py","args":["-m","dejafix.mcp_server"]}}}'
 
 
 @pytest.fixture
@@ -118,7 +118,7 @@ def test_an_unreadable_config_is_reported_rather_than_skipped(win, monkeypatch):
 
     monkeypatch.setattr(Path, "read_text", deny)
 
-    states = {c: st for c, _, st in _projectmem_client_configs()}
+    states = {c: st for c, _, st in _dejafix_client_configs()}
     assert states.get("Claude Desktop") == "unreadable"
     # and it must not be silently counted as fine
     assert _pinned_client_configs() == []
@@ -126,7 +126,7 @@ def test_an_unreadable_config_is_reported_rather_than_skipped(win, monkeypatch):
 
 def test_a_missing_config_says_nothing_at_all(win):
     """Not installed is not a problem to report."""
-    assert _projectmem_client_configs() == []
+    assert _dejafix_client_configs() == []
 
 
 def test_a_project_scoped_mcp_json_is_checked(tmp_path, monkeypatch):
@@ -156,4 +156,4 @@ def test_a_clean_project_config_is_not_flagged(tmp_path, monkeypatch):
     (proj / ".mcp.json").write_text(CLEAN, encoding="utf-8")
 
     assert _pinned_client_configs(proj) == []
-    assert [st for _, _, st in _projectmem_client_configs(proj)] == ["clean"]
+    assert [st for _, _, st in _dejafix_client_configs(proj)] == ["clean"]

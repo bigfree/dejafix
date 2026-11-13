@@ -1,0 +1,15 @@
+---
+source: crates/dejafix-core/src/core/brief/tests.rs
+expression: "render(&[], &[], &[], false)"
+---
+
+dejafix brief — demo
+────────────────────────────────────────────────────────────
+⚠ Active warnings
+   none — no failed attempts in 30 days
+📋 Open issues
+   none open
+🕑 Recent decisions
+   none logged yet
+📈 Score  F (0/100) — unchanged this week
+────────────────────────────────────────────────────────────

@@ -1,0 +1,61 @@
+[workspace]
+resolver = "3"
+members = ["crates/dejafix-core", "crates/dejafix"]
+
+[workspace.package]
+version = "1.0.0-rc.1"
+edition = "2024"
+rust-version = "1.99.1"
+license = "MIT"
+repository = "https://github.com/bigfree/dejafix"
+homepage = "https://github.com/bigfree/dejafix"
+publish = false
+
+[workspace.dependencies]
+assert_cmd = "=2.2.2"
+clap = { version = "=4.6.7", features = ["derive"] }
+criterion = "=0.8.2"
+dejafix-core = { path = "crates/dejafix-core" }
+getrandom = "=0.4.3"
+insta = "=1.49.0"
+jiff = "=0.2.43"
+proptest = "=1.12.0"
+regex = "=1.13.1"
+rmcp = { version = "=3.10.0", default-features = false, features = ["server", "transport-io"] }
+rustix = { version = "=1.1.6", features = ["process"] }
+serde = "=1.0.229"
+serde_json = { version = "=1.0.154", features = ["float_roundtrip", "preserve_order", "raw_value"] }
+sha1 = "=0.11.0"
+tempfile = "=3.27.0"
+thiserror = "=2.0.21"
+ureq = { version = "=3.5.2", default-features = false, features = ["rustls", "platform-verifier"] }
+tokio = { version = "=1.54.1", features = ["rt", "macros", "io-std"] }
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+todo = "deny"
+unimplemented = "deny"
+indexing_slicing = "deny"
+as_conversions = "deny"
+allow_attributes = "deny"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+opt-level = 2
+
+[profile.release]
+panic = "abort"
+
+[profile.dist]
+inherits = "release"
+lto = "thin"

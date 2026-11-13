@@ -1,7 +1,7 @@
 """Tests for the cross-project registry + global dashboard (dashboard.py).
 
-The PROJECTMEM_HOME registry is isolated per-test by conftest, so these never
-touch the real ~/.projectmem/projects.json.
+The DEJAFIX_HOME registry is isolated per-test by conftest, so these never
+touch the real ~/.dejafix/projects.json.
 """
 import json
 import re
@@ -10,8 +10,8 @@ import shutil
 import pytest
 import typer
 
-from projectmem.storage import initialize, register_project, registered_projects
-from projectmem.commands import dashboard as dashboard_command
+from dejafix.storage import initialize, register_project, registered_projects
+from dejafix.commands import dashboard as dashboard_command
 
 
 def _resolved(projects):
@@ -22,8 +22,8 @@ def _make(root, name, events):
     """Create a registered project with a known set of events."""
     proj = root / name
     proj.mkdir()
-    initialize(proj)  # scaffolds .projectmem AND registers the project
-    (proj / ".projectmem" / "events.jsonl").write_text(
+    initialize(proj)  # scaffolds .dejafix AND registers the project
+    (proj / ".dejafix" / "events.jsonl").write_text(
         "\n".join(json.dumps(e) for e in events) + "\n", encoding="utf-8"
     )
     return proj
@@ -66,7 +66,7 @@ def test_registered_projects_skips_deleted_memory(tmp_path):
     p.mkdir()
     initialize(p)
     assert p.resolve() in _resolved(registered_projects())
-    shutil.rmtree(p / ".projectmem")  # memory removed — path stays in registry
+    shutil.rmtree(p / ".dejafix")  # memory removed — path stays in registry
     assert p.resolve() not in _resolved(registered_projects())  # but reader filters it
 
 
@@ -112,7 +112,7 @@ def test_dashboard_open_and_fix_totals(tmp_path):
 def test_dashboard_never_writes_to_the_projects(tmp_path):
     """The global view only READS each project — it must not mutate them."""
     proj = _make(tmp_path, "alpha", [ISSUE, FAIL, FIX])
-    events_file = proj / ".projectmem" / "events.jsonl"
+    events_file = proj / ".dejafix" / "events.jsonl"
     before = events_file.read_text(encoding="utf-8")
     dashboard_command.run(output=tmp_path / "g", open_browser=False)
     assert events_file.read_text(encoding="utf-8") == before
@@ -125,7 +125,7 @@ def _data_from_html(html):
 
 
 def test_static_mode_marks_the_page_as_a_snapshot(tmp_path):
-    """Default `pjm dashboard` is a serverless snapshot: live flag is False."""
+    """Default `djf dashboard` is a serverless snapshot: live flag is False."""
     _make(tmp_path, "alpha", [ISSUE, FIX])
     html, count = dashboard_command._global_html()  # static default
     assert count == 1
@@ -147,14 +147,14 @@ def test_back_linked_injects_before_body_and_is_safe_without_one():
     assert dashboard_command._back_linked("<div>x</div>") == "<div>x</div>"
 
 
-def test_dashboard_output_follows_projectmem_home(tmp_path, monkeypatch):
+def test_dashboard_output_follows_dejafix_home(tmp_path, monkeypatch):
     """A sandboxed run must not overwrite the real dashboard.
 
-    $PROJECTMEM_HOME moves the registry; the output directory has to move with
-    it, or a test run reads isolated projects and writes over ~/.projectmem.
+    $DEJAFIX_HOME moves the registry; the output directory has to move with
+    it, or a test run reads isolated projects and writes over ~/.dejafix.
     """
     home = tmp_path / "home"
-    monkeypatch.setenv("PROJECTMEM_HOME", str(home))
+    monkeypatch.setenv("DEJAFIX_HOME", str(home))
     project = tmp_path / "proj"
     project.mkdir()
     initialize(project)

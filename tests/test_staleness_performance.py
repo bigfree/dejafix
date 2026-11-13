@@ -17,8 +17,8 @@ from pathlib import Path
 
 import pytest
 
-from projectmem.models import Event
-from projectmem.staleness import (
+from dejafix.models import Event
+from dejafix.staleness import (
     STALE_COMMIT_THRESHOLD,
     commit_times,
     commits_touching_since,

@@ -1,0 +1,34 @@
+use std::path::{Path, PathBuf};
+
+use super::types::{MemoryFile, WiringError};
+use crate::adapters::fs::{find_memory_dir, read_text, read_text_within, write_text};
+use crate::core::scaffold::plan_with_idea;
+
+impl MemoryFile {
+    #[must_use]
+    pub fn file_name(self) -> &'static str {
+        match self {
+            Self::Instructions => "AI_INSTRUCTIONS.md",
+            Self::ProjectMap => "PROJECT_MAP.md",
+            Self::Plan => "plan.md",
+        }
+    }
+}
+
+fn memory_file(cwd: &Path, file: MemoryFile) -> Result<PathBuf, WiringError> {
+    Ok(find_memory_dir(cwd)?.dir.join(file.file_name()))
+}
+
+pub fn read_memory_file(cwd: &Path, file: MemoryFile) -> Result<(PathBuf, String), WiringError> {
+    let path = memory_file(cwd, file)?;
+    let text = read_text(&path)?;
+    Ok((path, text))
+}
+
+pub fn add_plan_idea(cwd: &Path, idea: &str) -> Result<PathBuf, WiringError> {
+    let memory = find_memory_dir(cwd)?;
+    let path = memory.dir.join(MemoryFile::Plan.file_name());
+    let existing = read_text_within(&path, &memory.root)?.unwrap_or_default();
+    write_text(&path, &plan_with_idea(&existing, idea))?;
+    Ok(path)
+}

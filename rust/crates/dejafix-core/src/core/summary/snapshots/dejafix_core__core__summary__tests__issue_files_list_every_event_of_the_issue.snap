@@ -1,0 +1,9 @@
+---
+source: crates/dejafix-core/src/core/summary/tests.rs
+expression: "files[0].contents"
+---
+# #0001 Login redirect loop!
+
+- 2027-01-15T07:00:00Z `issue`: Login redirect loop! [auth.py:1]
+- 2027-01-15T07:00:00Z `attempt`: cleared cookies (failed)
+- 2027-01-15T07:00:00Z `fix`: guarded it

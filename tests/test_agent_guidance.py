@@ -20,12 +20,12 @@ from pathlib import Path
 
 import pytest
 
-from projectmem.commands.init import _claude_md_bridge
-from projectmem.storage import RECORD_CHARS, TITLE_CHARS, ai_instructions
+from dejafix.commands.init import _claude_md_bridge
+from dejafix.storage import RECORD_CHARS, TITLE_CHARS, ai_instructions
 
 
 def _mcp_instructions() -> str:
-    from projectmem import mcp_server
+    from dejafix import mcp_server
 
     return mcp_server.mcp.instructions or ""
 
@@ -41,16 +41,16 @@ def test_the_bridge_names_the_project():
 def test_the_bridge_is_still_valid_without_a_name():
     """Registration is best-effort; a missing name must not break the block."""
     bridge = _claude_md_bridge(None)
-    assert "projectmem (MANDATORY)" in bridge
-    assert "registered with projectmem as" not in bridge
+    assert "dejafix (MANDATORY)" in bridge
+    assert "registered with dejafix as" not in bridge
 
 
 def test_init_writes_the_registered_name_into_claude_md(tmp_path, monkeypatch):
     from conftest import set_fake_home
-    from projectmem.commands.init import run as init_run
+    from dejafix.commands.init import run as init_run
 
     set_fake_home(monkeypatch, tmp_path / "home")
-    monkeypatch.setenv("PROJECTMEM_HOME", str(tmp_path / "pm"))
+    monkeypatch.setenv("DEJAFIX_HOME", str(tmp_path / "pm"))
     project = tmp_path / "checkout-api"
     project.mkdir()
     monkeypatch.chdir(project)
@@ -90,7 +90,7 @@ def _tool_params() -> dict[str, list[str]]:
     import asyncio
     import inspect
 
-    from projectmem import mcp_server
+    from dejafix import mcp_server
 
     params = {}
     for tool in asyncio.run(mcp_server.mcp.list_tools()):
@@ -175,7 +175,7 @@ def _required_params() -> dict[str, set[str]]:
     """{tool name: the arguments its schema requires}."""
     import asyncio
 
-    from projectmem import mcp_server
+    from dejafix import mcp_server
 
     return {
         tool.name: set((getattr(tool, "inputSchema", None) or tool.input_schema).get("required", []))
@@ -244,7 +244,7 @@ def test_instructions_state_the_record_length_the_summary_clips_at():
 def test_every_write_tool_states_its_record_length():
     import asyncio
 
-    from projectmem import mcp_server
+    from dejafix import mcp_server
 
     limits = {
         "log_issue": TITLE_CHARS,
@@ -266,25 +266,11 @@ def test_every_write_tool_states_its_record_length():
 
 
 def test_the_three_surfaces_agree_about_the_session_start_order():
-    """There is a standing warning about these drifting apart.
-
-    A past divergence had CLAUDE.md saying "call get_summary first" while the
-    MCP field said get_instructions — clients that read both got contradictory
-    orders.
-    """
-    import re
-
-    # AI_INSTRUCTIONS.md is deliberately not in this list: it *is* the content
-    # of step 1, so it does not tell you to call step 1 again. Only the two
-    # surfaces that advertise the trio can disagree about its order.
     for name, text in (("bridge", _claude_md_bridge("demo")),
                        ("instructions=", _mcp_instructions())):
-        # Anchor on the numbered session-start list, not on the first mention
-        # anywhere: the prose also cites get_summary when explaining token cost,
-        # which says nothing about ordering.
-        ordered = re.findall(r"\d\.\s+`?(get_\w+)", text)
-        assert ordered[:2] == ["get_instructions", "get_summary"], (
-            f"{name} lists the session-start trio as {ordered[:3]}"
+        assert "start_session()" in text, f"{name} does not name start_session()"
+        assert "1. `get_instructions" not in text and "1. get_instructions" not in text, (
+            f"{name} still lists the old session-start trio"
         )
 
 
@@ -305,7 +291,7 @@ def _decisions(tmp_path):
     """
     from datetime import datetime, timedelta, timezone
 
-    from projectmem.models import Event
+    from dejafix.models import Event
 
     now = datetime.now(timezone.utc)
     stamp = lambda days: (now - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -320,8 +306,8 @@ def _decisions(tmp_path):
 
 
 def test_get_context_drops_a_superseded_decision(tmp_path):
-    from projectmem.commands.context import generate_context
-    from projectmem.storage import initialize
+    from dejafix.commands.context import generate_context
+    from dejafix.storage import initialize
 
     initialize(tmp_path)          # generate_context reads the project's own dir
     md = generate_context(_decisions(tmp_path), token_budget=2000, root=tmp_path)["markdown"]
@@ -332,7 +318,7 @@ def test_get_context_drops_a_superseded_decision(tmp_path):
 
 def test_precheck_does_not_warn_from_a_retired_event(tmp_path):
     """Warning off an approach someone explicitly retired is worse than silence."""
-    from projectmem.commands.precheck import _events_for_file
+    from dejafix.commands.precheck import _events_for_file
 
     live = _events_for_file("src/api/routes.py", _decisions(tmp_path))
 
@@ -343,8 +329,8 @@ def test_every_agent_facing_surface_filters_superseded():
     """Five surfaces filtered; context and precheck did not. Pin all of them."""
     import inspect
 
-    from projectmem import summary as summary_mod
-    from projectmem.commands import brief, context, export, precheck, search
+    from dejafix import summary as summary_mod
+    from dejafix.commands import brief, context, export, precheck, search
 
     for mod in (summary_mod, brief, context, export, precheck, search):
         assert "superseded_ids" in inspect.getsource(mod), (
@@ -355,17 +341,17 @@ def test_every_agent_facing_surface_filters_superseded():
 # ── the bridge must reach clients that do not read CLAUDE.md ────────────────
 #
 # Antigravity never reads CLAUDE.md — a user reported copying the block into
-# AGENTS.md by hand to make projectmem work at all (#14). AGENTS.md is a
+# AGENTS.md by hand to make dejafix work at all (#14). AGENTS.md is a
 # cross-tool convention, not an Antigravity one, so both files are written
-# always rather than on detection: pjm init runs once and the choice of client
+# always rather than on detection: djf init runs once and the choice of client
 # comes later.
 
 def test_init_writes_the_bridge_to_both_rule_files(tmp_path, monkeypatch):
     from conftest import set_fake_home
-    from projectmem.commands.init import run as init_run
+    from dejafix.commands.init import run as init_run
 
     set_fake_home(monkeypatch, tmp_path / "home")
-    monkeypatch.setenv("PROJECTMEM_HOME", str(tmp_path / "pm"))
+    monkeypatch.setenv("DEJAFIX_HOME", str(tmp_path / "pm"))
     project = tmp_path / "checkout-api"
     project.mkdir()
     monkeypatch.chdir(project)
@@ -373,21 +359,21 @@ def test_init_writes_the_bridge_to_both_rule_files(tmp_path, monkeypatch):
 
     for name in ("CLAUDE.md", "AGENTS.md"):
         text = (project / name).read_text(encoding="utf-8")
-        assert "projectmem (MANDATORY)" in text, f"{name} has no bridge"
+        assert "dejafix (MANDATORY)" in text, f"{name} has no bridge"
         assert "checkout-api" in text, f"{name} does not name the project"
 
 
 def test_both_rule_files_say_exactly_the_same_thing(tmp_path, monkeypatch):
     """Two copies that can drift are worse than one that is missing."""
     from conftest import set_fake_home
-    from projectmem.commands.init import (
+    from dejafix.commands.init import (
         _CLAUDE_MD_BRIDGE_END,
         _CLAUDE_MD_BRIDGE_START,
         run as init_run,
     )
 
     set_fake_home(monkeypatch, tmp_path / "home")
-    monkeypatch.setenv("PROJECTMEM_HOME", str(tmp_path / "pm"))
+    monkeypatch.setenv("DEJAFIX_HOME", str(tmp_path / "pm"))
     project = tmp_path / "app"
     project.mkdir()
     monkeypatch.chdir(project)
@@ -403,10 +389,10 @@ def test_both_rule_files_say_exactly_the_same_thing(tmp_path, monkeypatch):
 def test_an_existing_agents_md_is_preserved(tmp_path, monkeypatch):
     """Users already have AGENTS.md files. Do not clobber them."""
     from conftest import set_fake_home
-    from projectmem.commands.init import run as init_run
+    from dejafix.commands.init import run as init_run
 
     set_fake_home(monkeypatch, tmp_path / "home")
-    monkeypatch.setenv("PROJECTMEM_HOME", str(tmp_path / "pm"))
+    monkeypatch.setenv("DEJAFIX_HOME", str(tmp_path / "pm"))
     project = tmp_path / "app"
     project.mkdir()
     (project / "AGENTS.md").write_text("# House rules\n\nAlways run the tests.\n")
@@ -415,15 +401,15 @@ def test_an_existing_agents_md_is_preserved(tmp_path, monkeypatch):
 
     text = (project / "AGENTS.md").read_text(encoding="utf-8")
     assert "Always run the tests." in text, "existing content was destroyed"
-    assert "projectmem (MANDATORY)" in text
+    assert "dejafix (MANDATORY)" in text
 
 
 def test_re_running_init_does_not_duplicate_the_block(tmp_path, monkeypatch):
     from conftest import set_fake_home
-    from projectmem.commands.init import _CLAUDE_MD_BRIDGE_START, run as init_run
+    from dejafix.commands.init import _CLAUDE_MD_BRIDGE_START, run as init_run
 
     set_fake_home(monkeypatch, tmp_path / "home")
-    monkeypatch.setenv("PROJECTMEM_HOME", str(tmp_path / "pm"))
+    monkeypatch.setenv("DEJAFIX_HOME", str(tmp_path / "pm"))
     project = tmp_path / "app"
     project.mkdir()
     monkeypatch.chdir(project)
@@ -437,11 +423,11 @@ def test_re_running_init_does_not_duplicate_the_block(tmp_path, monkeypatch):
 
 def test_list_projects_leads_with_the_active_project(tmp_path, monkeypatch):
     """The one name the caller wants should not be on line 14 of 16."""
-    from projectmem import mcp_server
-    from projectmem.project_registry import register, set_active
-    from projectmem.storage import initialize
+    from dejafix import mcp_server
+    from dejafix.project_registry import register, set_active
+    from dejafix.storage import initialize
 
-    monkeypatch.setenv("PROJECTMEM_HOME", str(tmp_path / "pm"))
+    monkeypatch.setenv("DEJAFIX_HOME", str(tmp_path / "pm"))
     for name in ("alpha", "beta", "gamma"):
         d = tmp_path / name
         d.mkdir()
@@ -458,7 +444,7 @@ def test_list_projects_leads_with_the_active_project(tmp_path, monkeypatch):
 
 def test_instructions_do_not_tell_the_agent_to_list_projects_first():
     """We were telling it to, then counting the call as waste."""
-    from projectmem.mcp_server import _GLOBAL_INSTRUCTIONS
+    from dejafix.mcp_server import _GLOBAL_INSTRUCTIONS
 
     text = _GLOBAL_INSTRUCTIONS.lower()
     assert "do not look the project up before you start" in text

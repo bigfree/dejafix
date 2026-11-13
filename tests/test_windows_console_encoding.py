@@ -1,6 +1,6 @@
 """#18 — a decorative character killed the command on a Windows console.
 
-`pjm init` on Windows created `.projectmem/`, the hooks, `CLAUDE.md` and
+`djf init` on Windows created `.dejafix/`, the hooks, `CLAUDE.md` and
 `AGENTS.md`, then raised `UnicodeEncodeError` printing a box-drawing rule and
 exited 1. Every side effect had already landed, so the command both succeeded
 and reported failure — the worst combination for a script that checks the exit
@@ -32,7 +32,7 @@ def _cp1252_env(tmp_path: Path) -> dict:
         "PYTHONPATH": SRC,
         "HOME": str(tmp_path),
         "USERPROFILE": str(tmp_path),
-        "PROJECTMEM_HOME": str(tmp_path / "pm"),
+        "DEJAFIX_HOME": str(tmp_path / "pm"),
     }
 
 
@@ -52,8 +52,8 @@ def _repo(tmp_path: Path) -> Path:
 def _run(args: list[str], repo: Path, env: dict) -> subprocess.CompletedProcess:
     return subprocess.run(
         [sys.executable, "-c",
-         "from projectmem.cli import main; import sys;"
-         " sys.argv=['pjm']+sys.argv[1:]; main()", *args],
+         "from dejafix.cli import main; import sys;"
+         " sys.argv=['djf']+sys.argv[1:]; main()", *args],
         cwd=repo, env=env, capture_output=True, text=True,
         # The child writes cp1252 bytes by design — that is the whole point.
         # Reading them back as utf-8 fails on the em-dash (0x97), which is
@@ -69,7 +69,7 @@ def test_init_survives_a_cp1252_console(tmp_path):
 
     assert "UnicodeEncodeError" not in result.stderr, result.stderr
     assert result.returncode == 0, f"exit {result.returncode}\n{result.stderr}"
-    assert (repo / ".projectmem").is_dir()
+    assert (repo / ".dejafix").is_dir()
 
 
 def test_init_prints_the_mcp_block_on_cp1252(tmp_path):
@@ -116,7 +116,7 @@ def test_no_replacement_characters_leak_into_cp1252_output(tmp_path):
 
 def test_configure_stdio_tolerates_a_stream_it_cannot_reconfigure(tmp_path):
     """pytest's capture object and a detached stream both lack reconfigure()."""
-    from projectmem.glyphs import configure_stdio
+    from dejafix.glyphs import configure_stdio
 
     original = sys.stdout
     try:
@@ -142,8 +142,8 @@ def test_cp1252_output_contains_no_byte_that_renders_as_a_black_diamond(tmp_path
     env = _cp1252_env(tmp_path)
     result = subprocess.run(
         [sys.executable, "-c",
-         "from projectmem.cli import main; import sys;"
-         " sys.argv=['pjm','init']; main()"],
+         "from dejafix.cli import main; import sys;"
+         " sys.argv=['djf','init']; main()"],
         cwd=repo, env=env, capture_output=True,  # bytes, not text
     )
 
@@ -159,8 +159,8 @@ def test_utf8_output_keeps_its_real_characters(tmp_path):
     env = {**_cp1252_env(tmp_path), "PYTHONIOENCODING": "utf-8"}
     result = subprocess.run(
         [sys.executable, "-c",
-         "from projectmem.cli import main; import sys;"
-         " sys.argv=['pjm','init']; main()"],
+         "from dejafix.cli import main; import sys;"
+         " sys.argv=['djf','init']; main()"],
         cwd=repo, env=env, capture_output=True, text=True, encoding="utf-8",
     )
 
@@ -170,7 +170,7 @@ def test_utf8_output_keeps_its_real_characters(tmp_path):
 
 def test_folding_stream_still_looks_like_a_stream():
     """click asks isatty() to decide on colour; a naive wrapper breaks that."""
-    from projectmem.glyphs import _AsciiFoldingStream
+    from dejafix.glyphs import _AsciiFoldingStream
 
     wrapped = _AsciiFoldingStream(sys.__stdout__)
     assert hasattr(wrapped, "isatty")
