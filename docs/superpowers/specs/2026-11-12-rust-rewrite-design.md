@@ -259,9 +259,8 @@ pinned by a test:
   (`tests/cli/memory/global.rs::import_reports_a_missing_or_invalid_file`,
   `a_corrupt_store_is_an_error_not_a_silent_loss`).
 
-Windows, found when the `Test` workflow first ran there on 2026-11-13; these
-await the user's approval like any change to this contract, each pinned by a
-test:
+Windows, found when the `Test` workflow first ran there on 2026-11-13 and
+approved by the user the same day, each pinned by a test:
 
 - git hooks are written with `\n` line endings on every platform. Python
   writes them in text mode, so on Windows they get `\r\n`, which Git for
