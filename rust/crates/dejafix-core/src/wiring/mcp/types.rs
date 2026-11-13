@@ -5,7 +5,7 @@ use std::time::SystemTime;
 
 use jiff::tz::TimeZone;
 
-use crate::adapters::git::RepoState;
+use crate::adapters::git::{GitDirs, RepoState};
 use crate::core::event::Outcome;
 use crate::core::log::EventLog;
 use crate::core::path::PathContext;
@@ -31,6 +31,7 @@ pub struct McpState {
 pub(super) struct GitMemo {
     pub(super) churn: HashMap<(PathBuf, String), Remembered<usize>>,
     pub(super) times: HashMap<(PathBuf, String, Option<String>), Remembered<Vec<String>>>,
+    pub(super) dirs: HashMap<PathBuf, Option<GitDirs>>,
 }
 
 #[derive(Debug)]

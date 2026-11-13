@@ -335,6 +335,10 @@ fn integers_are_read_as_leniently_as_pydantic_reads_them() {
         (json!("5__0"), None),
         (json!("_5"), None),
         (json!("5.5"), None),
+        (json!("5."), None),
+        (json!("5.00"), Some(5)),
+        (json!("05"), Some(5)),
+        (json!("5.0e0"), None),
         (json!(null), None),
     ] {
         assert_eq!(lax_integer(&value), expected, "{value}");
@@ -359,6 +363,10 @@ fn booleans_are_read_as_leniently_as_pydantic_reads_them() {
         (json!("2"), None),
         (json!(2), None),
         (json!(""), None),
+        (json!("YES"), Some(true)),
+        (json!("Y"), Some(true)),
+        (json!(" yes"), None),
+        (json!("On "), None),
         (json!(null), None),
     ] {
         assert_eq!(lax_boolean(&value), expected, "{value}");

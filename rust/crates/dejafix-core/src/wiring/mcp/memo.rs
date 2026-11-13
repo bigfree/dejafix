@@ -5,7 +5,7 @@ use std::sync::{MutexGuard, PoisonError};
 use jiff::SignedDuration;
 
 use super::types::{GitMemo, MemoGit, Remembered};
-use crate::adapters::git::{RepoState, repository_state};
+use crate::adapters::git::{RepoState, git_dirs, repository_state};
 use crate::core::stale::FileHistory;
 use crate::wiring::hooks::GitAnswers;
 
@@ -36,7 +36,17 @@ impl<G: GitAnswers> MemoGit<'_, G> {
 
     fn state(&self) -> Option<&RepoState> {
         self.state
-            .get_or_init(|| repository_state(self.root))
+            .get_or_init(|| {
+                let known = self.memo().dirs.get(self.root).cloned();
+                let dirs = known.unwrap_or_else(|| {
+                    let found = git_dirs(self.root);
+                    self.memo()
+                        .dirs
+                        .insert(self.root.to_path_buf(), found.clone());
+                    found
+                });
+                dirs.as_ref().and_then(repository_state)
+            })
             .as_ref()
     }
 

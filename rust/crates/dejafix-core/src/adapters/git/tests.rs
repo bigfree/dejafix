@@ -5,8 +5,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use super::{
-    head_short, hooks_dir, last_changes, last_message, read_hook, remove_hook, repository_state,
-    resolve_djf_binary, staged_files, status_files, working_files, write_hook,
+    git_dirs, head_short, hooks_dir, last_changes, last_message, read_hook, remove_hook,
+    repository_state, resolve_djf_binary, staged_files, status_files, working_files, write_hook,
 };
 use crate::core::capture::Change;
 
@@ -573,30 +573,34 @@ fn status_files_are_empty_for_a_clean_tree_or_no_repository() {
     assert_eq!(status_files(&dir.path().join("missing")), none);
 }
 
+fn state_of(root: &Path) -> Option<super::RepoState> {
+    git_dirs(root).as_ref().and_then(repository_state)
+}
+
 #[test]
 fn the_repository_state_changes_with_every_commit_and_branch_switch() {
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path();
-    assert_eq!(repository_state(root), None);
+    assert_eq!(git_dirs(root), None);
     git(root, &["init", "-q", "-b", "main"]);
-    let empty = repository_state(root).unwrap();
+    let empty = state_of(root).unwrap();
     git(root, &["commit", "-q", "--allow-empty", "-m", "one"]);
-    let one = repository_state(root).unwrap();
+    let one = state_of(root).unwrap();
     assert_ne!(empty, one);
-    assert_eq!(repository_state(root), Some(one.clone()));
+    assert_eq!(state_of(root), Some(one.clone()));
     git(root, &["commit", "-q", "--allow-empty", "-m", "two"]);
-    let two = repository_state(root).unwrap();
+    let two = state_of(root).unwrap();
     assert_ne!(one, two);
     git(root, &["checkout", "-q", "--detach", "HEAD~1"]);
-    let detached = repository_state(root).unwrap();
+    let detached = state_of(root).unwrap();
     assert_ne!(two, detached);
     git(root, &["checkout", "-q", "main"]);
     git(root, &["pack-refs", "--all"]);
-    let packed = repository_state(root).unwrap();
+    let packed = state_of(root).unwrap();
     assert_ne!(two, packed);
     let nested = root.join("src/deep");
     fs::create_dir_all(&nested).unwrap();
-    assert_eq!(repository_state(&nested), Some(packed));
+    assert_eq!(state_of(&nested), Some(packed));
 }
 
 #[test]
@@ -609,9 +613,37 @@ fn a_worktree_state_follows_its_own_head_through_the_git_file() {
     git(&main, &["worktree", "add", "-q", "-b", "side", "../side"]);
     let side = dir.path().join("side");
     assert!(side.join(".git").is_file());
-    let before = repository_state(&side).unwrap();
-    let main_before = repository_state(&main).unwrap();
+    let before = state_of(&side).unwrap();
+    let main_before = state_of(&main).unwrap();
     git(&side, &["commit", "-q", "--allow-empty", "-m", "side work"]);
-    assert_ne!(repository_state(&side).unwrap(), before);
-    assert_eq!(repository_state(&main).unwrap(), main_before);
+    assert_ne!(state_of(&side).unwrap(), before);
+    assert_eq!(state_of(&main).unwrap(), main_before);
+}
+
+#[test]
+fn a_reftable_repository_state_changes_with_every_commit() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    git(root, &["init", "-q", "--ref-format=reftable", "-b", "main"]);
+    git(root, &["commit", "-q", "--allow-empty", "-m", "one"]);
+    let one = state_of(root).unwrap();
+    git(root, &["commit", "-q", "--allow-empty", "-m", "two"]);
+    assert_ne!(state_of(root).unwrap(), one);
+}
+
+#[test]
+fn git_dirs_follow_the_git_dir_git_itself_uses() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path().join("repo");
+    fs::create_dir_all(&root).unwrap();
+    git(&root, &["init", "-q", "-b", "main"]);
+    let dirs = git_dirs(&root.join(".")).unwrap();
+    assert_eq!(
+        fs::canonicalize(&dirs.dir).unwrap(),
+        fs::canonicalize(root.join(".git")).unwrap()
+    );
+    assert_eq!(
+        fs::canonicalize(&dirs.common).unwrap(),
+        fs::canonicalize(root.join(".git")).unwrap()
+    );
 }

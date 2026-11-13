@@ -12,9 +12,9 @@ pub use head::head_short;
 pub use history::recent_changes;
 pub use hooks::{hooks_dir, read_hook, remove_hook, resolve_djf_binary, write_hook};
 pub(crate) use run::{git, git_status};
-pub use state::repository_state;
+pub use state::{git_dirs, repository_state};
 pub use status::status_files;
-pub use types::{GitHistory, RepoState};
+pub use types::{GitDirs, GitHistory, RepoState};
 
 #[cfg(test)]
 mod tests;

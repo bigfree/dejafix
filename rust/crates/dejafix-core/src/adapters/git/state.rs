@@ -1,10 +1,9 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use super::types::RepoState;
+use super::run::git;
+use super::types::{GitDirs, RepoState};
 
-const GIT: &str = ".git";
-const GITDIR_PREFIX: &str = "gitdir:";
 const REF_PREFIX: &str = "ref:";
 
 fn read_trimmed(path: &Path) -> Option<String> {
@@ -13,24 +12,22 @@ fn read_trimmed(path: &Path) -> Option<String> {
         .map(|text| text.trim().to_owned())
 }
 
-fn git_dir(root: &Path) -> Option<PathBuf> {
-    root.ancestors().find_map(|folder| {
-        let candidate = folder.join(GIT);
-        let metadata = fs::metadata(&candidate).ok()?;
-        if metadata.is_dir() {
-            return Some(candidate);
-        }
-        let pointer = read_trimmed(&candidate)?;
-        let target = pointer.strip_prefix(GITDIR_PREFIX)?.trim();
-        Some(folder.join(target))
-    })
+#[must_use]
+pub fn git_dirs(root: &Path) -> Option<GitDirs> {
+    let output = git(
+        root,
+        &["rev-parse", "--absolute-git-dir", "--git-common-dir"],
+    )?;
+    let text = String::from_utf8(output).ok()?;
+    let mut lines = text.lines().map(str::trim);
+    let dir = PathBuf::from(lines.next()?);
+    let common = root.join(lines.next()?);
+    Some(GitDirs { dir, common })
 }
 
 #[must_use]
-pub fn repository_state(root: &Path) -> Option<RepoState> {
-    let dir = git_dir(root)?;
-    let common =
-        read_trimmed(&dir.join("commondir")).map_or_else(|| dir.clone(), |common| dir.join(common));
+pub fn repository_state(dirs: &GitDirs) -> Option<RepoState> {
+    let GitDirs { dir, common } = dirs;
     let head = read_trimmed(&dir.join("HEAD"))?;
     let reference = head
         .strip_prefix(REF_PREFIX)
@@ -41,9 +38,11 @@ pub fn repository_state(root: &Path) -> Option<RepoState> {
     let packed = fs::metadata(common.join("packed-refs"))
         .ok()
         .map(|metadata| (metadata.len(), metadata.modified().ok()));
+    let tables = read_trimmed(&common.join("reftable").join("tables.list"));
     Some(RepoState {
         head,
         reference,
         packed,
+        tables,
     })
 }

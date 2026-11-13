@@ -26,7 +26,11 @@ fn integer_text(text: &str) -> Option<i64> {
         Some(rest) => (true, rest),
         None => (false, trimmed.strip_prefix('+').unwrap_or(trimmed)),
     };
-    let (whole, fraction) = unsigned.split_once('.').unwrap_or((unsigned, ""));
+    let (whole, fraction) = match unsigned.split_once('.') {
+        Some((whole, fraction)) if !fraction.is_empty() => (whole, fraction),
+        Some(_) => return None,
+        None => (unsigned, ""),
+    };
     if !fraction.chars().all(|character| character == '0') {
         return None;
     }

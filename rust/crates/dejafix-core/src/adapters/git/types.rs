@@ -17,4 +17,11 @@ pub struct RepoState {
     pub(super) head: String,
     pub(super) reference: Option<String>,
     pub(super) packed: Option<(u64, Option<SystemTime>)>,
+    pub(super) tables: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GitDirs {
+    pub dir: PathBuf,
+    pub common: PathBuf,
 }
