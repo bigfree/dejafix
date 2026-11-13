@@ -1,6 +1,7 @@
 use crate::core::event::EventKind;
 use crate::core::hooks::HookKind;
 use crate::core::precheck::{SnoozeError, Warning};
+use crate::core::stale::FileHistory;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum HooksAction {
@@ -78,4 +79,8 @@ pub struct EditHookRun {
     pub cwd: String,
     pub files: usize,
     pub error: String,
+}
+
+pub(crate) trait GitAnswers: FileHistory {
+    fn churn(&self, relative: &str) -> Option<usize>;
 }

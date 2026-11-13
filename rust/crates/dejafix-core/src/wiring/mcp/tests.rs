@@ -3,10 +3,17 @@ use std::path::{Path, PathBuf};
 use std::process::Command as Process;
 use std::sync::Arc;
 
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Mutex, OnceLock};
+
+use super::memo::CHURN_LIFETIME;
+use super::types::{GitMemo, MemoGit};
 use super::{McpSettings, McpState, ToolCall, ToolReply, WriteCall};
 use crate::core::event::Outcome;
+use crate::core::stale::FileHistory;
 use crate::core::write::OsIds;
 use crate::testing::fixed_clock;
+use crate::wiring::hooks::GitAnswers;
 use crate::wiring::registry::register_project;
 use crate::wiring::types::Settings;
 
@@ -482,4 +489,177 @@ fn a_pinned_server_resolves_paths_from_its_root_as_python_s_chdir_does() {
     let state = world.state(Some(&root), &elsewhere);
     let cached = state.cached_log(&root, &fixed_clock()).unwrap();
     assert_eq!(cached.context.cwd, root.to_string_lossy());
+}
+
+#[derive(Default)]
+struct Counting {
+    churn: AtomicUsize,
+    times: AtomicUsize,
+    answer: AtomicUsize,
+}
+
+impl FileHistory for Counting {
+    fn exists(&self, _relative: &str) -> bool {
+        true
+    }
+
+    fn commit_times(&self, _relative: &str, _since: Option<&str>) -> Option<Vec<String>> {
+        self.times.fetch_add(1, Ordering::SeqCst);
+        Some(vec![self.answer.load(Ordering::SeqCst).to_string()])
+    }
+}
+
+impl GitAnswers for Counting {
+    fn churn(&self, _relative: &str) -> Option<usize> {
+        self.churn.fetch_add(1, Ordering::SeqCst);
+        Some(self.answer.load(Ordering::SeqCst))
+    }
+}
+
+fn committed_repository(root: &Path, message: &str) {
+    let status = Process::new("git")
+        .args(["-c", "user.name=t", "-c", "user.email=t@example.invalid"])
+        .args(["commit", "-q", "--allow-empty", "-m", message])
+        .current_dir(root)
+        .status()
+        .unwrap();
+    assert!(status.success());
+}
+
+#[test]
+fn churn_is_remembered_for_sixty_seconds_of_one_repository_state() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    assert!(
+        Process::new("git")
+            .args(["init", "-q"])
+            .current_dir(root)
+            .status()
+            .unwrap()
+            .success()
+    );
+    committed_repository(root, "one");
+    let memo = Mutex::new(GitMemo::default());
+    let inner = Counting::default();
+    let start = fixed_clock().now;
+    let ask = |inner: &Counting, now: jiff::Timestamp| {
+        MemoGit {
+            inner,
+            root,
+            state: OnceLock::new(),
+            memo: &memo,
+            now,
+        }
+        .churn("src/a.py")
+    };
+    inner.answer.store(3, Ordering::SeqCst);
+    assert_eq!(ask(&inner, start), Some(3));
+    inner.answer.store(4, Ordering::SeqCst);
+    let almost = start
+        .checked_add(CHURN_LIFETIME - jiff::SignedDuration::from_secs(1))
+        .unwrap();
+    assert_eq!(
+        ask(&inner, almost),
+        Some(3),
+        "a churn answer may lag git for up to 60 s"
+    );
+    assert_eq!(inner.churn.load(Ordering::SeqCst), 1);
+    let expired = start.checked_add(CHURN_LIFETIME).unwrap();
+    assert_eq!(ask(&inner, expired), Some(4));
+    assert_eq!(inner.churn.load(Ordering::SeqCst), 2);
+    inner.answer.store(5, Ordering::SeqCst);
+    committed_repository(root, "two");
+    assert_eq!(
+        ask(&inner, expired),
+        Some(5),
+        "a new commit is seen at once"
+    );
+    assert_eq!(inner.churn.load(Ordering::SeqCst), 3);
+}
+
+#[test]
+fn commit_times_are_remembered_until_the_repository_changes() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    assert!(
+        Process::new("git")
+            .args(["init", "-q"])
+            .current_dir(root)
+            .status()
+            .unwrap()
+            .success()
+    );
+    committed_repository(root, "one");
+    let memo = Mutex::new(GitMemo::default());
+    let inner = Counting::default();
+    let ask = |now: jiff::Timestamp, since: Option<&str>| {
+        MemoGit {
+            inner: &inner,
+            root,
+            state: OnceLock::new(),
+            memo: &memo,
+            now,
+        }
+        .commit_times("src/a.py", since)
+    };
+    let start = fixed_clock().now;
+    let much_later = start
+        .checked_add(jiff::SignedDuration::from_hours(48))
+        .unwrap();
+    assert_eq!(ask(start, None), Some(vec!["0".to_owned()]));
+    inner.answer.store(1, Ordering::SeqCst);
+    assert_eq!(ask(much_later, None), Some(vec!["0".to_owned()]));
+    assert_eq!(ask(start, Some("2026-01-01")), Some(vec!["1".to_owned()]));
+    assert_eq!(inner.times.load(Ordering::SeqCst), 2);
+    committed_repository(root, "two");
+    assert_eq!(ask(much_later, None), Some(vec!["1".to_owned()]));
+    assert_eq!(inner.times.load(Ordering::SeqCst), 3);
+}
+
+#[test]
+fn precheck_sees_a_new_commit_at_once_through_the_memo() {
+    let world = World::new();
+    let root = world.project("alpha");
+    let git = |args: &[&str]| {
+        let status = Process::new("git")
+            .args(["-c", "user.name=t", "-c", "user.email=t@example.invalid"])
+            .args(args)
+            .current_dir(&root)
+            .status()
+            .unwrap();
+        assert!(status.success());
+    };
+    git(&["init", "-q"]);
+    let state = world.state(Some(&root), &world.base);
+    text(
+        &state,
+        ToolCall::Write(WriteCall::LogIssue {
+            summary: "auth breaks".into(),
+            location: Some("src/auth.py".into()),
+        }),
+        None,
+    );
+    fs::create_dir_all(root.join("src")).unwrap();
+    let churn_of = |state: &McpState| {
+        let reply = state.call(
+            ToolCall::PrecheckFile("src/auth.py".into()),
+            None,
+            jiff::Timestamp::now(),
+            &mut OsIds,
+        );
+        reply.text.contains("HIGH CHURN")
+    };
+    for round in 0..3 {
+        fs::write(root.join("src/auth.py"), format!("{round}\n")).unwrap();
+        git(&["add", "src/auth.py"]);
+        git(&["commit", "-q", "-m", &format!("change {round}")]);
+    }
+    assert!(!churn_of(&state));
+    fs::write(root.join("src/auth.py"), "3\n").unwrap();
+    git(&["add", "src/auth.py"]);
+    git(&["commit", "-q", "-m", "change 3"]);
+    assert!(
+        churn_of(&state),
+        "the fourth commit must not wait for the memo to expire"
+    );
 }

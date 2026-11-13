@@ -150,3 +150,13 @@ pub fn stale_label(stale: &Stale<'_, '_>) -> String {
         event.id.as_str(),
     )
 }
+
+impl<T: FileHistory + ?Sized> FileHistory for &T {
+    fn exists(&self, relative: &str) -> bool {
+        (**self).exists(relative)
+    }
+
+    fn commit_times(&self, relative: &str, since: Option<&str>) -> Option<Vec<String>> {
+        (**self).commit_times(relative, since)
+    }
+}

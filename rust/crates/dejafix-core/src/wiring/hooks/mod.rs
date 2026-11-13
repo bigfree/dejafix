@@ -10,6 +10,7 @@ pub use install::hooks_action;
 pub(crate) use install::install;
 pub(crate) use precheck::analyze_files;
 pub use precheck::precheck;
+pub(crate) use types::GitAnswers;
 pub use types::{
     CaptureOutcome, EditHookRun, HooksAction, HooksOutcome, HooksReport, PrecheckOutcome,
     PrecheckRequest,

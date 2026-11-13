@@ -1,5 +1,6 @@
 mod cache;
 mod errors;
+mod memo;
 mod probe;
 mod tools;
 mod types;

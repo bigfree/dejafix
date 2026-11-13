@@ -4,7 +4,7 @@ use std::num::NonZeroUsize;
 use std::path::Path;
 use std::thread;
 
-use super::types::{PrecheckOutcome, PrecheckRequest};
+use super::types::{GitAnswers, PrecheckOutcome, PrecheckRequest};
 use crate::adapters::fs::{
     FsResolver, MEMORY_DIR, MemoryDir, lock_events, path_context, read_events_file, read_snooze,
     remove_snooze, write_snooze,
@@ -79,7 +79,10 @@ pub fn precheck(
     let (Some(log), Some(context)) = (parsed, context.as_ref()) else {
         return Ok(PrecheckOutcome::Unreadable);
     };
-    let warnings = analyze_files(cwd, &log, context, &files, now);
+    let history = GitHistory {
+        root: cwd.to_path_buf(),
+    };
+    let warnings = analyze_files(&log, context, &files, now, &history);
     if warnings.is_empty() {
         return Ok(PrecheckOutcome::Clean);
     }
@@ -89,17 +92,20 @@ pub fn precheck(
     Ok(PrecheckOutcome::Warnings { warnings, blocking })
 }
 
+impl GitAnswers for GitHistory {
+    fn churn(&self, relative: &str) -> Option<usize> {
+        recent_changes(&self.root, relative, RECENT_DAYS)
+    }
+}
+
 pub(crate) fn analyze_files(
-    root: &Path,
     log: &EventLog<'_>,
     context: &PathContext,
     files: &[String],
     now: jiff::Timestamp,
+    history: &impl GitAnswers,
 ) -> Vec<Warning> {
     let found = targets(files, log, context, &FsResolver);
-    let history = GitHistory {
-        root: root.to_path_buf(),
-    };
     let only: HashSet<&str> = found.files.iter().map(String::as_str).collect();
     let (churn, stale) = thread::scope(|scope| {
         let stale = scope.spawn(|| {
@@ -107,18 +113,18 @@ pub(crate) fn analyze_files(
                 log,
                 context,
                 &FsResolver,
-                &history,
+                history,
                 Some(&only),
                 STALE_COMMIT_THRESHOLD,
             )
         });
-        let churn = churn_counts(root, &found);
+        let churn = churn_counts(history, &found);
         (churn, stale.join().unwrap_or_default())
     });
     analyze(log, &found, &churn, &stale, now)
 }
 
-fn churn_counts(cwd: &Path, found: &Targets) -> Vec<Option<usize>> {
+fn churn_counts(history: &impl GitAnswers, found: &Targets) -> Vec<Option<usize>> {
     let asked: Vec<(usize, &str)> = found
         .files
         .iter()
@@ -137,7 +143,7 @@ fn churn_counts(cwd: &Path, found: &Targets) -> Vec<Option<usize>> {
             .map(|part| {
                 scope.spawn(move || {
                     part.iter()
-                        .map(|(position, file)| (*position, recent_changes(cwd, file, RECENT_DAYS)))
+                        .map(|(position, file)| (*position, history.churn(file)))
                         .collect::<Vec<_>>()
                 })
             })
@@ -233,4 +239,10 @@ fn note(
         return Vec::new();
     }
     redaction_notice(&fired).into_iter().collect()
+}
+
+impl<T: GitAnswers + ?Sized> GitAnswers for &T {
+    fn churn(&self, relative: &str) -> Option<usize> {
+        (**self).churn(relative)
+    }
 }

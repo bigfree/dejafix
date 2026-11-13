@@ -5,8 +5,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use super::{
-    head_short, hooks_dir, last_changes, last_message, read_hook, remove_hook, resolve_djf_binary,
-    staged_files, status_files, working_files, write_hook,
+    head_short, hooks_dir, last_changes, last_message, read_hook, remove_hook, repository_state,
+    resolve_djf_binary, staged_files, status_files, working_files, write_hook,
 };
 use crate::core::capture::Change;
 
@@ -571,4 +571,47 @@ fn status_files_are_empty_for_a_clean_tree_or_no_repository() {
     git(dir.path(), &["init", "-q"]);
     assert_eq!(status_files(dir.path()), none);
     assert_eq!(status_files(&dir.path().join("missing")), none);
+}
+
+#[test]
+fn the_repository_state_changes_with_every_commit_and_branch_switch() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    assert_eq!(repository_state(root), None);
+    git(root, &["init", "-q", "-b", "main"]);
+    let empty = repository_state(root).unwrap();
+    git(root, &["commit", "-q", "--allow-empty", "-m", "one"]);
+    let one = repository_state(root).unwrap();
+    assert_ne!(empty, one);
+    assert_eq!(repository_state(root), Some(one.clone()));
+    git(root, &["commit", "-q", "--allow-empty", "-m", "two"]);
+    let two = repository_state(root).unwrap();
+    assert_ne!(one, two);
+    git(root, &["checkout", "-q", "--detach", "HEAD~1"]);
+    let detached = repository_state(root).unwrap();
+    assert_ne!(two, detached);
+    git(root, &["checkout", "-q", "main"]);
+    git(root, &["pack-refs", "--all"]);
+    let packed = repository_state(root).unwrap();
+    assert_ne!(two, packed);
+    let nested = root.join("src/deep");
+    fs::create_dir_all(&nested).unwrap();
+    assert_eq!(repository_state(&nested), Some(packed));
+}
+
+#[test]
+fn a_worktree_state_follows_its_own_head_through_the_git_file() {
+    let dir = tempfile::tempdir().unwrap();
+    let main = dir.path().join("main");
+    fs::create_dir_all(&main).unwrap();
+    git(&main, &["init", "-q", "-b", "main"]);
+    git(&main, &["commit", "-q", "--allow-empty", "-m", "one"]);
+    git(&main, &["worktree", "add", "-q", "-b", "side", "../side"]);
+    let side = dir.path().join("side");
+    assert!(side.join(".git").is_file());
+    let before = repository_state(&side).unwrap();
+    let main_before = repository_state(&main).unwrap();
+    git(&side, &["commit", "-q", "--allow-empty", "-m", "side work"]);
+    assert_ne!(repository_state(&side).unwrap(), before);
+    assert_eq!(repository_state(&main).unwrap(), main_before);
 }

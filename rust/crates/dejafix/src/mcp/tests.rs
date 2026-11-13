@@ -364,3 +364,29 @@ fn booleans_are_read_as_leniently_as_pydantic_reads_them() {
         assert_eq!(lax_boolean(&value), expected, "{value}");
     }
 }
+
+#[tokio::test]
+async fn initialize_reports_the_crate_version_and_only_tools() {
+    let temp = tempfile::tempdir().unwrap();
+    let base = fs::canonicalize(temp.path()).unwrap();
+    let running = server(&base, None);
+    let (server_side, client_side) = tokio::io::duplex(1 << 16);
+    tokio::spawn(async move {
+        if let Ok(service) = running.serve(server_side).await {
+            let _ = service.waiting().await;
+        }
+    });
+    let client = ().serve(client_side).await.unwrap();
+    let info = client.peer_info().unwrap();
+    let server_info = info.server_info.clone().unwrap();
+    assert_eq!(server_info.name, "dejafix");
+    assert_eq!(server_info.version, env!("CARGO_PKG_VERSION"));
+    let capabilities = serde_json::to_value(&info.capabilities).unwrap();
+    assert_eq!(
+        capabilities
+            .as_object()
+            .map(|map| map.keys().cloned().collect::<Vec<_>>()),
+        Some(vec!["tools".to_owned()])
+    );
+    client.cancel().await.unwrap();
+}

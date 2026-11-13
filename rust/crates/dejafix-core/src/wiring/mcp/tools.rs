@@ -1,13 +1,15 @@
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::{Mutex, OnceLock};
 
 use super::errors::io_error;
-use super::types::{FsProbe, LogCache, McpSettings, McpState, ToolCall, ToolError, ToolReply};
+use super::types::{
+    FsProbe, GitMemo, LogCache, McpSettings, McpState, MemoGit, ToolCall, ToolError, ToolReply,
+};
 use crate::adapters::fs::{
     FsResolver, GlobalStore, MEMORY_DIR, events_path, read_text, resolve_path,
 };
-use crate::adapters::git::status_files;
+use crate::adapters::git::{GitHistory, status_files};
 use crate::core::context::{ContextInput, generate_context};
 use crate::core::event::IssueId;
 use crate::core::registry::Registry;
@@ -41,6 +43,7 @@ impl McpState {
         Self {
             settings,
             cache: Mutex::new(LogCache::default()),
+            git: Mutex::new(GitMemo::default()),
         }
     }
 
@@ -161,7 +164,22 @@ impl McpState {
 
     fn precheck(&self, root: &Path, paths: &[String], clock: &Clock) -> Result<String, ToolError> {
         let cached = self.cached_log(root, clock)?;
-        let warnings = analyze_files(root, &cached.log, &cached.context, paths, clock.now);
+        let history = GitHistory {
+            root: root.to_path_buf(),
+        };
+        let warnings = analyze_files(
+            &cached.log,
+            &cached.context,
+            paths,
+            clock.now,
+            &MemoGit {
+                inner: history,
+                root,
+                state: OnceLock::new(),
+                memo: &self.git,
+                now: clock.now,
+            },
+        );
         Ok(precheck_report(
             paths,
             &warnings,
