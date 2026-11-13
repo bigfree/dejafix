@@ -34,15 +34,15 @@ pub(super) struct IssueArgs {
 #[derive(Debug, Deserialize)]
 pub(super) struct SearchArgs {
     pub(super) query: String,
-    #[serde(default = "default_limit")]
+    #[serde(default = "default_limit", deserialize_with = "super::lax::integer")]
     pub(super) limit: i64,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "super::lax::boolean")]
     pub(super) full: bool,
 }
 
 #[derive(Debug, Deserialize)]
 pub(super) struct ContextArgs {
-    #[serde(default = "default_tokens")]
+    #[serde(default = "default_tokens", deserialize_with = "super::lax::integer")]
     pub(super) tokens: i64,
     #[serde(default)]
     pub(super) focus: Option<String>,

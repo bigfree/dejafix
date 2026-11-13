@@ -84,6 +84,18 @@ fn read_calls() -> Vec<(&'static str, Value)> {
             json!({"query": "cache sessions", "full": true}),
         ),
         ("search_events", json!({"query": "zz-nothing-zz"})),
+        (
+            "search_events",
+            json!({"query": "session", "limit": " 3 ", "full": "yes"}),
+        ),
+        (
+            "search_events",
+            json!({"query": "session", "limit": 2.0, "full": 0}),
+        ),
+        (
+            "get_context",
+            json!({"tokens": "500.0", "focus": "src/app.py"}),
+        ),
         ("get_score", empty()),
         ("get_context", empty()),
         ("get_context", json!({"tokens": 500})),

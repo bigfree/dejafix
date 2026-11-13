@@ -1,4 +1,5 @@
 mod instructions;
+mod lax;
 mod schema;
 mod server;
 mod types;

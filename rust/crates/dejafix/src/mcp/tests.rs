@@ -10,6 +10,7 @@ use serde_json::{Value, json};
 
 use super::DejafixServer;
 use super::instructions;
+use super::lax::{lax_boolean, lax_integer};
 use super::schema::tools;
 
 const NAMES: [&str; 19] = [
@@ -313,4 +314,53 @@ async fn a_global_server_adds_the_routing_instructions() {
         .unwrap();
     assert!(text(&listed).starts_with("No projects registered."));
     client.cancel().await.unwrap();
+}
+
+#[test]
+fn integers_are_read_as_leniently_as_pydantic_reads_them() {
+    for (value, expected) in [
+        (json!(5), Some(5)),
+        (json!("5"), Some(5)),
+        (json!(" 5 "), Some(5)),
+        (json!("5.0"), Some(5)),
+        (json!(5.0), Some(5)),
+        (json!("+5"), Some(5)),
+        (json!("-5"), Some(-5)),
+        (json!("5_0"), Some(50)),
+        (json!(true), Some(1)),
+        (json!(5.5), None),
+        (json!("0x5"), None),
+        (json!(""), None),
+        (json!("５"), None),
+        (json!("5__0"), None),
+        (json!("_5"), None),
+        (json!("5.5"), None),
+        (json!(null), None),
+    ] {
+        assert_eq!(lax_integer(&value), expected, "{value}");
+    }
+}
+
+#[test]
+fn booleans_are_read_as_leniently_as_pydantic_reads_them() {
+    for (value, expected) in [
+        (json!(true), Some(true)),
+        (json!("true"), Some(true)),
+        (json!("True"), Some(true)),
+        (json!("yes"), Some(true)),
+        (json!("on"), Some(true)),
+        (json!("t"), Some(true)),
+        (json!("1"), Some(true)),
+        (json!(1), Some(true)),
+        (json!(0), Some(false)),
+        (json!("off"), Some(false)),
+        (json!("f"), Some(false)),
+        (json!("n"), Some(false)),
+        (json!("2"), None),
+        (json!(2), None),
+        (json!(""), None),
+        (json!(null), None),
+    ] {
+        assert_eq!(lax_boolean(&value), expected, "{value}");
+    }
 }
