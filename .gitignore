@@ -13,6 +13,9 @@
 # Specs, plans and other working documents stay local.
 /docs/
 
+# Instructions for the coding assistant stay local.
+/CLAUDE.md
+
 # Local mcp-publisher CLI binary downloaded for releasing to the
 # official MCP Registry. ~20MB Go binary — must NOT ship in sdist.
 mcp-publisher
