@@ -220,6 +220,45 @@ Deliberate differences:
   the `structure.json` cache, since those features are out of scope;
 - `djf map` only prints the project map; `--build` is gone with the cache.
 
+Approved by the user on 2026-11-13 for M4 (MCP server, `djf global`), each
+pinned by a test:
+
+- the MCP server remembers git's answers for `precheck_file` and
+  `precheck_files` per project and file while the repository state (`HEAD`,
+  the ref it names, `packed-refs` and the reftable list, read in the git
+  directories `git rev-parse` reports once per project, so worktrees and
+  `GIT_DIR` are followed as git follows them) is unchanged; the churn count (`git log --since=30.days.ago`) is remembered for
+  at most 60 s, so a reply may differ from Python near the 30-day boundary for
+  at most 60 s, while a new commit is seen at once
+  (`wiring/mcp/tests.rs::churn_is_remembered_for_sixty_seconds_of_one_repository_state`,
+  `commit_times_are_remembered_until_the_repository_changes`,
+  `precheck_sees_a_new_commit_at_once_through_the_memo`);
+- a tool's own error is sent with `isError: true` and Python's text
+  (`dejafix tool error: {Class}: {message}`); Python sends `isError: false`
+  (`mcp/tests.rs::a_client_sees_the_instructions_tools_and_replies`,
+  `wiring/mcp/tests.rs::several_open_issues_need_an_issue_id`);
+- invalid arguments are answered with `Error executing tool {name}: {Rust's
+  message}` and `isError: true` instead of pydantic's message; numbers and
+  booleans sent as strings are still accepted as pydantic accepts them
+  (`"5"`, `" 5 "`, `"5.0"`, `5.0`, `"5_0"`, `true` for integers; `"yes"`,
+  `"on"`, `"t"`, `"1"`, `1`, `0` and the other pydantic words for booleans)
+  (`mcp/tests.rs::a_client_sees_the_instructions_tools_and_replies`,
+  `integers_are_read_as_leniently_as_pydantic_reads_them`,
+  `booleans_are_read_as_leniently_as_pydantic_reads_them`,
+  `golden/m4.rs::mcp_replies_match_python`);
+- `initialize` reports the crate version (Python reports `""`) and only the
+  `tools` capability (Python also lists empty prompts and resources)
+  (`mcp/tests.rs::initialize_reports_the_crate_version_and_only_tools`);
+- read tools skip corrupt lines of `events.jsonl`, as every Rust reader does,
+  where Python's `read_events` fails the whole call
+  (`wiring/mcp/tests.rs::the_cache_serves_until_the_log_changes`);
+- `djf global import` reports serde's message after `Invalid JSON: ` and
+  refuses a file whose top level is not an object, where Python crashes;
+  a corrupt `patterns.jsonl` or `library_gotchas.jsonl` is an error in
+  `djf global` (exit 3, file untouched), where Python crashes
+  (`tests/cli/memory/global.rs::import_reports_a_missing_or_invalid_file`,
+  `a_corrupt_store_is_an_error_not_a_silent_loss`).
+
 ## Testing
 
 1. Unit tests in `core`, including property tests (`proptest`): any log line

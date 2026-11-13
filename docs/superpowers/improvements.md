@@ -180,7 +180,7 @@ Append new entries at the end, one heading each, with this template:
 - Proposal: keep the two answers per `(root, file)` in the MCP state, keyed by the repository state read without a process (the `HEAD` file, the ref it names or `packed-refs`, through the `.git` file of a worktree), and give the churn answer a short lifetime (for example 60 s), because `--since=30.days.ago` moves with the clock.
 - Gain: a cited file drops from about 12.5 ms to about 1.5 ms per warm call.
 - Compatibility: changes MCP replies only near the 30-day boundary, for at most the memo's lifetime; needs a line in the compatibility contract.
-- Status: proposed
+- Status: accepted by the user on 2026-11-13 and implemented in M4 (`wiring/mcp/memo.rs`, `adapters/git/state.rs`); recorded in the spec's compatibility contract
 
 ## Keep the first line of `git status` intact in `get_context`
 
