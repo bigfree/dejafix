@@ -170,4 +170,6 @@ def manifest(*roots: str) -> None:
 COMMANDS = {"templates": templates, "splice": splice, "inherit": inherit, "manifest": manifest, "stack": stack, "promote": promote, "summary": summary, "purpose": purpose, "redact": redact_lines, "casefold": casefold, "word": word, "dumps": dumps}
 
 if __name__ == "__main__":
+    # Print \n on every platform: Windows text mode would print \r\n.
+    sys.stdout.reconfigure(newline="\n")
     COMMANDS[sys.argv[1]](*sys.argv[2:])

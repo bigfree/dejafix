@@ -2,8 +2,8 @@ use std::borrow::Cow;
 
 use super::{
     casefold, char_len, char_prefix, collapse_whitespace, contains_word, decimal_value,
-    is_python_decimal, is_python_space, is_python_word, python_lines, python_split, python_strip,
-    python_strip_matches, universal_newlines, zfill,
+    is_python_decimal, is_python_space, is_python_word, python_int, python_lines, python_split,
+    python_strip, python_strip_matches, universal_newlines, zfill,
 };
 
 fn lines(bytes: &[u8]) -> Vec<(usize, Vec<u8>)> {
@@ -162,4 +162,33 @@ fn contains_word_uses_python_word_boundaries() {
     assert!(!contains_word("préact", "act"));
     assert!(!contains_word("", "x"));
     assert!(!contains_word("x", ""));
+}
+
+#[test]
+fn integers_parse_like_python_int() {
+    for (text, value) in [
+        ("42", 42),
+        (" +42\n", 42),
+        ("-7", -7),
+        ("1_000", 1000),
+        ("\u{ff15}", 5),
+        ("\u{661}\u{662}", 12),
+        ("0", 0),
+    ] {
+        assert_eq!(python_int(text), Some(value), "{text:?}");
+    }
+    for text in [
+        "",
+        "+",
+        "-",
+        "++5",
+        "_1",
+        "1_",
+        "1__0",
+        "1.0",
+        "0x1",
+        "99999999999999999999",
+    ] {
+        assert_eq!(python_int(text), None, "{text:?}");
+    }
 }

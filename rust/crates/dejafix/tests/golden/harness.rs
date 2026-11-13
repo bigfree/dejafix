@@ -26,16 +26,19 @@ pub fn repository() -> Result<PathBuf, Box<dyn Error>> {
     )?)
 }
 
+pub const GIT_NO_MAINTENANCE: [&str; 4] = ["-c", "maintenance.auto=false", "-c", "gc.auto=0"];
+
 pub fn isolated(program: impl AsRef<OsStr>, home: &Path, source: &Path) -> Command {
     let mut command = Command::new(program);
     command.env_clear();
-    for name in ["PATH", "LLVM_PROFILE_FILE"] {
+    for name in ["PATH", "LLVM_PROFILE_FILE", "SYSTEMROOT"] {
         if let Some(value) = std::env::var_os(name) {
             command.env(name, value);
         }
     }
     command
         .env("HOME", home)
+        .env("USERPROFILE", home)
         .env("DEJAFIX_HOME", home.join(".dejafix"))
         .env("PYTHONPATH", source)
         .env("PYTHONDONTWRITEBYTECODE", "1")
@@ -163,7 +166,7 @@ pub fn run_actions(
     let mut files = BTreeMap::new();
     snapshot(&project, "project", &mut files)?;
     snapshot(&home, "home", &mut files)?;
-    snapshot_git_hooks(&project, &mut files)?;
+    snapshot_git_hooks(implementation, &project, &mut files)?;
     let python_version = python_version(&repository)?;
     let mut normalizer = Normalizer::new(
         &[
@@ -179,8 +182,8 @@ pub fn run_actions(
         .into_iter()
         .map(|output| StepOutput {
             code: output.status.code(),
-            stdout: normalizer.apply(&String::from_utf8_lossy(&output.stdout)),
-            stderr: normalizer.apply(&String::from_utf8_lossy(&output.stderr)),
+            stdout: normalizer.apply(&printed(implementation, &output.stdout)),
+            stderr: normalizer.apply(&printed(implementation, &output.stderr)),
         })
         .collect();
     let files = files
@@ -191,6 +194,22 @@ pub fn run_actions(
         })
         .collect();
     Ok(Run { steps, files })
+}
+
+fn printed(implementation: Implementation, bytes: &[u8]) -> String {
+    match implementation {
+        Implementation::Python => console_text(bytes),
+        Implementation::Rust => String::from_utf8_lossy(bytes).into_owned(),
+    }
+}
+
+pub fn console_text(bytes: &[u8]) -> String {
+    let text = String::from_utf8_lossy(bytes);
+    if cfg!(windows) {
+        text.replace("\r\n", "\n")
+    } else {
+        text.into_owned()
+    }
 }
 
 fn sorted(value: &serde_json::Value) -> serde_json::Value {
@@ -342,6 +361,7 @@ fn output_with_stdin(command: &mut Command, stdin: &str) -> Result<Output, Box<d
 }
 
 fn snapshot_git_hooks(
+    implementation: Implementation,
     project: &Path,
     files: &mut BTreeMap<String, String>,
 ) -> Result<(), Box<dyn Error>> {
@@ -352,6 +372,10 @@ fn snapshot_git_hooks(
             continue;
         }
         let text = String::from_utf8_lossy(&fs::read(&path)?).into_owned();
+        let text = match implementation {
+            Implementation::Python if cfg!(windows) => text.replace("\r\n", "\n"),
+            _ => text,
+        };
         files.insert(format!("project/.git/hooks/{name}"), text);
         files.insert(format!("project/.git/hooks/{name} (mode)"), mode(&path)?);
     }
@@ -413,15 +437,20 @@ fn first_difference(key: &str, left: &str, right: &str) -> String {
     }
 }
 
+fn at(path: &Path) -> impl FnOnce(std::io::Error) -> Box<dyn Error> + '_ {
+    move |error| format!("{}: {error}", path.display()).into()
+}
+
 fn copy_tree(from: &Path, to: &Path) -> Result<(), Box<dyn Error>> {
-    fs::create_dir_all(to)?;
-    for entry in fs::read_dir(from)? {
-        let entry = entry?;
+    fs::create_dir_all(to).map_err(at(to))?;
+    for entry in fs::read_dir(from).map_err(at(from))? {
+        let entry = entry.map_err(at(from))?;
+        let source = entry.path();
         let target = to.join(entry.file_name());
-        if entry.file_type()?.is_dir() {
-            copy_tree(&entry.path(), &target)?;
+        if entry.file_type().map_err(at(&source))?.is_dir() {
+            copy_tree(&source, &target)?;
         } else {
-            fs::copy(entry.path(), target)?;
+            fs::copy(&source, target).map_err(at(&source))?;
         }
     }
     Ok(())
@@ -432,16 +461,17 @@ fn snapshot(
     label: &str,
     files: &mut BTreeMap<String, String>,
 ) -> Result<(), Box<dyn Error>> {
-    for entry in fs::read_dir(root)? {
-        let entry = entry?;
+    for entry in fs::read_dir(root).map_err(at(root))? {
+        let entry = entry.map_err(at(root))?;
+        let path = entry.path();
         let key = format!("{label}/{}", entry.file_name().to_string_lossy());
         if key.ends_with("/.git") {
             continue;
         }
-        if entry.file_type()?.is_dir() {
-            snapshot(&entry.path(), &key, files)?;
+        if entry.file_type().map_err(at(&path))?.is_dir() {
+            snapshot(&path, &key, files)?;
         } else {
-            let text = String::from_utf8_lossy(&fs::read(entry.path())?).into_owned();
+            let text = String::from_utf8_lossy(&fs::read(&path).map_err(at(&path))?).into_owned();
             files.insert(key, text);
         }
     }

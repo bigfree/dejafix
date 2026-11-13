@@ -40,17 +40,18 @@ fn init_installs_three_executable_hooks_baked_with_this_binary() -> TestResult {
         "dejafix git hooks installed: post-commit, post-merge, pre-commit\n  Auto-captures: commits, reverts, merges, fixes, features, breaking changes.\n  Pre-commit: warns about repeating failed approaches and high-churn files.\n  Auto-capture active — events will be logged automatically.\n"
     ));
     let binary = Path::new(env!("CARGO_BIN_EXE_djf"));
-    let baked = binary.parent().ok_or("no parent")?.join("djf");
+    let baked = binary
+        .parent()
+        .ok_or("no parent")?
+        .join(format!("djf{}", std::env::consts::EXE_SUFFIX));
+    let baked = dejafix_core::shell_path(&baked.to_string_lossy());
     for name in ["post-commit", "post-merge", "pre-commit"] {
         let text = hook(&repo, name);
         assert!(
             text.starts_with("#!/bin/sh\n# >>> dejafix auto-capture >>>\n"),
             "{name}"
         );
-        assert!(
-            text.contains(&format!("DJF_BIN=\"{}\"", baked.display())),
-            "{name}"
-        );
+        assert!(text.contains(&format!("DJF_BIN=\"{baked}\"")), "{name}");
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
@@ -61,6 +62,25 @@ fn init_installs_three_executable_hooks_baked_with_this_binary() -> TestResult {
         }
     }
     assert!(hook(&repo, "post-merge").contains("_auto-capture \"merge\" >/dev/null 2>&1 &"));
+    Ok(())
+}
+
+#[test]
+fn a_hook_written_with_crlf_is_rewritten_with_lf() -> TestResult {
+    let repo = Repo::new()?;
+    repo.djf(&["hooks", "install"]).assert().success();
+    let path = repo.root.join(".git/hooks/post-commit");
+    let lf = hook(&repo, "post-commit");
+    fs::write(&path, lf.replace('\n', "\r\n"))?;
+    repo.djf(&["hooks", "install"])
+        .assert()
+        .success()
+        .stdout("dejafix git hooks refreshed: post-commit\n");
+    assert_eq!(hook(&repo, "post-commit"), lf);
+    repo.djf(&["hooks", "install"])
+        .assert()
+        .success()
+        .stdout("dejafix git hooks already installed.\n");
     Ok(())
 }
 
@@ -150,6 +170,17 @@ fn wait_for_events(
     }
 }
 
+fn path_without_djf() -> Result<std::ffi::OsString, std::env::JoinPathsError> {
+    let inherited = std::env::var_os("PATH").unwrap_or_default();
+    std::env::join_paths(std::env::split_paths(&inherited).filter(|directory| {
+        ["djf", "dejafix"].iter().all(|name| {
+            !directory
+                .join(format!("{name}{}", std::env::consts::EXE_SUFFIX))
+                .exists()
+        })
+    }))
+}
+
 #[test]
 fn a_real_commit_records_the_event_and_is_never_blocked() -> TestResult {
     let repo = Repo::bare()?;
@@ -163,7 +194,7 @@ fn a_real_commit_records_the_event_and_is_never_blocked() -> TestResult {
         .current_dir(&repo.root)
         .env("HOME", &repo.home)
         .env("DEJAFIX_HOME", repo.home.join(".dejafix"))
-        .env("PATH", "/usr/bin:/bin")
+        .env("PATH", path_without_djf()?)
         .output()?;
     assert!(output.status.success(), "{output:?}");
     let events = wait_for_events(&repo, 1)?;

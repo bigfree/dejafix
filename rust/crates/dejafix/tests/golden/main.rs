@@ -15,7 +15,7 @@ use std::error::Error;
 use std::path::Path;
 
 use dejafix_core::testing::{FIXTURE_SEED, FIXTURE_SIZES, write_project};
-use harness::{diff, isolated, output, python, repository, run};
+use harness::{console_text, diff, isolated, output, python, repository, run};
 use types::{Implementation, Normalizer, Step};
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -50,7 +50,7 @@ fn every_fixture_is_read_by_python_read_events() -> TestResult {
             "{}",
             String::from_utf8_lossy(&output.stderr)
         );
-        assert_eq!(String::from_utf8(output.stdout)?, format!("ok {size}\n"));
+        assert_eq!(console_text(&output.stdout), format!("ok {size}\n"));
     }
     Ok(())
 }

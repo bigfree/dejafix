@@ -2,7 +2,7 @@ use std::env::consts::EXE_SUFFIX;
 use std::fs;
 use std::path::Path;
 
-use crate::support::{Repo, TestResult};
+use crate::support::{self, Repo, TestResult};
 
 const STALE: &str = "# dejafix AI Instructions\n\n\
 Call `precheck_file(path)` before editing.\n\n\
@@ -202,7 +202,7 @@ fn init_refreshes_a_stale_file_keeping_a_backup_and_the_global_block() -> TestRe
     let rules = text.find("## Rules summary").ok_or("no rules summary")?;
     assert!(global < rules);
     assert_eq!(
-        fs::read_to_string(repo.mem().join("AI_INSTRUCTIONS.md.bak"))?,
+        support::text(&repo.mem().join("AI_INSTRUCTIONS.md.bak"))?,
         STALE
     );
     assert!(out.contains(
@@ -407,7 +407,7 @@ fn no_mcp_config_suppresses_the_block() -> TestResult {
 #[test]
 fn init_warns_when_a_client_config_still_pins_one_repo() -> TestResult {
     let repo = Repo::bare()?;
-    let config = repo.home.join(".cursor/mcp.json");
+    let config = repo.home.join(".cursor").join("mcp.json");
     fs::create_dir_all(config.parent().ok_or("no parent")?)?;
     let pinned =
         r#"{"mcpServers":{"dejafix":{"args":["-m","dejafix.mcp_server","--root","/old/repo"]}}}"#;
@@ -439,7 +439,7 @@ fn init_detects_a_pin_set_through_the_environment() -> TestResult {
 #[test]
 fn a_client_config_that_does_not_pin_raises_no_warning() -> TestResult {
     let repo = Repo::bare()?;
-    let config = repo.home.join(".cursor/mcp.json");
+    let config = repo.home.join(".cursor").join("mcp.json");
     fs::create_dir_all(config.parent().ok_or("no parent")?)?;
     fs::write(
         &config,
@@ -466,7 +466,7 @@ fn init_prints_the_codex_toml_form() -> TestResult {
 fn linux_client_paths_are_scanned_and_xdg_is_honoured() -> TestResult {
     let repo = Repo::bare()?;
     let xdg = repo.home.with_file_name("elsewhere");
-    let config = xdg.join("Claude/claude_desktop_config.json");
+    let config = xdg.join("Claude").join("claude_desktop_config.json");
     fs::create_dir_all(config.parent().ok_or("no parent")?)?;
     fs::write(
         &config,

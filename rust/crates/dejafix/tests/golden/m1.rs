@@ -22,6 +22,11 @@ use crate::harness::{isolated, python, repository};
 type TestResult = Result<(), Box<dyn Error>>;
 
 const ZONE: &str = "America/Denver";
+const OUT_OF_CRT_RANGE: [&str; 2] = ["0001-", "9999-"];
+
+fn python_zone() -> &'static str {
+    if cfg!(windows) { "MST7MDT" } else { ZONE }
+}
 
 fn oracle(args: &[&str], cwd: &Path, stdin: &str) -> Result<String, Box<dyn Error>> {
     let script = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/golden/oracle.py");
@@ -29,7 +34,7 @@ fn oracle(args: &[&str], cwd: &Path, stdin: &str) -> Result<String, Box<dyn Erro
     let home = tempfile::tempdir()?;
     let mut command = isolated(python(&repository), home.path(), &repository.join("src"));
     command
-        .env("TZ", ZONE)
+        .env("TZ", python_zone())
         .arg(script)
         .args(args)
         .current_dir(cwd)
@@ -217,6 +222,12 @@ fn compare_scalars(
     let mut mismatches = Vec::new();
     for (input, line) in inputs.iter().zip(python.lines()) {
         let expected: Value = serde_json::from_str(line)?;
+        if cfg!(windows)
+            && expected == "!os"
+            && OUT_OF_CRT_RANGE.iter().any(|year| input.starts_with(year))
+        {
+            continue;
+        }
         let actual = rust(input);
         if expected != actual {
             mismatches.push(format!("{input:?}: python {expected} != rust {actual}"));

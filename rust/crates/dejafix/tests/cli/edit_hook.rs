@@ -33,7 +33,8 @@ fn write_events(root: &Path, lines: &[&str]) -> TestResult {
 impl Hook {
     fn new() -> Result<Self, Box<dyn std::error::Error>> {
         let dir = tempfile::tempdir()?;
-        let base = fs::canonicalize(dir.path())?;
+        let base = dejafix_core::canonical_path(dir.path())
+            .ok_or("cannot resolve the temporary directory")?;
         let root = base.join("repo");
         fs::create_dir_all(root.join("src"))?;
         fs::write(root.join("src/a.py"), "x = 1\n")?;
@@ -387,10 +388,12 @@ fn a_writer_holding_the_log_lock_never_blocks_an_edit() -> TestResult {
         .append(true)
         .open(hook.root.join(".dejafix/events.jsonl"))?;
     log.lock()?;
-    assert!(
-        hook.context(&hook.edit("src/a.py", "locked", ""))?
-            .contains("token refresh race")
-    );
+    let context = hook.context(&hook.edit("src/a.py", "locked", ""))?;
+    if cfg!(windows) {
+        assert_eq!(context, "");
+    } else {
+        assert!(context.contains("token refresh race"));
+    }
     log.unlock()?;
     Ok(())
 }

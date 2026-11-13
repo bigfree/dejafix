@@ -1,5 +1,6 @@
 use std::error::Error;
 use std::fs;
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -26,6 +27,14 @@ fn git(dir: &Path, args: &[&str]) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+pub fn native(path: &Path) -> PathBuf {
+    path.components().collect()
+}
+
+pub fn text(path: &Path) -> Result<String, Box<dyn Error>> {
+    Ok(dejafix_core::testing::universal_newlines(&fs::read_to_string(path)?).into_owned())
+}
+
 impl Repo {
     pub fn new() -> Result<Self, Box<dyn Error>> {
         let repo = Self::bare()?;
@@ -41,7 +50,9 @@ impl Repo {
 
     pub fn bare_named(name: &str) -> Result<Self, Box<dyn Error>> {
         let dir = tempfile::tempdir()?;
-        let root = fs::canonicalize(dir.path())?.join(name);
+        let root = dejafix_core::canonical_path(dir.path())
+            .ok_or("cannot resolve the temporary directory")?
+            .join(name);
         let home = root.with_file_name("home");
         fs::create_dir_all(&root)?;
         fs::create_dir_all(&home)?;
@@ -61,7 +72,7 @@ impl Repo {
     }
 
     pub fn read(&self, relative: &str) -> Result<String, Box<dyn Error>> {
-        Ok(fs::read_to_string(self.root.join(relative))?)
+        text(&self.root.join(relative))
     }
 
     pub fn djf_in(&self, cwd: &Path, args: &[&str]) -> assert_cmd::Command {
@@ -90,8 +101,11 @@ impl Repo {
     }
 
     pub fn events(&self) -> Result<Vec<Value>, Box<dyn Error>> {
-        fs::read_to_string(self.mem().join("events.jsonl"))?
-            .lines()
+        let mut file = fs::File::open(self.mem().join("events.jsonl"))?;
+        file.lock_shared()?;
+        let mut text = String::new();
+        file.read_to_string(&mut text)?;
+        text.lines()
             .map(|line| Ok(serde_json::from_str(line)?))
             .collect()
     }

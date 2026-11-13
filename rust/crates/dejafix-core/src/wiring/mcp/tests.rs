@@ -28,7 +28,7 @@ struct World {
 impl World {
     fn new() -> Self {
         let temp = tempfile::tempdir().unwrap();
-        let base = fs::canonicalize(temp.path()).unwrap();
+        let base = crate::canonical_path(temp.path()).unwrap();
         let home = base.join("home");
         fs::create_dir_all(&home).unwrap();
         Self {
@@ -439,7 +439,11 @@ fn a_missing_log_is_python_s_file_not_found_error() {
         reply.text,
         format!(
             "dejafix tool error: FileNotFoundError: [Errno 2] No such file or directory: '{}'",
-            root.join(".dejafix/events.jsonl").display()
+            root.join(".dejafix")
+                .join("events.jsonl")
+                .display()
+                .to_string()
+                .replace('\\', "\\\\")
         )
     );
 }
@@ -488,7 +492,12 @@ fn a_pinned_server_resolves_paths_from_its_root_as_python_s_chdir_does() {
     fs::create_dir_all(&elsewhere).unwrap();
     let state = world.state(Some(&root), &elsewhere);
     let cached = state.cached_log(&root, &fixed_clock()).unwrap();
-    assert_eq!(cached.context.cwd, root.to_string_lossy());
+    let posix = if cfg!(windows) {
+        root.to_string_lossy().replace('\\', "/")
+    } else {
+        root.to_string_lossy().into_owned()
+    };
+    assert_eq!(cached.context.cwd, posix);
 }
 
 #[derive(Default)]

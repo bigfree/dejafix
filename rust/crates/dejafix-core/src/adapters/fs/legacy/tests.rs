@@ -128,11 +128,13 @@ fn a_live_watcher_is_found_and_anything_else_is_not() {
     let legacy = temp.path();
     assert_eq!(live_watcher(legacy), None);
     let pid = std::process::id();
-    for text in [format!("{pid}\n"), format!(" +{pid} ")] {
+    let digits = pid.to_string();
+    let grouped = format!("{}_{}", &digits[..1], &digits[1..]);
+    for text in [format!("{pid}\n"), format!(" +{pid} "), grouped] {
         fs::write(legacy.join("watch.pid"), text).unwrap();
         assert_eq!(live_watcher(legacy), Some(pid));
     }
-    for text in ["garbage", "0", "-1", "++5", "4194999"] {
+    for text in ["garbage", "0", "-1", "++5", "1__2", "4194999"] {
         fs::write(legacy.join("watch.pid"), text).unwrap();
         assert_eq!(live_watcher(legacy), None, "{text}");
     }

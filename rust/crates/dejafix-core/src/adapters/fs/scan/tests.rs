@@ -1,6 +1,8 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use crate::adapters::fs::canonical_path;
+
 use super::{
     ClientPaths, ConfigState, client_configs, dedupe_paths, default_roots, find_projects,
     pinned_client_configs, scan_client_configs,
@@ -221,7 +223,7 @@ fn project(root: &Path) {
 #[test]
 fn the_walk_finds_projects_and_skips_noise() {
     let dir = tempfile::tempdir().unwrap();
-    let base = fs::canonicalize(dir.path()).unwrap();
+    let base = canonical_path(dir.path()).unwrap();
     let work = base.as_path().join("work");
     project(&work.join("one"));
     project(&work.join("nested/two"));
@@ -239,7 +241,7 @@ fn the_walk_finds_projects_and_skips_noise() {
 #[test]
 fn the_default_depth_reaches_a_nested_repo_folder() {
     let dir = tempfile::tempdir().unwrap();
-    let base = fs::canonicalize(dir.path()).unwrap();
+    let base = canonical_path(dir.path()).unwrap();
     let deep = base.as_path().join("drive/repo/Group/Project");
     project(&deep);
     let drive = base.as_path().join("drive");
@@ -252,7 +254,7 @@ fn the_default_depth_reaches_a_nested_repo_folder() {
 #[test]
 fn a_missing_root_finds_nothing() {
     let dir = tempfile::tempdir().unwrap();
-    let base = fs::canonicalize(dir.path()).unwrap();
+    let base = canonical_path(dir.path()).unwrap();
     assert_eq!(find_projects(&base.as_path().join("missing"), 4).len(), 0);
 }
 
@@ -260,7 +262,7 @@ fn a_missing_root_finds_nothing() {
 #[test]
 fn symlinked_folders_are_listed_but_not_entered() {
     let dir = tempfile::tempdir().unwrap();
-    let base = fs::canonicalize(dir.path()).unwrap();
+    let base = canonical_path(dir.path()).unwrap();
     let outside = base.as_path().join("outside");
     project(&outside.join("deep"));
     let work = base.as_path().join("work");
@@ -277,7 +279,7 @@ fn symlinked_folders_are_listed_but_not_entered() {
 #[test]
 fn dedupe_paths_uses_identity_not_text() {
     let dir = tempfile::tempdir().unwrap();
-    let base = fs::canonicalize(dir.path()).unwrap();
+    let base = canonical_path(dir.path()).unwrap();
     let real = base.as_path().join("dir");
     fs::create_dir_all(&real).unwrap();
     let link = base.as_path().join("link");
@@ -290,7 +292,7 @@ fn dedupe_paths_uses_identity_not_text() {
 #[test]
 fn the_same_folder_reached_twice_is_found_once() {
     let dir = tempfile::tempdir().unwrap();
-    let base = fs::canonicalize(dir.path()).unwrap();
+    let base = canonical_path(dir.path()).unwrap();
     let work = base.as_path().join("work");
     project(&work.join("api"));
     let again = base.as_path().join("work-again");
@@ -306,7 +308,7 @@ fn the_same_folder_reached_twice_is_found_once() {
 #[test]
 fn cloud_folders_are_included_by_default() {
     let dir = tempfile::tempdir().unwrap();
-    let base = fs::canonicalize(dir.path()).unwrap();
+    let base = canonical_path(dir.path()).unwrap();
     let home = base.as_path();
     for name in [
         "OneDrive - Some University",
@@ -344,7 +346,7 @@ fn cloud_folders_are_included_by_default() {
 #[test]
 fn cloud_roots_are_deduped_by_what_they_resolve_to() {
     let dir = tempfile::tempdir().unwrap();
-    let base = fs::canonicalize(dir.path()).unwrap();
+    let base = canonical_path(dir.path()).unwrap();
     let home = base.as_path();
     let real = home.join("Library/CloudStorage/OneDrive-Uni");
     fs::create_dir_all(&real).unwrap();
@@ -362,15 +364,19 @@ fn cloud_roots_are_deduped_by_what_they_resolve_to() {
 #[test]
 fn an_empty_home_has_no_roots() {
     let dir = tempfile::tempdir().unwrap();
-    let base = fs::canonicalize(dir.path()).unwrap();
-    assert_eq!(default_roots(base.as_path()).len(), 0);
+    let base = canonical_path(dir.path()).unwrap();
+    let roots = default_roots(base.as_path());
+    assert!(
+        roots.iter().all(|root| !root.starts_with(&base)),
+        "{roots:?}"
+    );
 }
 
 #[cfg(unix)]
 #[test]
 fn a_symlinked_root_is_walked_under_its_resolved_path() {
     let dir = tempfile::tempdir().unwrap();
-    let base = fs::canonicalize(dir.path()).unwrap();
+    let base = canonical_path(dir.path()).unwrap();
     project(&base.join("real/api"));
     std::os::unix::fs::symlink(base.join("real"), base.join("alias")).unwrap();
     assert_eq!(

@@ -84,7 +84,7 @@ fn write(path: &Path, text: &str) {
 
 fn bare() -> Machine {
     let dir = tempfile::tempdir().unwrap();
-    let base = fs::canonicalize(dir.path()).unwrap();
+    let base = crate::canonical_path(dir.path()).unwrap();
     let home = base.join("home");
     fs::create_dir_all(&home).unwrap();
     Machine {

@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use regex::Regex;
 use serde_json::Value;
 
-use crate::support::{Repo, TestResult};
+use crate::support::{Repo, TestResult, text};
 
 const PATTERNS: &str = concat!(
     r#"{"confidence": "high", "created": "2020-01-01T00:00:00Z", "id": "pat_000000000001", "pattern": "old high pattern", "source_project": "alpha", "tags": ["python"], "times_encountered": 1}"#,
@@ -131,7 +131,7 @@ fn with_stack(repo: &Repo) -> TestResult {
 }
 
 fn read(repo: &Repo, name: &str) -> Result<String, Box<dyn std::error::Error>> {
-    Ok(fs::read_to_string(global_dir(repo).join(name))?)
+    text(&global_dir(repo).join(name))
 }
 
 fn run(repo: &Repo, args: &[&str]) -> Result<String, Box<dyn std::error::Error>> {

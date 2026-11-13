@@ -92,7 +92,7 @@ fn an_unregistered_project_is_given_by_a_relative_path() -> TestResult {
 #[test]
 fn legacy_variables_and_configs_are_reported() -> TestResult {
     let repo = Repo::bare()?;
-    let config = repo.home.join(".codex/config.toml");
+    let config = repo.home.join(".codex").join("config.toml");
     fs::create_dir_all(config.parent().ok_or("no parent")?)?;
     fs::write(&config, "[mcp_servers.projectmem]\ncommand = \"pjm-mcp\"\n")?;
     let output = repo

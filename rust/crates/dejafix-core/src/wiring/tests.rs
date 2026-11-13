@@ -7,13 +7,18 @@ use super::{
     other_projects, read_memory_file, record, regenerate, register_project, registry_op,
     scan_projects, search_project, show, upgrade_notice,
 };
-use crate::adapters::fs::ClientPaths;
+use crate::adapters::fs::{ClientPaths, canonical_path};
 use crate::core::event::Outcome;
 use crate::core::registry::RegistryError;
 use crate::core::scaffold::{INSTRUCTIONS_VERSION, ai_instructions, instructions_version};
 use crate::core::search::SearchQuery;
+use crate::core::text::universal_newlines;
 use crate::core::write::{Command, ValidationError, WriteOutcome};
 use crate::testing::{FIXTURE_SEED, SeqIds, fixed_clock, write_project};
+
+fn read(path: impl AsRef<Path>) -> String {
+    universal_newlines(&fs::read_to_string(path).unwrap()).into_owned()
+}
 
 fn settings(home: &Path) -> Settings {
     Settings {
@@ -48,7 +53,7 @@ fn a_note_appends_one_line_and_regenerates_the_summary() {
     )
     .unwrap();
     assert_eq!(recorded.outcome, WriteOutcome::Noted);
-    let log = fs::read_to_string(dir.path().join(".dejafix/events.jsonl")).unwrap();
+    let log = read(dir.path().join(".dejafix/events.jsonl"));
     assert_eq!(log.lines().count(), 1);
     let summary = show(&project).unwrap();
     assert!(summary.contains("- models live in src/models\n"));
@@ -72,10 +77,7 @@ fn log_attempt_fix_keep_the_marker_and_issue_file_in_step() {
     )
     .unwrap();
     assert_eq!(logged.outcome, WriteOutcome::Logged("0001".into()));
-    assert_eq!(
-        fs::read_to_string(dir.path().join(".dejafix/.current_issue")).unwrap(),
-        "0001"
-    );
+    assert_eq!(read(dir.path().join(".dejafix/.current_issue")), "0001");
     let attempted = record(
         &project,
         Command::Attempt {
@@ -106,7 +108,7 @@ fn log_attempt_fix_keep_the_marker_and_issue_file_in_step() {
     )
     .unwrap();
     assert!(!dir.path().join(".dejafix/.current_issue").exists());
-    let issue = fs::read_to_string(dir.path().join(".dejafix/issues/0001-login-fails.md")).unwrap();
+    let issue = read(dir.path().join(".dejafix/issues/0001-login-fails.md"));
     assert_eq!(issue.lines().count(), 5);
     assert!(
         show(&project)
@@ -137,10 +139,7 @@ fn a_stale_marker_is_cleared_even_when_the_command_fails() {
         WiringError::Validation(ValidationError::NoOpenIssue)
     ));
     assert!(!dir.path().join(".dejafix/.current_issue").exists());
-    assert_eq!(
-        fs::read_to_string(dir.path().join(".dejafix/events.jsonl")).unwrap(),
-        ""
-    );
+    assert_eq!(read(dir.path().join(".dejafix/events.jsonl")), "");
 }
 
 #[test]
@@ -166,15 +165,11 @@ fn appending_an_event_stays_inside_an_isolated_home() {
         &mut SeqIds::default(),
     )
     .unwrap();
-    let gotchas = fs::read_to_string(home.path().join("global/library_gotchas.jsonl")).unwrap();
+    let gotchas = read(home.path().join("global/library_gotchas.jsonl"));
     assert_eq!(gotchas.lines().count(), 1);
     assert!(gotchas.contains("\"library\": \"react\""));
     assert!(gotchas.contains("\"discovered\": \"2027-01-15T08:00:00Z\""));
-    assert!(
-        fs::read_to_string(home.path().join("global/.promotable.json"))
-            .unwrap()
-            .contains("\"zod\"")
-    );
+    assert!(read(home.path().join("global/.promotable.json")).contains("\"zod\""));
 }
 
 #[test]
@@ -257,7 +252,7 @@ fn a_failed_regeneration_still_reports_the_recorded_event() {
     let recorded = record(&project, note("still recorded"), &mut SeqIds::default()).unwrap();
     assert_eq!(recorded.outcome, WriteOutcome::Noted);
     assert!(matches!(recorded.incomplete, Some(WiringError::Store(_))));
-    let log = fs::read_to_string(dir.path().join(".dejafix/events.jsonl")).unwrap();
+    let log = read(dir.path().join(".dejafix/events.jsonl"));
     assert_eq!(log.lines().count(), 1);
 }
 
@@ -303,7 +298,7 @@ struct Initialised {
 
 fn initialised(name: &str) -> Initialised {
     let dir = tempfile::tempdir().unwrap();
-    let base = fs::canonicalize(dir.path()).unwrap();
+    let base = canonical_path(dir.path()).unwrap();
     let root = base.join(name);
     fs::create_dir(&root).unwrap();
     Initialised {
@@ -340,21 +335,15 @@ fn init_creates_the_memory_files_and_registers_the_project() {
     );
     assert_eq!(report.project_map, None);
     assert_eq!(report.inherited, None);
-    assert!(
-        fs::read_to_string(project.root.join("CLAUDE.md"))
-            .unwrap()
-            .contains("**checkout-api**")
-    );
-    let gitignore = fs::read_to_string(project.root.join(".gitignore")).unwrap();
+    assert!(read(project.root.join("CLAUDE.md")).contains("**checkout-api**"));
+    let gitignore = read(project.root.join(".gitignore"));
     assert!(gitignore.contains(".dejafix/events.jsonl") && !gitignore.contains("plan.md"));
-    let list = fs::read_to_string(project.home.join("projects.json")).unwrap();
-    assert!(list.contains(&*project.root.to_string_lossy()));
+    let list = read(project.home.join("projects.json"));
+    let listed: Vec<String> = serde_json::from_str(&list).unwrap();
+    assert!(listed.contains(&project.root.display().to_string()));
     let again = init_project(&project.root, None, &settings(&project.home), &options()).unwrap();
     assert_eq!(again.bridges.len(), 0);
-    assert_eq!(
-        fs::read_to_string(project.home.join("projects.json")).unwrap(),
-        list
-    );
+    assert_eq!(read(project.home.join("projects.json")), list);
     assert_eq!(other_projects(&settings(&project.home), &project.root), 0);
 }
 
@@ -362,7 +351,7 @@ fn init_creates_the_memory_files_and_registers_the_project() {
 fn init_names_the_bridge_after_the_registered_alias() {
     let project = initialised("Shop_Front");
     init_project(&project.root, None, &settings(&project.home), &options()).unwrap();
-    let claude = fs::read_to_string(project.root.join("CLAUDE.md")).unwrap();
+    let claude = read(project.root.join("CLAUDE.md"));
     assert!(claude.contains("**shop-front**"));
     registry_op(
         &settings(&project.home),
@@ -382,11 +371,7 @@ fn init_names_the_bridge_after_the_registered_alias() {
             ("AGENTS.md", BridgeOutcome::Refreshed)
         ]
     );
-    assert!(
-        fs::read_to_string(project.root.join("AGENTS.md"))
-            .unwrap()
-            .contains("**shop**")
-    );
+    assert!(read(project.root.join("AGENTS.md")).contains("**shop**"));
 }
 
 #[test]
@@ -396,11 +381,7 @@ fn an_unregistrable_home_falls_back_to_the_folder_slug() {
     let mut no_claude = options();
     no_claude.global = false;
     init_project(&project.root, None, &settings(&project.home), &no_claude).unwrap();
-    assert!(
-        fs::read_to_string(project.root.join("CLAUDE.md"))
-            .unwrap()
-            .contains("**my-app**")
-    );
+    assert!(read(project.root.join("CLAUDE.md")).contains("**my-app**"));
 }
 
 #[test]
@@ -414,24 +395,14 @@ fn init_refreshes_an_older_marker_and_keeps_the_global_block() {
     no_global.global = false;
     let report = init_project(&project.root, None, &settings(&project.home), &no_global).unwrap();
     assert!(report.refreshed_instructions);
-    let text = fs::read_to_string(mem.join("AI_INSTRUCTIONS.md")).unwrap();
+    let text = read(mem.join("AI_INSTRUCTIONS.md"));
     assert_eq!(instructions_version(&text), INSTRUCTIONS_VERSION);
     assert!(text.contains("- kept\n"));
-    assert_eq!(
-        fs::read_to_string(mem.join("AI_INSTRUCTIONS.md.bak")).unwrap(),
-        stale
-    );
-    assert!(
-        fs::read_to_string(project.root.join(".gitignore"))
-            .unwrap()
-            .contains(".dejafix/AI_INSTRUCTIONS.md.bak\n")
-    );
+    assert_eq!(read(mem.join("AI_INSTRUCTIONS.md.bak")), stale);
+    assert!(read(project.root.join(".gitignore")).contains(".dejafix/AI_INSTRUCTIONS.md.bak\n"));
     fs::write(mem.join("AI_INSTRUCTIONS.md"), "old, no marker\n").unwrap();
     init_project(&project.root, None, &settings(&project.home), &no_global).unwrap();
-    assert_eq!(
-        fs::read_to_string(mem.join("AI_INSTRUCTIONS.md")).unwrap(),
-        ai_instructions()
-    );
+    assert_eq!(read(mem.join("AI_INSTRUCTIONS.md")), ai_instructions());
 }
 
 #[test]
@@ -443,7 +414,7 @@ fn a_current_instructions_file_is_never_rewritten() {
     fs::write(&path, &edited).unwrap();
     let report = init_project(&project.root, None, &settings(&project.home), &options()).unwrap();
     assert!(!report.refreshed_instructions);
-    assert_eq!(fs::read_to_string(&path).unwrap(), edited);
+    assert_eq!(read(&path), edited);
     assert!(!path.with_file_name("AI_INSTRUCTIONS.md.bak").exists());
 }
 
@@ -476,10 +447,9 @@ fn global_memory_and_the_stack_map_are_inherited() {
     let inherited = report.inherited.unwrap();
     assert_eq!((inherited.gotchas, inherited.patterns), (1, 0));
     assert_eq!(inherited.tags, ["javascript", "react"]);
-    let instructions =
-        fs::read_to_string(project.root.join(".dejafix/AI_INSTRUCTIONS.md")).unwrap();
+    let instructions = read(project.root.join(".dejafix/AI_INSTRUCTIONS.md"));
     assert!(instructions.contains("- **react**: strict mode mounts twice (from web)\n"));
-    let map = fs::read_to_string(project.root.join(".dejafix/PROJECT_MAP.md")).unwrap();
+    let map = read(project.root.join(".dejafix/PROJECT_MAP.md"));
     assert!(
         map.contains("## Project purpose\nShop\n")
             && map.contains("- `src/` — package or application code")
@@ -487,7 +457,7 @@ fn global_memory_and_the_stack_map_are_inherited() {
     assert!(project.home.join("global/.promotable.json").is_file());
     let again = init_project(&project.root, None, &settings(&project.home), &options()).unwrap();
     assert_eq!(again.project_map, None);
-    let twice = fs::read_to_string(project.root.join(".dejafix/AI_INSTRUCTIONS.md")).unwrap();
+    let twice = read(project.root.join(".dejafix/AI_INSTRUCTIONS.md"));
     assert_eq!(twice, instructions);
     let mut python = options();
     python.global_tags = Some(" python , x".into());
@@ -520,7 +490,7 @@ fn plan_ideas_and_memory_files_are_read_from_the_memory_directory() {
     let sub = project.root.join("src");
     fs::create_dir(&sub).unwrap();
     let path = add_plan_idea(&sub, "ship the plan").unwrap();
-    assert_eq!(path, project.root.join(".dejafix/plan.md"));
+    assert_eq!(path, project.root.join(".dejafix").join("plan.md"));
     let (_, plan) = read_memory_file(&project.root, MemoryFile::Plan).unwrap();
     assert!(plan.contains("## Ideas\n- ship the plan\n"));
     assert_eq!(
@@ -640,7 +610,7 @@ fn an_unsaved_registration_does_not_name_the_bridge() {
     let report = init_project(&second, None, &settings(&first.home), &options());
     fs::set_permissions(&first.home, fs::Permissions::from_mode(0o700)).unwrap();
     report.unwrap();
-    let claude = fs::read_to_string(second.join("CLAUDE.md")).unwrap();
+    let claude = read(second.join("CLAUDE.md"));
     assert!(claude.contains("**web**"), "{claude}");
     assert!(!claude.contains("web-2"));
 }
@@ -663,20 +633,16 @@ fn a_symlink_out_of_the_project_is_never_copied_into_it() {
     .unwrap();
     init_project(&project.root, None, &settings(&project.home), &options()).unwrap();
     for file in ["CLAUDE.md", ".gitignore"] {
-        let text = fs::read_to_string(project.root.join(file)).unwrap();
+        let text = read(project.root.join(file));
         assert!(!text.contains("hunter2"), "{file}: {text}");
     }
-    assert!(
-        fs::read_to_string(project.root.join("AGENTS.md"))
-            .unwrap()
-            .starts_with("# Notes\n")
-    );
-    assert_eq!(fs::read_to_string(&secret).unwrap(), "TOKEN=hunter2\n");
+    assert!(read(project.root.join("AGENTS.md")).starts_with("# Notes\n"));
+    assert_eq!(read(&secret), "TOKEN=hunter2\n");
     let plan = project.root.join(".dejafix/plan.md");
     fs::remove_file(&plan).unwrap();
     symlink(&secret, &plan).unwrap();
     add_plan_idea(&project.root, "x").unwrap();
-    assert!(!fs::read_to_string(&plan).unwrap().contains("hunter2"));
+    assert!(!read(&plan).contains("hunter2"));
     let instructions = project.root.join(".dejafix/AI_INSTRUCTIONS.md");
     fs::remove_file(&instructions).unwrap();
     symlink(&secret, &instructions).unwrap();
@@ -693,7 +659,7 @@ fn a_symlink_out_of_the_project_is_never_copied_into_it() {
             .join(".dejafix/AI_INSTRUCTIONS.md.bak")
             .exists()
     );
-    assert_eq!(fs::read_to_string(&secret).unwrap(), "TOKEN=hunter2\n");
+    assert_eq!(read(&secret), "TOKEN=hunter2\n");
 }
 
 struct Machine {
@@ -705,7 +671,7 @@ struct Machine {
 
 fn machine() -> Machine {
     let dir = tempfile::tempdir().unwrap();
-    let root = fs::canonicalize(dir.path()).unwrap();
+    let root = canonical_path(dir.path()).unwrap();
     let home = root.join("home");
     fs::create_dir_all(&home).unwrap();
     Machine {
@@ -792,13 +758,13 @@ fn doctor_prunes_entries_whose_memory_is_gone() {
 #[test]
 fn doctor_tracks_pinned_configs_across_runs() {
     let machine = machine();
-    let config = machine.paths.home.join(".cursor/mcp.json");
+    let config = machine.paths.home.join(".cursor").join("mcp.json");
     fs::create_dir_all(config.parent().unwrap()).unwrap();
     let options = doctor_options(false, &[]);
     fs::write(&config, r#"{"dejafix": {"args": []}}"#).unwrap();
     let first = doctor(&machine.settings, &machine.paths, &machine.root, &options).unwrap();
     assert!(first.pinned.is_empty() && first.reverted.is_empty());
-    let state = fs::read_to_string(machine.root.join("djf/doctor-state.json")).unwrap();
+    let state = read(machine.root.join("djf/doctor-state.json"));
     let key = serde_json::to_string(&config.display().to_string()).unwrap();
     assert_eq!(
         state,
@@ -823,7 +789,7 @@ fn doctor_tracks_pinned_configs_across_runs() {
 fn doctor_survives_an_unwritable_state_file_and_reports_unreadable_configs() {
     let machine = machine();
     fs::create_dir_all(machine.root.join("djf/doctor-state.json")).unwrap();
-    fs::create_dir_all(machine.paths.home.join(".codex/config.toml")).unwrap();
+    fs::create_dir_all(machine.paths.home.join(".codex").join("config.toml")).unwrap();
     let report = doctor(
         &machine.settings,
         &machine.paths,
@@ -935,7 +901,7 @@ fn scan_refuses_a_root_that_is_not_a_directory() {
 #[test]
 fn doctor_ignores_configs_that_never_mention_dejafix() {
     let machine = machine();
-    let config = machine.paths.home.join(".cursor/mcp.json");
+    let config = machine.paths.home.join(".cursor").join("mcp.json");
     fs::create_dir_all(config.parent().unwrap()).unwrap();
     fs::write(
         &config,
@@ -950,10 +916,7 @@ fn doctor_ignores_configs_that_never_mention_dejafix() {
     )
     .unwrap();
     assert_eq!(report.pinned.len(), 0);
-    assert_eq!(
-        fs::read_to_string(machine.root.join("djf/doctor-state.json")).unwrap(),
-        "{}"
-    );
+    assert_eq!(read(machine.root.join("djf/doctor-state.json")), "{}");
 }
 
 #[test]

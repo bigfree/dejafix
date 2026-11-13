@@ -7,7 +7,24 @@ use super::{
 };
 use crate::core::log::EventLog;
 use crate::core::path::{PathResolver, project_relative};
+use crate::core::text::platform_newlines;
 use crate::testing::fixed_clock;
+
+fn p(path: &str) -> String {
+    if cfg!(windows) {
+        format!("C:{}", path.replace('/', "\\"))
+    } else {
+        path.to_owned()
+    }
+}
+
+fn quoted(path: &str) -> String {
+    serde_json::json!(p(path)).to_string()
+}
+
+fn nl(text: &str) -> String {
+    platform_newlines(text).into_owned()
+}
 
 #[test]
 fn reading_a_missing_log_names_the_path() {
@@ -52,11 +69,11 @@ fn symlinks_resolve_and_a_missing_tail_is_kept() {
 #[test]
 fn a_deep_missing_path_resolves_through_its_deepest_existing_ancestor() {
     let dir = tempfile::tempdir().unwrap();
-    let real = fs::canonicalize(dir.path()).unwrap();
+    let real = super::resolve::posix(&fs::canonicalize(dir.path()).unwrap());
     let tail: Vec<String> = (0..2_000).map(|n| format!("d{n}")).collect();
     let deep = dir.path().join(tail.join("/"));
     let resolved = FsResolver.resolve(deep.to_str().unwrap()).unwrap();
-    assert_eq!(resolved, format!("{}/{}", real.display(), tail.join("/")));
+    assert_eq!(resolved, format!("{real}/{}", tail.join("/")));
 }
 
 #[cfg(unix)]
@@ -118,7 +135,7 @@ mod store {
         project(&root);
         assert_eq!(find_memory_dir(&root).unwrap().root, root);
         let found = find_memory_dir(&root.join("src/deep")).unwrap();
-        assert_eq!(found.root, fs::canonicalize(&root).unwrap());
+        assert_eq!(found.root, crate::canonical_path(&root).unwrap());
         let home = dir.path().join("home");
         fs::create_dir_all(home.join(".dejafix/global")).unwrap();
         fs::create_dir_all(home.join("work")).unwrap();
@@ -256,7 +273,7 @@ mod store {
         assert!(!cache.exists());
         store.record_promotable(&["zod".into()]).unwrap();
         let text = fs::read_to_string(&cache).unwrap();
-        assert!(text.starts_with("{\n  \"libraries\": [\n    \"alembic\","));
+        assert!(text.starts_with(&super::nl("{\n  \"libraries\": [\n    \"alembic\",")));
         assert!(text.contains("\"zod\"") && !text.ends_with('\n'));
         assert_eq!(store.promotable().unwrap().len(), 28);
         fs::write(&cache, "{broken").unwrap();
@@ -292,7 +309,7 @@ mod store {
         );
         assert_eq!(
             fs::read_to_string(dir.path().join("global/library_gotchas.jsonl")).unwrap(),
-            "{\"id\": \"got_1\", \"library\": \"react\"}\n"
+            super::nl("{\"id\": \"got_1\", \"library\": \"react\"}\n")
         );
         fs::write(dir.path().join("global/library_gotchas.jsonl"), "[1]\n").unwrap();
         assert_eq!(store.gotchas(), None);
@@ -312,16 +329,24 @@ const NOW: &str = "2027-01-15T08:00:00Z";
 fn a_0_2_x_registry_keeps_its_list_and_gains_a_sidecar() {
     let (_dir, files) = registry_home();
     fs::create_dir_all(files.list.parent().unwrap()).unwrap();
-    fs::write(&files.list, "[\n \"/code/alpha\",\n \"/code/beta\"\n]").unwrap();
+    let list = format!(
+        "[\n {},\n {}\n]",
+        quoted("/code/alpha"),
+        quoted("/code/beta")
+    );
+    fs::write(&files.list, &list).unwrap();
     let registry = files.load(NOW).unwrap();
     assert_eq!(registry.projects.len(), 2);
     assert_eq!(
         fs::read_to_string(&files.list).unwrap(),
-        "[\n \"/code/alpha\",\n \"/code/beta\"\n]\n"
+        nl(&format!("{list}\n"))
     );
     let meta = fs::read_to_string(&files.meta).unwrap();
-    assert!(meta.starts_with("{\n \"schema_version\": 1,\n \"active_project\": null,\n \"by_path\": {\n  \"/code/alpha\": {\n   \"id\": \"alpha\","));
-    assert!(meta.ends_with("}\n"));
+    assert!(meta.starts_with(&nl(&format!(
+        "{{\n \"schema_version\": 1,\n \"active_project\": null,\n \"by_path\": {{\n  {}: {{\n   \"id\": \"alpha\",",
+        quoted("/code/alpha")
+    ))));
+    assert!(meta.ends_with(&nl("}\n")));
     let leftovers: Vec<_> = fs::read_dir(files.list.parent().unwrap())
         .unwrap()
         .filter_map(Result::ok)
@@ -340,7 +365,7 @@ fn a_0_2_x_registry_keeps_its_list_and_gains_a_sidecar() {
 fn a_utf8_bom_and_a_corrupt_file_are_tolerated() {
     let (_dir, files) = registry_home();
     fs::create_dir_all(files.list.parent().unwrap()).unwrap();
-    fs::write(&files.list, b"\xef\xbb\xbf[\"/code/alpha\"]").unwrap();
+    fs::write(&files.list, format!("\u{feff}[{}]", quoted("/code/alpha"))).unwrap();
     assert_eq!(files.load(NOW).unwrap().projects[0].id, "alpha");
     fs::write(&files.list, "{not json").unwrap();
     fs::write(&files.meta, "[1]").unwrap();
@@ -352,16 +377,18 @@ fn a_utf8_bom_and_a_corrupt_file_are_tolerated() {
 fn a_dev_format_registry_is_converted_and_backed_up_once() {
     let (_dir, files) = registry_home();
     fs::create_dir_all(files.list.parent().unwrap()).unwrap();
-    let original =
-        r#"{"active_project": "alpha", "projects": [{"id": "alpha", "path": "/code/alpha"}]}"#;
-    fs::write(&files.list, original).unwrap();
+    let original = format!(
+        r#"{{"active_project": "alpha", "projects": [{{"id": "alpha", "path": {}}}]}}"#,
+        quoted("/code/alpha")
+    );
+    fs::write(&files.list, &original).unwrap();
     let registry = files.load(NOW).unwrap();
     assert_eq!(registry.active_project.as_deref(), Some("alpha"));
     let backup = files.list.with_file_name("projects.json.bak");
     assert_eq!(fs::read_to_string(&backup).unwrap(), original);
     assert_eq!(
         fs::read_to_string(&files.list).unwrap(),
-        "[\n \"/code/alpha\"\n]\n"
+        nl(&format!("[\n {}\n]\n", quoted("/code/alpha")))
     );
     fs::write(&files.list, r#"{"projects": []}"#).unwrap();
     files.load(NOW).unwrap();
@@ -375,7 +402,7 @@ fn the_version_stamp_keeps_other_keys_in_place() {
     files.record_version("1.0.0");
     assert_eq!(
         fs::read_to_string(&files.meta).unwrap(),
-        "{\n \"last_version\": \"1.0.0\"\n}\n"
+        nl("{\n \"last_version\": \"1.0.0\"\n}\n")
     );
     fs::write(
         &files.meta,
@@ -386,7 +413,7 @@ fn the_version_stamp_keeps_other_keys_in_place() {
     files.record_version("1.0.1");
     assert_eq!(
         fs::read_to_string(&files.meta).unwrap(),
-        "{\n \"by_path\": {},\n \"last_version\": \"1.0.1\",\n \"z\": 1\n}\n"
+        nl("{\n \"by_path\": {},\n \"last_version\": \"1.0.1\",\n \"z\": 1\n}\n")
     );
 }
 
