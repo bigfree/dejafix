@@ -4,6 +4,7 @@ mod guidance;
 mod hooks;
 mod init;
 mod memory;
+mod migrate;
 mod precheck;
 mod project;
 mod read;

@@ -24,7 +24,7 @@ pub(super) const MEMORY_DIR: &str = ".dejafix";
 const INSTRUCTIONS_FILE: &str = "AI_INSTRUCTIONS.md";
 const PROJECT_MAP_FILE: &str = "PROJECT_MAP.md";
 const MAP_PLACEHOLDER: &str = "Status: not created yet";
-const RULE_FILES: [&str; 2] = ["CLAUDE.md", "AGENTS.md"];
+pub(super) const RULE_FILES: [&str; 2] = ["CLAUDE.md", "AGENTS.md"];
 const INHERITED_TAGS: usize = 5;
 
 fn write_failed(path: &Path) -> impl Fn(io::Error) -> StoreError + '_ {
@@ -96,7 +96,7 @@ fn initialize(
     Ok((memory, registry))
 }
 
-fn refresh_instructions(root: &Path) -> Result<bool, StoreError> {
+pub(super) fn refresh_instructions(root: &Path) -> Result<bool, StoreError> {
     let memory = root.join(MEMORY_DIR);
     let path = memory.join(INSTRUCTIONS_FILE);
     let Some(current) = read_text_within(&path, root)? else {
@@ -128,7 +128,7 @@ fn bridge_name(root: &Path, registry: Option<&Registry>, home: Option<&Path>) ->
         .map_or_else(|| slugify(&folder), |record| record.name().to_owned())
 }
 
-fn write_bridges(
+pub(super) fn write_bridges(
     root: &Path,
     name: &str,
 ) -> Result<Vec<(&'static str, BridgeOutcome)>, StoreError> {

@@ -16,6 +16,7 @@ pub struct Config {
     pub zone: TimeZone,
     pub path_var: Option<OsString>,
     pub exe_dir: Option<PathBuf>,
+    pub legacy_env: Vec<String>,
 }
 
 #[derive(Debug, Clone)]

@@ -219,11 +219,7 @@ pub fn run(
         )?;
     }
     for (file, outcome) in &report.bridges {
-        match outcome {
-            BridgeOutcome::Created => writeln!(out, "  {file}: created with dejafix bridge.")?,
-            BridgeOutcome::Appended => writeln!(out, "  {file}: dejafix bridge appended.")?,
-            BridgeOutcome::Refreshed => writeln!(out, "  {file}: dejafix bridge refreshed.")?,
-        }
+        print_bridge(file, *outcome, out)?;
     }
     if let Some(suffix) = &report.project_map {
         writeln!(
@@ -285,6 +281,14 @@ pub fn run(
         "\n  Next: Start an AI session to refine PROJECT_MAP.md and capture decisions."
     )?;
     Ok(Outcome::Done)
+}
+
+pub fn print_bridge(file: &str, outcome: BridgeOutcome, out: &mut impl Write) -> io::Result<()> {
+    match outcome {
+        BridgeOutcome::Created => writeln!(out, "  {file}: created with dejafix bridge."),
+        BridgeOutcome::Appended => writeln!(out, "  {file}: dejafix bridge appended."),
+        BridgeOutcome::Refreshed => writeln!(out, "  {file}: dejafix bridge refreshed."),
+    }
 }
 
 fn print_hooks(

@@ -63,7 +63,7 @@ pub fn read_optional_text(path: &Path) -> Result<Option<String>, StoreError> {
     }
 }
 
-fn points_outside(path: &Path, root: &Path) -> bool {
+pub(crate) fn points_outside(path: &Path, root: &Path) -> bool {
     let is_link =
         fs::symlink_metadata(path).is_ok_and(|metadata| metadata.file_type().is_symlink());
     if !is_link {

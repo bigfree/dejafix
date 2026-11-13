@@ -2,14 +2,17 @@ use std::io::{self, Write};
 use std::path::PathBuf;
 
 use dejafix_core::{
-    ClientPaths, DoctorOptions, DoctorReport, FoundProject, ScanReport, Settings, doctor,
-    scan_projects,
+    ClientPaths, DoctorOptions, DoctorReport, FoundProject, ScanReport, Settings, UpdateStatus,
+    doctor, scan_projects, set_auto_check, update_status,
 };
 
-use super::USER_ERROR;
-use super::output::{FAIL, OK, WARN, secho};
-use super::types::{Outcome, Style};
+use super::types::DoctorRun;
+use crate::cli::USER_ERROR;
+use crate::cli::output::{FAIL, OK, WARN, secho};
+use crate::cli::types::{Outcome, Style};
 use crate::config::Config;
+
+const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 const LISTED: usize = 10;
 const CORRUPT_LISTED: usize = 5;
@@ -210,44 +213,72 @@ fn write_corrupt(report: &DoctorReport, out: &mut impl Write, color: bool) -> io
     Ok(usize::from(!report.corrupt.is_empty()))
 }
 
-fn write_version(out: &mut impl Write, color: bool) -> io::Result<()> {
-    secho(
-        out,
-        &format!("\n  {OK} Running {}", env!("CARGO_PKG_VERSION")),
-        Style::Green,
-        color,
-    )?;
-    writeln!(
-        out,
-        "      Check PyPI for a newer release:  djf doctor --online"
-    )?;
-    writeln!(
-        out,
-        "      Check daily from now on:         djf doctor --auto"
-    )?;
-    writeln!(
-        out,
-        "      (dejafix makes no network calls unless you ask.)"
-    )
+fn write_version(status: &UpdateStatus, out: &mut impl Write, color: bool) -> io::Result<()> {
+    match status {
+        UpdateStatus::Offline => {
+            secho(
+                out,
+                &format!("\n  {OK} Running {VERSION}"),
+                Style::Green,
+                color,
+            )?;
+            writeln!(
+                out,
+                "      Check PyPI for a newer release:  djf doctor --online"
+            )?;
+            writeln!(
+                out,
+                "      Check daily from now on:         djf doctor --auto"
+            )?;
+            writeln!(
+                out,
+                "      (dejafix makes no network calls unless you ask.)"
+            )
+        }
+        UpdateStatus::Unreachable => {
+            secho(
+                out,
+                &format!("\n  {OK} Running {VERSION}"),
+                Style::Green,
+                color,
+            )?;
+            writeln!(
+                out,
+                "      Could not reach PyPI — nothing else was affected."
+            )
+        }
+        UpdateStatus::Newer(newest) => {
+            secho(
+                out,
+                &format!("\n  {WARN} {newest} is available (you have {VERSION})"),
+                Style::Yellow,
+                color,
+            )?;
+            writeln!(out, "      pip install -U dejafix")
+        }
+        UpdateStatus::Latest => secho(
+            out,
+            &format!("\n  {OK} Running {VERSION} — the latest"),
+            Style::Green,
+            color,
+        ),
+    }
 }
 
 fn write_report(
     report: &DoctorReport,
     fix: bool,
+    status: &UpdateStatus,
     out: &mut impl Write,
     color: bool,
 ) -> io::Result<()> {
-    writeln!(
-        out,
-        "dejafix {} — checking your setup\n",
-        env!("CARGO_PKG_VERSION")
-    )?;
+    writeln!(out, "dejafix {VERSION} — checking your setup\n")?;
     writeln!(out, "Scanning {} location(s) for projects…", report.roots)?;
     let problems = write_missing(report, fix, out, color)?
         + write_stale(report, fix, out, color)?
         + write_configs(report, out, color)?
         + write_corrupt(report, out, color)?;
-    write_version(out, color)?;
+    write_version(status, out, color)?;
     writeln!(out)?;
     if problems == 0 {
         secho(out, "Everything checks out.", Style::GreenBold, color)
@@ -269,21 +300,33 @@ fn write_report(
 }
 
 pub fn run(
-    fix: bool,
-    depth_limit: i64,
-    roots: Vec<String>,
+    run: DoctorRun,
     paths: &ClientPaths,
     config: &Config,
     settings: &Settings,
     out: &mut impl Write,
+    fetch: impl FnOnce() -> Option<String>,
 ) -> io::Result<Outcome> {
+    if let Some(enabled) = run.auto {
+        let _ = set_auto_check(settings, enabled);
+        let state = if enabled { "on (once a day)" } else { "off" };
+        secho(
+            out,
+            &format!("{OK} Automatic update checks {state}\n"),
+            Style::Green,
+            config.color,
+        )?;
+    }
     let options = DoctorOptions {
-        fix,
-        depth: depth(depth_limit),
-        roots: (!roots.is_empty()).then_some(roots),
+        fix: run.fix,
+        depth: depth(run.depth),
+        roots: (!run.roots.is_empty()).then_some(run.roots),
     };
     match doctor(settings, paths, &config.cwd, &options) {
-        Ok(report) => write_report(&report, fix, out, config.color).map(|()| Outcome::Done),
+        Ok(report) => {
+            let status = update_status(settings, run.online, VERSION, fetch);
+            write_report(&report, run.fix, &status, out, config.color).map(|()| Outcome::Done)
+        }
         Err(error) => Ok(Outcome::Failed(error)),
     }
 }

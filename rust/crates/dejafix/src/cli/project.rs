@@ -150,7 +150,7 @@ pub fn run(
             paths,
             depth,
             dry_run,
-        } => return super::doctor::scan(&paths, depth, dry_run, config, settings, out),
+        } => return super::setup::scan(&paths, depth, dry_run, config, settings, out),
         ProjectAction::List => RegistryOp::List,
         ProjectAction::Use { identifier } => RegistryOp::Use(identifier),
         ProjectAction::Remove { identifier } => RegistryOp::Remove(identifier),

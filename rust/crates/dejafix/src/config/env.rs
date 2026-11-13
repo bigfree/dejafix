@@ -8,6 +8,27 @@ use dejafix_core::ClientPaths;
 use super::types::{Config, HookConfig, McpConfig};
 
 const NO_REDACT_VALUES: [&str; 3] = ["1", "true", "yes"];
+const LEGACY_PREFIXES: [&str; 2] = ["PROJECTMEM_", "PJM_"];
+
+fn legacy_env() -> Vec<String> {
+    let mut names: Vec<String> = env::vars_os()
+        .map(|(name, _)| {
+            let name = name.to_string_lossy().into_owned();
+            if cfg!(windows) {
+                name.to_uppercase()
+            } else {
+                name
+            }
+        })
+        .filter(|name| {
+            LEGACY_PREFIXES
+                .iter()
+                .any(|prefix| name.starts_with(prefix))
+        })
+        .collect();
+    names.sort();
+    names
+}
 
 fn non_empty(name: &str) -> Option<OsString> {
     env::var_os(name).filter(|value| !value.is_empty())
@@ -46,6 +67,7 @@ impl Config {
             exe_dir: env::current_exe()
                 .ok()
                 .and_then(|exe| exe.parent().map(std::path::Path::to_path_buf)),
+            legacy_env: legacy_env(),
         })
     }
 }

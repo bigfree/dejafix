@@ -2,7 +2,11 @@ use std::fs;
 
 use crate::support::{Repo, TestResult};
 
-const NOTICE: &str = "\ndejafix upgraded to 0.0.0.\n  Run `djf init` in each project to refresh its instructions and hooks.\n  Check your setup with:  djf doctor\n\n";
+const NOTICE: &str = concat!(
+    "\ndejafix upgraded to ",
+    env!("CARGO_PKG_VERSION"),
+    ".\n  Run `djf init` in each project to refresh its instructions and hooks.\n  Check your setup with:  djf doctor\n\n"
+);
 
 fn registered(repo: &Repo) -> Result<Vec<String>, Box<dyn std::error::Error>> {
     let path = repo.registry().join("projects.json");

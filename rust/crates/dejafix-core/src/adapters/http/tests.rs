@@ -123,3 +123,17 @@ fn the_user_agent_is_sent() {
     assert!(received.starts_with("get /pypi/dejafix/json "));
     assert!(received.contains("user-agent: dejafix-test/9.9\r\n"));
 }
+
+#[test]
+fn a_version_with_control_characters_or_no_text_yields_nothing() {
+    for version in ["1.0\u{1b}[2J", "", "1 0", &"9".repeat(65)] {
+        let body = serde_json::json!({"info": {"version": version}}).to_string();
+        assert_eq!(fetch(reply("200 OK", body.as_bytes())), None, "{version:?}");
+    }
+}
+
+#[test]
+fn a_redirect_is_not_followed() {
+    let raw = b"HTTP/1.1 301 Moved Permanently\r\nLocation: http://127.0.0.1:9/elsewhere\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".to_vec();
+    assert_eq!(fetch(raw), None);
+}

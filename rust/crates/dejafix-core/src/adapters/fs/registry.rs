@@ -134,10 +134,14 @@ impl RegistryFiles {
         write_text(&path, &String::from_utf8_lossy(&text))
     }
 
+    pub fn save_meta(&self, meta: Map<String, Value>) -> Result<(), StoreError> {
+        write_json_atomic(&self.meta, &Value::Object(meta))
+    }
+
     pub fn record_version(&self, version: &str) {
         let mut meta = self.read_meta();
         meta.insert(LAST_VERSION.to_owned(), Value::String(version.to_owned()));
-        let _ = write_json_atomic(&self.meta, &Value::Object(meta));
+        let _ = self.save_meta(meta);
     }
 }
 

@@ -48,6 +48,31 @@ pub enum Commands {
         depth: i64,
         #[arg(short, long, help = "Scan here instead of the usual places.")]
         path: Vec<String>,
+        #[arg(long, help = "Also ask PyPI whether a newer dejafix exists.")]
+        online: bool,
+        #[arg(
+            long,
+            overrides_with = "no_auto",
+            help = "Remember to check PyPI daily (off by default)."
+        )]
+        auto: bool,
+        #[arg(
+            long = "no-auto",
+            overrides_with = "auto",
+            help = "Stop the daily PyPI check."
+        )]
+        no_auto: bool,
+    },
+    #[command(about = "Move a projectmem install (~/.projectmem, .projectmem/, hooks) to dejafix.")]
+    Migrate {
+        #[arg(long, help = "Make the changes, not just list them.")]
+        apply: bool,
+        #[arg(
+            short,
+            long,
+            help = "Also migrate this project if it is not registered."
+        )]
+        path: Vec<String>,
     },
     #[command(about = "Start a new issue.")]
     Log {

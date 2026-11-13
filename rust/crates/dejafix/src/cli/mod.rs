@@ -1,5 +1,4 @@
 mod args;
-mod doctor;
 mod hooks;
 mod init;
 mod memory;
@@ -7,6 +6,7 @@ mod notice;
 mod output;
 mod project;
 mod read;
+mod setup;
 mod types;
 mod write;
 
@@ -18,7 +18,12 @@ use std::io::{self, Write};
 use std::process::ExitCode;
 
 use clap::Parser;
-use dejafix_core::{Clock, MemoryFile, Project, SearchQuery, Settings, StoreError, WiringError};
+use std::time::Duration;
+
+use dejafix_core::{
+    Clock, LEGACY_DIR, MemoryFile, MigrateOptions, Project, SearchQuery, Settings, StoreError,
+    WiringError, latest_version,
+};
 
 use crate::config::Config;
 use args::{Cli, Commands};
@@ -26,6 +31,8 @@ use types::Outcome;
 
 pub(super) const USER_ERROR: u8 = 1;
 const IO_ERROR: u8 = 3;
+const PYPI_JSON: &str = "https://pypi.org/pypi/dejafix/json";
+const PYPI_TIMEOUT: Duration = Duration::from_secs(3);
 
 pub fn run(
     arguments: impl IntoIterator<Item = OsString>,
@@ -133,12 +140,48 @@ fn dispatch(
         Commands::Brief => return memory::run_brief(config, settings, out),
         Commands::Global(args) => return memory::run_global(args, config, settings, out),
         Commands::Project { action } => return project::run(action, config, settings, out),
-        Commands::Doctor { fix, depth, path } => {
+        Commands::Doctor {
+            fix,
+            depth,
+            path,
+            online,
+            auto,
+            no_auto,
+        } => {
             let Some(paths) = config.client_paths() else {
                 writeln!(err, "Error: cannot determine the home directory")?;
                 return Ok(Outcome::Exit(IO_ERROR));
             };
-            return doctor::run(fix, depth, path, &paths, config, settings, out);
+            let run = setup::DoctorRun {
+                fix,
+                depth,
+                roots: path,
+                online,
+                auto: (auto || no_auto).then_some(auto),
+            };
+            return setup::run_doctor(run, &paths, config, settings, out, || {
+                latest_version(
+                    PYPI_JSON,
+                    &format!("dejafix/{}", env!("CARGO_PKG_VERSION")),
+                    PYPI_TIMEOUT,
+                )
+            });
+        }
+        Commands::Migrate { apply, path } => {
+            let Some(clients) = config.client_paths() else {
+                writeln!(err, "Error: cannot determine the home directory")?;
+                return Ok(Outcome::Exit(IO_ERROR));
+            };
+            let options = MigrateOptions {
+                apply,
+                old_home: clients.home.join(LEGACY_DIR),
+                cwd: cwd.clone(),
+                extra_roots: path,
+                clients,
+                legacy_env: config.legacy_env.clone(),
+                djf: hooks::djf_binary(config),
+            };
+            return setup::run_migrate(&options, settings, out, err);
         }
         _ => {}
     }

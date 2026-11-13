@@ -8,6 +8,7 @@ pub mod hooks;
 pub(crate) mod json;
 pub mod lessons;
 pub mod log;
+pub mod migrate;
 pub mod path;
 pub mod precheck;
 pub mod redact;

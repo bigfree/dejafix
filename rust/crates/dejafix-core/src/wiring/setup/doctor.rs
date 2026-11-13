@@ -4,11 +4,6 @@ use std::path::{Path, PathBuf};
 
 use jiff::tz::TimeZone;
 
-use super::init::MEMORY_DIR;
-use super::registry::{has_memory, now_text};
-use super::types::{
-    CorruptLog, DoctorOptions, DoctorReport, FoundProject, ScanReport, Settings, WiringError,
-};
 use crate::adapters::fs::{
     ClientPaths, ConfigState, RegistryFiles, canonical_path, dedupe_paths, default_roots,
     events_path, find_projects, identity, read_events_file, resolve_path, scan_client_configs,
@@ -16,6 +11,11 @@ use crate::adapters::fs::{
 use crate::core::doctor::{SeenConfig, track_pins};
 use crate::core::log::skipped_lines;
 use crate::core::registry::{RegisterResult, Registry, RegistryError, same_path};
+use crate::wiring::init::MEMORY_DIR;
+use crate::wiring::registry::{has_memory, now_text};
+use crate::wiring::types::{
+    CorruptLog, DoctorOptions, DoctorReport, FoundProject, ScanReport, Settings, WiringError,
+};
 
 const STATE_STAMP: &str = "%Y-%m-%d %H:%M";
 

@@ -3,7 +3,7 @@ use std::borrow::Cow;
 use super::location::location_to_file;
 use super::types::{Never, PathContext, PathResolver, RelativePath};
 
-const MEMORY_DIR: &str = ".dejafix";
+pub(crate) const MEMORY_DIR: &str = ".dejafix";
 
 pub fn project_relative<'a>(
     path: &'a str,

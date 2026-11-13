@@ -40,6 +40,10 @@ pub use crate::core::lessons::{
     marker_name, mention, python_json, records, session_key,
 };
 pub use crate::core::log::{EventLog, EventRefError, Skipped, skipped_lines};
+pub use crate::core::migrate::{
+    BRIDGE_BLOCK, Block, HOOK_BLOCK, LEGACY_DIR, MigrateStep, convert_block, has_legacy_path,
+    is_stale_config, rewrite_legacy_paths,
+};
 pub use crate::core::path::{
     PathContext, PathResolver, RelativePath, is_memory_path, location_file, location_to_file,
     project_relative,
@@ -100,6 +104,10 @@ pub use crate::wiring::{
     scan_projects, search_project, show, upgrade_notice,
 };
 pub use crate::wiring::{CachedLog, McpSettings, McpState, ToolCall, ToolReply, WriteCall};
+pub use crate::wiring::{
+    MigrateEvent, MigrateOptions, ProjectState, UpdateStatus, migrate, set_auto_check,
+    update_status,
+};
 
 #[cfg(any(test, feature = "testing"))]
 pub mod testing;
