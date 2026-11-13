@@ -202,7 +202,7 @@ Rows: 514.
 | `tests/test_global_mcp.py::test_scan_finds_projects_the_registry_never_knew_about` | M2 | project registry and `djf project` | `crates/dejafix/tests/cli/doctor.rs::scan_finds_projects_the_registry_never_knew_about` |
 | `tests/test_global_mcp.py::test_scan_is_idempotent` | M2 | `djf doctor` | `crates/dejafix/tests/cli/doctor.rs::scan_is_idempotent` |
 | `tests/test_global_mcp.py::test_scan_accepts_several_roots` | M2 | `djf doctor` | `crates/dejafix/tests/cli/doctor.rs::scan_accepts_several_roots` |
-| `tests/test_global_mcp.py::test_package_version_matches_pyproject` | M5 | version in Cargo and the maturin wheel match | |
+| `tests/test_global_mcp.py::test_package_version_matches_pyproject` | M5 | version in Cargo and the maturin wheel match || `crates/dejafix/tests/cli/doctor.rs::the_wheel_takes_its_version_from_cargo` |
 | `tests/test_global_mcp.py::test_doctor_registers_what_it_finds` | M2 | `djf doctor` | `crates/dejafix/tests/cli/doctor.rs::doctor_reports_then_registers_what_it_finds` |
 | `tests/test_global_mcp.py::test_doctor_prunes_entries_whose_memory_is_gone` | M2 | `djf doctor` | `crates/dejafix/tests/cli/doctor.rs::doctor_prunes_entries_whose_memory_is_gone` |
 | `tests/test_global_mcp.py::test_upgrade_notice_fires_once` | M2 | `djf doctor` | `crates/dejafix/tests/cli/project.rs::the_upgrade_notice_fires_once` |
@@ -215,9 +215,9 @@ Rows: 514.
 | `tests/test_global_mcp.py::test_the_same_folder_reached_twice_registers_once` | M2 | project registry and `djf project` | `crates/dejafix/tests/cli/doctor.rs::the_same_folder_reached_twice_registers_once` |
 | `tests/test_global_mcp.py::test_dedupe_paths_uses_identity_not_text` | M2 | project registry and `djf project` | `crates/dejafix-core/src/adapters/fs/scan/tests.rs::dedupe_paths_uses_identity_not_text` |
 | `tests/test_global_mcp.py::test_no_network_unless_asked` | M2 | `djf doctor` | `crates/dejafix/tests/cli/doctor.rs::doctor_reports_then_registers_what_it_finds` |
-| `tests/test_global_mcp.py::test_online_flag_reports_a_newer_release` | M5 | `djf doctor --online`/`--auto` need an HTTPS client and the release channel | |
-| `tests/test_global_mcp.py::test_auto_check_is_remembered_and_can_be_turned_off` | M5 | `djf doctor --online`/`--auto` need an HTTPS client and the release channel | |
-| `tests/test_global_mcp.py::test_version_comparison_ignores_suffixes` | M5 | `djf doctor --online`/`--auto` need an HTTPS client and the release channel | |
+| `tests/test_global_mcp.py::test_online_flag_reports_a_newer_release` | M5 | `djf doctor --online`/`--auto` need an HTTPS client and the release channel || `crates/dejafix/src/cli/setup/tests.rs::online_flag_reports_a_newer_release` |
+| `tests/test_global_mcp.py::test_auto_check_is_remembered_and_can_be_turned_off` | M5 | `djf doctor --online`/`--auto` need an HTTPS client and the release channel || `crates/dejafix/src/cli/setup/tests.rs::auto_check_is_remembered_and_can_be_turned_off` |
+| `tests/test_global_mcp.py::test_version_comparison_ignores_suffixes` | M5 | `djf doctor --online`/`--auto` need an HTTPS client and the release channel || `crates/dejafix-core/src/core/doctor/tests.rs::a_suffix_does_not_make_a_release_newer` |
 | `tests/test_global_mcp.py::test_doctor_remembers_a_config_that_was_clean_and_is_pinned_again` | M2 | `djf doctor` | `crates/dejafix-core/src/core/doctor/tests.rs::a_config_that_was_clean_and_is_pinned_again_is_reported` |
 | `tests/test_global_mcp.py::test_doctor_does_not_cry_revert_for_a_config_pinned_all_along` | M2 | `djf doctor` | `crates/dejafix-core/src/core/doctor/tests.rs::a_config_pinned_all_along_is_not_a_revert` |
 | `tests/test_global_mcp.py::test_doctor_state_survives_an_unwritable_home` | M2 | `djf doctor` | `crates/dejafix-core/src/wiring/tests.rs::doctor_survives_an_unwritable_state_file_and_reports_unreadable_configs` |
@@ -311,22 +311,22 @@ Rows: 514.
 | `tests/test_mcp_server.py::test_mcp_get_issue_accepts_unpadded_ids_and_rejects_globs` | M4 | MCP server | `crates/dejafix-core/src/wiring/mcp/tests.rs::get_issue_accepts_unpadded_and_legacy_ids_and_rejects_globs` |
 | `tests/test_mcp_server.py::test_mcp_get_issue_finds_backfilled_legacy_ids` | M4 | MCP server | `crates/dejafix-core/src/wiring/mcp/tests.rs::get_issue_accepts_unpadded_and_legacy_ids_and_rejects_globs` |
 | `tests/test_mcp_server.py::test_mcp_precheck_files_matches_single_calls` | M4 | MCP server | `crates/dejafix-core/src/wiring/mcp/tests.rs::precheck_matches_every_spelling_and_names_memory_files` |
-| `tests/test_migrate.py::test_dry_run_changes_nothing` | M5 | `djf migrate` | |
-| `tests/test_migrate.py::test_apply_moves_memory_home_and_hooks` | M5 | `djf migrate` | |
-| `tests/test_migrate.py::test_a_second_run_is_a_no_op` | M5 | `djf migrate` | |
-| `tests/test_migrate.py::test_existing_dejafix_folder_is_never_overwritten` | M5 | `djf migrate` | |
-| `tests/test_migrate.py::test_project_with_a_running_old_watcher_is_skipped` | M5 | `djf migrate` | |
-| `tests/test_migrate.py::test_a_home_stamped_by_a_first_djf_run_is_replaced` | M5 | `djf migrate` | |
-| `tests/test_migrate.py::test_home_entry_with_data_in_both_places_is_kept` | M5 | `djf migrate` | |
-| `tests/test_migrate.py::test_unregistered_project_given_by_path` | M5 | `djf migrate` | |
-| `tests/test_migrate.py::test_stale_client_configs_are_reported` | M5 | `djf migrate` | |
-| `tests/test_migrate.py::test_dry_run_does_not_repair_the_legacy_registry` | M5 | `djf migrate` | |
-| `tests/test_migrate.py::test_a_run_that_stopped_after_the_rename_is_finished` | M5 | `djf migrate` | |
-| `tests/test_migrate.py::test_a_bridge_already_added_by_djf_init_is_not_duplicated` | M5 | `djf migrate` | |
-| `tests/test_migrate.py::test_a_relative_path_gets_the_folder_name` | M5 | `djf migrate` | |
-| `tests/test_migrate.py::test_a_symlinked_memory_folder_is_left_alone` | M5 | `djf migrate` | |
-| `tests/test_migrate.py::test_unregistered_home_data_is_not_deleted` | M5 | `djf migrate` | |
-| `tests/test_migrate.py::test_a_folder_named_projectmem_is_not_a_stale_config` | M5 | `djf migrate` | |
+| `tests/test_migrate.py::test_dry_run_changes_nothing` | M5 | `djf migrate` || `crates/dejafix-core/src/wiring/setup/tests.rs::dry_run_changes_nothing` |
+| `tests/test_migrate.py::test_apply_moves_memory_home_and_hooks` | M5 | `djf migrate` || `crates/dejafix-core/src/wiring/setup/tests.rs::apply_moves_memory_home_and_hooks` |
+| `tests/test_migrate.py::test_a_second_run_is_a_no_op` | M5 | `djf migrate` || `crates/dejafix-core/src/wiring/setup/tests.rs::a_second_run_is_a_no_op` |
+| `tests/test_migrate.py::test_existing_dejafix_folder_is_never_overwritten` | M5 | `djf migrate` || `crates/dejafix-core/src/wiring/setup/tests.rs::existing_dejafix_folder_is_never_overwritten` |
+| `tests/test_migrate.py::test_project_with_a_running_old_watcher_is_skipped` | M5 | `djf migrate` || `crates/dejafix-core/src/wiring/setup/tests.rs::project_with_a_running_old_watcher_is_skipped` |
+| `tests/test_migrate.py::test_a_home_stamped_by_a_first_djf_run_is_replaced` | M5 | `djf migrate` || `crates/dejafix-core/src/wiring/setup/tests.rs::a_home_stamped_by_a_first_djf_run_is_replaced` |
+| `tests/test_migrate.py::test_home_entry_with_data_in_both_places_is_kept` | M5 | `djf migrate` || `crates/dejafix-core/src/wiring/setup/tests.rs::home_entry_with_data_in_both_places_is_kept` |
+| `tests/test_migrate.py::test_unregistered_project_given_by_path` | M5 | `djf migrate` || `crates/dejafix-core/src/wiring/setup/tests.rs::unregistered_project_given_by_path` |
+| `tests/test_migrate.py::test_stale_client_configs_are_reported` | M5 | `djf migrate` || `crates/dejafix-core/src/wiring/setup/tests.rs::stale_client_configs_are_reported` |
+| `tests/test_migrate.py::test_dry_run_does_not_repair_the_legacy_registry` | M5 | `djf migrate` || `crates/dejafix-core/src/wiring/setup/tests.rs::dry_run_does_not_repair_the_legacy_registry` |
+| `tests/test_migrate.py::test_a_run_that_stopped_after_the_rename_is_finished` | M5 | `djf migrate` || `crates/dejafix-core/src/wiring/setup/tests.rs::a_run_that_stopped_after_the_rename_is_finished` |
+| `tests/test_migrate.py::test_a_bridge_already_added_by_djf_init_is_not_duplicated` | M5 | `djf migrate` || `crates/dejafix-core/src/wiring/setup/tests.rs::a_bridge_already_added_by_djf_init_is_not_duplicated` |
+| `tests/test_migrate.py::test_a_relative_path_gets_the_folder_name` | M5 | `djf migrate` || `crates/dejafix-core/src/wiring/setup/tests.rs::a_relative_path_gets_the_folder_name` |
+| `tests/test_migrate.py::test_a_symlinked_memory_folder_is_left_alone` | M5 | `djf migrate` || `crates/dejafix-core/src/wiring/setup/tests.rs::a_symlinked_memory_folder_is_left_alone` |
+| `tests/test_migrate.py::test_unregistered_home_data_is_not_deleted` | M5 | `djf migrate` || `crates/dejafix-core/src/wiring/setup/tests.rs::unregistered_home_data_is_not_deleted` |
+| `tests/test_migrate.py::test_a_folder_named_projectmem_is_not_a_stale_config` | M5 | `djf migrate` || `crates/dejafix-core/src/wiring/setup/tests.rs::a_folder_named_projectmem_is_not_a_stale_config` |
 | `tests/test_models.py::test_an_event_without_an_id_gets_the_same_id_on_every_read` | M1 | event model and stable ids | `crates/dejafix-core/src/core/event/tests.rs::an_event_without_an_id_gets_the_same_id_on_every_read` |
 | `tests/test_models.py::test_events_without_ids_but_different_content_get_different_ids` | M1 | event model and stable ids | `crates/dejafix-core/src/core/event/tests.rs::events_without_ids_but_different_content_get_different_ids` |
 | `tests/test_models.py::test_a_stored_id_is_kept` | M1 | event model and stable ids | `crates/dejafix-core/src/core/event/tests.rs::a_stored_id_is_kept` |

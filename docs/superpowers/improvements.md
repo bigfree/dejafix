@@ -226,3 +226,57 @@ Append new entries at the end, one heading each, with this template:
 - Gain: a tool argument cannot reach a command configured by a cloned repository.
 - Compatibility: none in output.
 - Status: proposed
+
+## Keep line endings when migrate rewrites a memory file
+
+- Found: 2026-11-13, M5, `rust/crates/dejafix-core/src/wiring/setup/migrate.rs`
+- Today: `djf migrate` reads each file it rewrites with universal newlines and writes `\n`, as Python's `_read`/`_write_atomic` do. A CRLF `events.jsonl` (Windows text mode) comes out as LF.
+- Proposal: replace `.projectmem` in the raw bytes and leave line endings alone.
+- Gain: a Windows project keeps the endings its other files and its git attributes expect; the diff of the migration commit shows only the renamed paths.
+- Compatibility: on CRLF files the bytes differ from Python's (CRLF kept instead of LF). LF files are unchanged.
+- Status: proposed
+
+## Compare pre-releases correctly in the update check
+
+- Found: 2026-11-13, M5, `rust/crates/dejafix-core/src/core/doctor/version.rs`
+- Today: `doctor --online` compares only the leading digits of the first three version chunks, as Python's `_as_tuple` does, so `1.0.0rc1` equals `1.0.0`. Someone on `1.0.0-rc.1` is told "the latest" once `1.0.0` is out.
+- Proposal: compare PEP 440 versions (release, then pre-release `aN < bN < rcN < final`), accepting Cargo's `1.0.0-rc.1` spelling for the running version.
+- Gain: rc users learn that the final release exists.
+- Compatibility: `doctor --online` output differs from Python only when one side is a pre-release.
+- Status: proposed
+
+## Verify the dist installer the release workflow downloads
+
+- Found: 2026-11-13, M5, `.github/workflows/release.yml`
+- Today: the `plan` job runs `curl … cargo-dist-installer.sh | sh` for a pinned dist version over TLS from GitHub, as `dist generate` writes it. Every other action is pinned to a commit SHA.
+- Proposal: install dist with `cargo install --locked cargo-dist@0.34.0` (slower by a few minutes) or check the installer's SHA-256 before running it.
+- Gain: a compromised release asset of dist cannot run in the job that later holds `contents: write` artifacts.
+- Compatibility: none.
+- Status: proposed
+
+## A tag namespace for Rust releases
+
+- Found: 2026-11-13, M5, `.github/workflows/release.yml`
+- Today: the release workflow runs on every tag that looks like a version, so a Python `v0.4.1` tag also starts it; `dist plan` then fails because no package has that version, and nothing is published, but the run shows red.
+- Proposal: either stop tagging Python releases after `1.0.0-rc.1`, or let the workflow skip tags below `v1` (dist's `tag-namespace` or an `if:` on `plan`).
+- Gain: no failed release runs for Python tags.
+- Compatibility: none.
+- Status: proposed
+
+## Wheels for musl and an older glibc floor for the archives
+
+- Found: 2026-11-13, M5, `.github/workflows/release.yml`, `dist-workspace.toml`
+- Today: the release builds five platform wheels and no sdist, so on a platform without a wheel (Alpine/musl, ppc64le) `pip install --pre dejafix` falls back to the last Python 0.4.x release without a warning. The dist archives for Linux are built on ubuntu-22.04 and need glibc 2.35, while the manylinux wheels need 2.17.
+- Proposal: add `x86_64-unknown-linux-musl` and `aarch64-unknown-linux-musl` to both dist and the wheel matrix (musllinux wheels, static archives), or build the gnu archives with `cargo zigbuild` against glibc 2.17.
+- Gain: one set of supported systems for every channel; no silent fallback to Python on Alpine; RHEL 8 and Debian 11 can use the shell installer.
+- Compatibility: none.
+- Status: proposed
+
+## Proxy settings through config/
+
+- Found: 2026-11-13, M5, `rust/crates/dejafix-core/src/adapters/http/pypi.rs`
+- Today: the update check uses ureq's default configuration, which reads `HTTPS_PROXY`, `ALL_PROXY` and `NO_PROXY` itself, as Python's `urllib` does. That is the only environment read outside `config/`.
+- Proposal: read the proxy variables in `config/` and pass an explicit proxy (or none) to `latest_version`, re-implementing ureq's `NO_PROXY` matching.
+- Gain: the code rule holds without exception.
+- Compatibility: none, if the matching is reproduced exactly.
+- Status: proposed
