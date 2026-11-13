@@ -14,13 +14,14 @@ pub use crate::adapters::git::{hooks_dir, read_hook, remove_hook, resolve_djf_bi
 pub use crate::adapters::git::{
     last_changes, last_message, staged_files, status_files, working_files,
 };
+pub use crate::adapters::http::latest_version;
 pub use crate::core::brief::{BriefInput, render_brief};
 pub use crate::core::capture::{
     Change, Classified, capture_event, capture_files, classify, first_line, location_rank,
     meets_threshold, merge_event, parse_name_status, pick_location,
 };
 pub use crate::core::context::{ContextInput, generate_context};
-pub use crate::core::doctor::{Reverted, SeenConfig, track_pins};
+pub use crate::core::doctor::{Reverted, SeenConfig, is_newer, track_pins, version_key};
 pub use crate::core::event::{
     CaptureSource, Confidence, Event, EventId, EventKind, Extra, IssueId, LineError, Origin,
     Outcome, Summary,

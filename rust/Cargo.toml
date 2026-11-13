@@ -26,6 +26,7 @@ serde_json = { version = "=1.0.154", features = ["float_roundtrip", "preserve_or
 sha1 = "=0.11.0"
 tempfile = "=3.27.0"
 thiserror = "=2.0.21"
+ureq = { version = "=3.5.2", default-features = false, features = ["rustls", "platform-verifier"] }
 tokio = { version = "=1.54.1", features = ["rt", "macros", "io-std"] }
 
 [workspace.lints.rust]

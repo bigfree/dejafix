@@ -1,6 +1,6 @@
 use serde_json::{Map, Value, json};
 
-use super::{Reverted, SeenConfig, track_pins};
+use super::{Reverted, SeenConfig, is_newer, track_pins, version_key};
 
 fn seen(client: &'static str, key: &str, pinned: bool) -> SeenConfig<'static> {
     SeenConfig {
@@ -132,4 +132,46 @@ fn odd_previous_entries_are_read_like_python() {
             clean_since: "None".to_owned()
         }]
     );
+}
+
+#[test]
+fn a_higher_release_is_newer() {
+    assert!(is_newer("0.3.1", "0.3.0"));
+    assert!(is_newer("0.10.0", "0.9.9"));
+    assert!(!is_newer("0.3.0", "0.3.1"));
+    assert!(!is_newer("0.3.0", "0.3.0"));
+}
+
+#[test]
+fn a_suffix_does_not_make_a_release_newer() {
+    assert_eq!(version_key("1.0.0rc1"), version_key("1.0.0"));
+    assert_eq!(version_key("1.0.0-rc.1"), version_key("1.0.0"));
+    assert!(!is_newer("1.0.0rc1", "1.0.0"));
+    assert!(!is_newer("1.0.0", "1.0.0-rc.1"));
+}
+
+#[test]
+fn a_shorter_version_sorts_below_the_longer_one_as_python_tuples_do() {
+    assert_eq!(version_key("1.0"), vec![1, 0]);
+    assert!(!is_newer("1.0", "1.0.0"));
+    assert!(is_newer("1.0.0", "1.0"));
+}
+
+#[test]
+fn only_three_chunks_count() {
+    assert_eq!(version_key("1.2.3.4.5"), vec![1, 2, 3]);
+}
+
+#[test]
+fn an_empty_or_garbage_version_is_zero() {
+    assert_eq!(version_key(""), vec![0]);
+    assert_eq!(version_key("abc"), vec![0]);
+    assert_eq!(version_key("x.y.z"), vec![0, 0, 0]);
+    assert!(is_newer("0.0.1", ""));
+    assert!(!is_newer("garbage", ""));
+}
+
+#[test]
+fn a_chunk_too_large_for_u64_saturates() {
+    assert_eq!(version_key("99999999999999999999999.1"), vec![u64::MAX, 1]);
 }
