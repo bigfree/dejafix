@@ -51,6 +51,7 @@ smoke:
     test -f .dejafix/issues/0001-smoke-issue.md
     grep -q "dejafix bridge" CLAUDE.md AGENTS.md
     expect "repo" djf project list
+    expect "^Dry run — nothing is changed. Re-run with --apply to migrate.$" djf migrate
     mkdir -p src && echo "print('login')" > src/login.py && git add src/login.py
     PATH=/usr/bin:/bin git -c user.email=smoke@example.invalid -c user.name=smoke commit -q -m "fix: guard the login submit"
     for _ in $(seq 50); do grep -q '"capture_source": "git_post_commit"' .dejafix/events.jsonl && break; sleep 0.1; done
@@ -77,6 +78,14 @@ smoke:
     wait "$mcp_pid"
     grep -q "MCP smoke issue" .dejafix/events.jsonl
     echo "smoke: ok"
+
+release-check:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    export RUSTUP_TOOLCHAIN="$(rustup show active-toolchain | cut -d' ' -f1)"
+    (cd .. && dist plan)
+    (cd .. && dist build --artifacts=local --target "$(rustc -vV | sed -n 's/^host: //p')")
+    maturin build --locked --manifest-path crates/dejafix/Cargo.toml --out target/wheels
 
 casefold:
     ../.venv/bin/python -I scripts/casefold.py > crates/dejafix-core/src/core/text/casefold_table.rs

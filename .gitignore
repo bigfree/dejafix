@@ -120,3 +120,6 @@ poster resource /
 *.out
 *.bbl
 *.blg
+
+# dist writes release archives here (the Cargo workspace lives in rust/)
+/target/

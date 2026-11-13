@@ -5,7 +5,13 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 publish.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "Coding agent memory: local-first memory and judgment for AI coding agents."
 autobins = false
+
+[package.metadata.dist]
+dist = true
 
 [[bin]]
 name = "djf"

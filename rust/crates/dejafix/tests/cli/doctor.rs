@@ -258,3 +258,31 @@ fn scan_refuses_a_missing_root_and_reports_an_empty_one() -> TestResult {
         ));
     Ok(())
 }
+
+#[test]
+fn the_wheel_takes_its_version_from_cargo() -> TestResult {
+    let pyproject =
+        fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("pyproject.toml"))?;
+    assert!(pyproject.contains("name = \"dejafix\""));
+    assert!(pyproject.contains("dynamic = [\"version\"]"));
+    assert!(!pyproject.lines().any(|line| line.starts_with("version")));
+    assert!(pyproject.contains("bindings = \"bin\""));
+    let repo = Repo::bare()?;
+    let out = repo.stdout(&["doctor", "-p", &repo.root.display().to_string(), "-d", "1"])?;
+    assert!(out.starts_with(&format!("dejafix {VERSION} — checking your setup\n")));
+    Ok(())
+}
+
+#[test]
+fn the_daily_check_can_be_turned_on_and_off() -> TestResult {
+    let repo = Repo::bare()?;
+    let path = repo.root.display().to_string();
+    let off = repo.stdout(&["doctor", "--auto", "--no-auto", "-p", &path, "-d", "1"])?;
+    assert!(off.starts_with("✓ Automatic update checks off\n\ndejafix "));
+    assert!(off.contains("djf doctor --online"));
+    let meta: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        repo.registry().join("projects.meta.json"),
+    )?)?;
+    assert_eq!(meta["update_check"], false);
+    Ok(())
+}

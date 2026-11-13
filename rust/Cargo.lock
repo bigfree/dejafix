@@ -452,7 +452,7 @@ dependencies = [
 
 [[package]]
 name = "dejafix"
-version = "0.0.0"
+version = "1.0.0-rc.1"
 dependencies = [
  "assert_cmd",
  "clap",
@@ -471,7 +471,7 @@ dependencies = [
 
 [[package]]
 name = "dejafix-core"
-version = "0.0.0"
+version = "1.0.0-rc.1"
 dependencies = [
  "criterion",
  "getrandom 0.4.3",
