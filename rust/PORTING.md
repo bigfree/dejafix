@@ -29,10 +29,10 @@ Rows: 514.
 | `tests/test_agent_guidance.py::test_init_writes_the_registered_name_into_claude_md` | M2 | agent guidance surfaces | `crates/dejafix/tests/cli/guidance.rs::init_writes_the_registered_name_into_claude_md` |
 | `tests/test_agent_guidance.py::test_supersedes_is_documented_on_every_surface[AI_INSTRUCTIONS.md (get_instructions)-ai_instructions]` | M2 | agent guidance surfaces | `crates/dejafix-core/src/core/scaffold/tests.rs::the_instructions_state_record_lengths_and_supersedes` |
 | `tests/test_agent_guidance.py::test_supersedes_is_documented_on_every_surface[CLAUDE.md bridge-<lambda>]` | M2 | agent guidance surfaces | `crates/dejafix-core/src/core/scaffold/tests.rs::the_bridge_is_still_valid_without_a_name` |
-| `tests/test_agent_guidance.py::test_supersedes_is_documented_on_every_surface[MCP instructions= field-_mcp_instructions]` | M4 | MCP server `instructions` | |
+| `tests/test_agent_guidance.py::test_supersedes_is_documented_on_every_surface[MCP instructions= field-_mcp_instructions]` | M4 | MCP server `instructions` | `crates/dejafix/src/mcp/tests.rs::the_instructions_document_supersedes_start_session_and_parallel_calls` |
 | `tests/test_agent_guidance.py::test_every_call_shown_uses_the_tools_real_arguments[AI_INSTRUCTIONS.md (get_instructions)]` | M2 | agent guidance surfaces | `crates/dejafix/tests/golden/m2b.rs::templates_match_python` |
 | `tests/test_agent_guidance.py::test_every_call_shown_uses_the_tools_real_arguments[CLAUDE.md bridge]` | M2 | agent guidance surfaces | `crates/dejafix/tests/golden/m2b.rs::templates_match_python` |
-| `tests/test_agent_guidance.py::test_every_call_shown_uses_the_tools_real_arguments[MCP instructions= field]` | M4 | MCP server `instructions` | |
+| `tests/test_agent_guidance.py::test_every_call_shown_uses_the_tools_real_arguments[MCP instructions= field]` | M4 | MCP server `instructions` | `crates/dejafix/src/mcp/tests.rs::every_call_shown_in_the_instructions_uses_real_and_required_arguments` |
 | `tests/test_agent_guidance.py::test_every_call_shown_uses_the_tools_real_arguments[README.md]` | M6 | user documentation is rewritten for 1.0 | |
 | `tests/test_agent_guidance.py::test_every_call_shown_uses_the_tools_real_arguments[TUTORIAL.md]` | M6 | user documentation is rewritten for 1.0 | |
 | `tests/test_agent_guidance.py::test_every_call_shown_uses_the_tools_real_arguments[llms.txt]` | M6 | user documentation is rewritten for 1.0 | |
@@ -43,7 +43,7 @@ Rows: 514.
 | `tests/test_agent_guidance.py::test_every_call_shown_uses_the_tools_real_arguments[docs/improvements.md]` | M6 | user documentation is rewritten for 1.0 | |
 | `tests/test_agent_guidance.py::test_every_call_shown_passes_the_tools_required_arguments[AI_INSTRUCTIONS.md (get_instructions)]` | M2 | agent guidance surfaces | `crates/dejafix/tests/golden/m2b.rs::templates_match_python` |
 | `tests/test_agent_guidance.py::test_every_call_shown_passes_the_tools_required_arguments[CLAUDE.md bridge]` | M2 | agent guidance surfaces | `crates/dejafix/tests/golden/m2b.rs::templates_match_python` |
-| `tests/test_agent_guidance.py::test_every_call_shown_passes_the_tools_required_arguments[MCP instructions= field]` | M4 | MCP server `instructions` | |
+| `tests/test_agent_guidance.py::test_every_call_shown_passes_the_tools_required_arguments[MCP instructions= field]` | M4 | MCP server `instructions` | `crates/dejafix/src/mcp/tests.rs::every_call_shown_in_the_instructions_uses_real_and_required_arguments` |
 | `tests/test_agent_guidance.py::test_every_call_shown_passes_the_tools_required_arguments[README.md]` | M6 | user documentation is rewritten for 1.0 | |
 | `tests/test_agent_guidance.py::test_every_call_shown_passes_the_tools_required_arguments[TUTORIAL.md]` | M6 | user documentation is rewritten for 1.0 | |
 | `tests/test_agent_guidance.py::test_every_call_shown_passes_the_tools_required_arguments[llms.txt]` | M6 | user documentation is rewritten for 1.0 | |
@@ -52,21 +52,21 @@ Rows: 514.
 | `tests/test_agent_guidance.py::test_every_call_shown_passes_the_tools_required_arguments[docs/2026-11-12-rust-m2-plan.md]` | M6 | user documentation is rewritten for 1.0 | |
 | `tests/test_agent_guidance.py::test_every_call_shown_passes_the_tools_required_arguments[docs/2026-11-12-rust-rewrite-design.md]` | M6 | user documentation is rewritten for 1.0 | |
 | `tests/test_agent_guidance.py::test_every_call_shown_passes_the_tools_required_arguments[docs/improvements.md]` | M6 | user documentation is rewritten for 1.0 | |
-| `tests/test_agent_guidance.py::test_precheck_file_is_shown_on_every_runtime_surface` | M4 | MCP tools and instructions | |
+| `tests/test_agent_guidance.py::test_precheck_file_is_shown_on_every_runtime_surface` | M4 | MCP tools and instructions | `crates/dejafix/src/mcp/tests.rs::every_call_shown_in_the_instructions_uses_real_and_required_arguments (MCP surface; the AI_INSTRUCTIONS and bridge surfaces are M2)` |
 | `tests/test_agent_guidance.py::test_the_call_scanner_reads_names_not_values` | out of scope | tests a helper of the Python test, not dejafix; the texts it scans are golden-equal to Python's | |
 | `tests/test_agent_guidance.py::test_supersedes_guidance_says_what_it_does_to_the_summary` | M2 | agent guidance surfaces | `crates/dejafix-core/src/core/scaffold/tests.rs::the_instructions_state_record_lengths_and_supersedes` |
 | `tests/test_agent_guidance.py::test_instructions_state_the_record_length_the_summary_clips_at` | M2 | agent guidance surfaces | `crates/dejafix-core/src/core/scaffold/tests.rs::the_instructions_state_record_lengths_and_supersedes` |
-| `tests/test_agent_guidance.py::test_every_write_tool_states_its_record_length` | M4 | MCP tools and instructions | |
-| `tests/test_agent_guidance.py::test_the_three_surfaces_agree_about_the_session_start_order` | M4 | MCP tools and instructions | |
-| `tests/test_agent_guidance.py::test_get_context_drops_a_superseded_decision` | M4 | MCP tools and instructions | |
+| `tests/test_agent_guidance.py::test_every_write_tool_states_its_record_length` | M4 | MCP tools and instructions | `crates/dejafix/src/mcp/tests.rs::every_write_tool_states_its_record_length` |
+| `tests/test_agent_guidance.py::test_the_three_surfaces_agree_about_the_session_start_order` | M4 | MCP tools and instructions | `crates/dejafix/src/mcp/tests.rs::the_instructions_document_supersedes_start_session_and_parallel_calls (MCP surface; bridge is M2)` |
+| `tests/test_agent_guidance.py::test_get_context_drops_a_superseded_decision` | M4 | MCP tools and instructions | `crates/dejafix-core/src/core/context/tests.rs::a_superseded_decision_is_dropped` |
 | `tests/test_agent_guidance.py::test_precheck_does_not_warn_from_a_retired_event` | M3 | precheck skips superseded events | `crates/dejafix-core/src/core/precheck/tests.rs::retired_events_and_memory_files_are_not_warned_about` |
-| `tests/test_agent_guidance.py::test_every_agent_facing_surface_filters_superseded` | M4 | MCP tools and instructions | |
+| `tests/test_agent_guidance.py::test_every_agent_facing_surface_filters_superseded` | M4 | MCP tools and instructions | `crates/dejafix-core/src/core/context/tests.rs::a_superseded_decision_is_dropped, crates/dejafix-core/src/core/search/tests.rs::search_reply_lists_the_last_matches_oldest_first (summary, precheck and brief: their own modules)` |
 | `tests/test_agent_guidance.py::test_init_writes_the_bridge_to_both_rule_files` | M2 | agent guidance surfaces | `crates/dejafix/tests/cli/guidance.rs::init_writes_the_bridge_to_both_rule_files` |
 | `tests/test_agent_guidance.py::test_both_rule_files_say_exactly_the_same_thing` | M2 | agent guidance surfaces | `crates/dejafix/tests/cli/guidance.rs::both_rule_files_say_exactly_the_same_thing` |
 | `tests/test_agent_guidance.py::test_an_existing_agents_md_is_preserved` | M2 | agent guidance surfaces | `crates/dejafix/tests/cli/guidance.rs::an_existing_agents_md_is_preserved` |
 | `tests/test_agent_guidance.py::test_re_running_init_does_not_duplicate_the_block` | M2 | agent guidance surfaces | `crates/dejafix/tests/cli/guidance.rs::re_running_init_does_not_duplicate_the_block` |
-| `tests/test_agent_guidance.py::test_list_projects_leads_with_the_active_project` | M4 | MCP tools and instructions | |
-| `tests/test_agent_guidance.py::test_instructions_do_not_tell_the_agent_to_list_projects_first` | M4 | MCP server `instructions` | |
+| `tests/test_agent_guidance.py::test_list_projects_leads_with_the_active_project` | M4 | MCP tools and instructions | `crates/dejafix-core/src/core/reply/tests.rs::list_projects_leads_with_the_active_project` |
+| `tests/test_agent_guidance.py::test_instructions_do_not_tell_the_agent_to_list_projects_first` | M4 | MCP server `instructions` | `crates/dejafix/src/mcp/tests.rs::the_instructions_document_supersedes_start_session_and_parallel_calls` |
 | `tests/test_attempt.py::test_attempt_on_an_unknown_issue_is_refused` | M2 | write path: attempt and issue resolution | `crates/dejafix/tests/cli/write.rs::attempt_on_an_unknown_issue_is_refused_and_the_project_still_works` |
 | `tests/test_attempt.py::test_attempt_issue_id_is_normalised_like_fix` | M2 | write path: attempt and issue resolution | `crates/dejafix/tests/cli/write.rs::attempt_issue_id_is_normalised_like_fix` |
 | `tests/test_attempt.py::test_a_stale_current_issue_marker_is_ignored` | M2 | write path: attempt and issue resolution | `crates/dejafix/tests/cli/write.rs::a_stale_current_issue_marker_is_ignored` |
@@ -181,18 +181,18 @@ Rows: 514.
 | `tests/test_global_mcp.py::test_a_0_2_x_registry_is_read_without_being_rewritten` | M2 | project registry and `djf project` | `crates/dejafix-core/src/adapters/fs/tests.rs::a_0_2_x_registry_keeps_its_list_and_gains_a_sidecar` |
 | `tests/test_global_mcp.py::test_dashboard_still_reads_the_registry_after_migration` | out of scope | `djf dashboard` is removed in 1.0 | |
 | `tests/test_global_mcp.py::test_ids_do_not_collide_for_same_named_folders` | M2 | project registry and `djf project` | `crates/dejafix/tests/cli/project.rs::ids_do_not_collide_for_same_named_folders` |
-| `tests/test_global_mcp.py::test_unknown_project_errors_with_the_known_ones` | M4 | MCP project resolution | |
-| `tests/test_global_mcp.py::test_explicit_selection_wins` | M4 | MCP project resolution | |
-| `tests/test_global_mcp.py::test_active_project_is_used_when_no_selection` | M4 | MCP project resolution | |
-| `tests/test_global_mcp.py::test_client_roots_outrank_a_stale_active_project` | M4 | MCP project resolution | |
-| `tests/test_global_mcp.py::test_two_usable_roots_is_an_error_not_a_coin_flip` | M4 | MCP project resolution | |
-| `tests/test_global_mcp.py::test_nothing_selected_refuses_rather_than_guessing` | M4 | MCP project resolution | |
-| `tests/test_global_mcp.py::test_pinned_root_is_a_boundary_not_a_default` | M4 | MCP project resolution | |
+| `tests/test_global_mcp.py::test_unknown_project_errors_with_the_known_ones` | M4 | MCP project resolution | `crates/dejafix-core/src/core/resolve/tests.rs::unknown_project_errors_with_the_known_ones` |
+| `tests/test_global_mcp.py::test_explicit_selection_wins` | M4 | MCP project resolution | `crates/dejafix-core/src/core/resolve/tests.rs::explicit_selection_wins` |
+| `tests/test_global_mcp.py::test_active_project_is_used_when_no_selection` | M4 | MCP project resolution | `crates/dejafix-core/src/core/resolve/tests.rs::active_project_is_used_when_no_selection` |
+| `tests/test_global_mcp.py::test_client_roots_outrank_a_stale_active_project` | M4 | MCP project resolution | `crates/dejafix-core/src/core/resolve/tests.rs::client_roots_outrank_a_stale_active_project` |
+| `tests/test_global_mcp.py::test_two_usable_roots_is_an_error_not_a_coin_flip` | M4 | MCP project resolution | `crates/dejafix-core/src/core/resolve/tests.rs::two_usable_roots_is_an_error_not_a_coin_flip` |
+| `tests/test_global_mcp.py::test_nothing_selected_refuses_rather_than_guessing` | M4 | MCP project resolution | `crates/dejafix-core/src/core/resolve/tests.rs::nothing_selected_refuses_rather_than_guessing` |
+| `tests/test_global_mcp.py::test_pinned_root_is_a_boundary_not_a_default` | M4 | MCP project resolution | `crates/dejafix-core/src/core/resolve/tests.rs::pinned_root_is_a_boundary_not_a_default` |
 | `tests/test_global_mcp.py::test_project_cli_round_trip` | M2 | project registry and `djf project` | `crates/dejafix/tests/cli/project.rs::project_cli_round_trip` |
 | `tests/test_global_mcp.py::test_registering_an_uninitialised_folder_is_refused` | M2 | project registry and `djf project` | `crates/dejafix/tests/cli/project.rs::registering_an_uninitialised_folder_is_refused` |
-| `tests/test_global_mcp.py::test_one_server_writes_to_the_project_it_was_told` | M4 | MCP project resolution | |
-| `tests/test_global_mcp.py::test_write_without_a_project_fails_visibly` | M4 | MCP project resolution | |
-| `tests/test_global_mcp.py::test_a_single_registered_project_needs_no_selection` | M4 | MCP project resolution | |
+| `tests/test_global_mcp.py::test_one_server_writes_to_the_project_it_was_told` | M4 | MCP project resolution | `crates/dejafix-core/src/wiring/mcp/tests.rs::one_server_writes_to_the_project_it_was_told` |
+| `tests/test_global_mcp.py::test_write_without_a_project_fails_visibly` | M4 | MCP project resolution | `crates/dejafix-core/src/wiring/mcp/tests.rs::one_server_writes_to_the_project_it_was_told` |
+| `tests/test_global_mcp.py::test_a_single_registered_project_needs_no_selection` | M4 | MCP project resolution | `crates/dejafix-core/src/core/resolve/tests.rs::a_single_registered_project_needs_no_selection` |
 | `tests/test_global_mcp.py::test_an_older_dejafix_can_only_append_a_path` | M2 | project registry and `djf project` | `crates/dejafix-core/src/core/registry/tests.rs::an_older_dejafix_can_only_append_a_path` |
 | `tests/test_global_mcp.py::test_a_dev_format_registry_is_converted_and_backed_up` | M2 | project registry and `djf project` | `crates/dejafix-core/src/adapters/fs/tests.rs::a_dev_format_registry_is_converted_and_backed_up_once` |
 | `tests/test_global_mcp.py::test_windows_paths_survive_migration` | M2 | project registry and `djf project` | `crates/dejafix-core/src/core/registry/tests.rs::junk_entries_are_dropped` |
@@ -283,10 +283,10 @@ Rows: 514.
 | `tests/test_location_parsing.py::test_location_to_file[-None]` | M1 | location and path normalisation | `crates/dejafix-core/src/core/path/tests.rs::location_to_file_cases` |
 | `tests/test_location_parsing.py::test_location_to_file[None-None]` | M1 | location and path normalisation | `crates/dejafix-core/src/core/path/tests.rs::location_to_file_cases (`None` is `Option::None` at the call site)` |
 | `tests/test_location_parsing.py::test_location_to_file[   -None]` | M1 | location and path normalisation | `crates/dejafix-core/src/core/path/tests.rs::location_to_file_cases` |
-| `tests/test_location_parsing.py::test_a_bare_path_counts_the_same_as_one_with_a_line_number` | M1 | location and path normalisation | `crates/dejafix-core/src/core/path/tests.rs::a_bare_path_counts_the_same_as_one_with_a_line_number (score half: M4 `get_score`)` |
-| `tests/test_location_parsing.py::test_a_windows_path_is_not_counted_as_a_file_called_c` | M1 | location and path normalisation | `crates/dejafix-core/src/core/path/tests.rs::a_windows_path_is_not_counted_as_a_file_called_c (score half: M4 `get_score`)` |
-| `tests/test_location_parsing.py::test_a_method_location_is_not_a_file` | M1 | location and path normalisation | `crates/dejafix-core/src/core/path/tests.rs::a_method_location_is_not_a_file (score half: M4 `get_score`)` |
-| `tests/test_location_parsing.py::test_the_same_file_by_two_spellings_counts_once` | M1 | location and path normalisation | `crates/dejafix-core/src/core/path/tests.rs::the_same_file_by_two_spellings_counts_once (score half: M4 `get_score`)` |
+| `tests/test_location_parsing.py::test_a_bare_path_counts_the_same_as_one_with_a_line_number` | M1 | location and path normalisation | `crates/dejafix-core/src/core/path/tests.rs::a_bare_path_counts_the_same_as_one_with_a_line_number + `crates/dejafix-core/src/core/score/tests.rs::a_bare_path_and_a_path_with_a_line_are_one_file` (score half)` |
+| `tests/test_location_parsing.py::test_a_windows_path_is_not_counted_as_a_file_called_c` | M1 | location and path normalisation | `crates/dejafix-core/src/core/path/tests.rs::a_windows_path_is_not_counted_as_a_file_called_c + `crates/dejafix-core/src/core/score/tests.rs::a_location_counts_as_a_file_only_when_it_looks_like_one` (score half)` |
+| `tests/test_location_parsing.py::test_a_method_location_is_not_a_file` | M1 | location and path normalisation | `crates/dejafix-core/src/core/path/tests.rs::a_method_location_is_not_a_file + `crates/dejafix-core/src/core/score/tests.rs::a_location_counts_as_a_file_only_when_it_looks_like_one` (score half)` |
+| `tests/test_location_parsing.py::test_the_same_file_by_two_spellings_counts_once` | M1 | location and path normalisation | `crates/dejafix-core/src/core/path/tests.rs::the_same_file_by_two_spellings_counts_once + `crates/dejafix-core/src/core/score/tests.rs::the_same_file_by_two_spellings_counts_once` (score half)` |
 | `tests/test_location_parsing.py::test_global_dir_follows_dejafix_home` | M2 | global memory follows DEJAFIX_HOME | `crates/dejafix/tests/cli/write.rs::appending_an_event_stays_inside_an_isolated_home` |
 | `tests/test_location_parsing.py::test_global_dir_falls_back_to_home_without_the_env_var` | M2 | global memory follows DEJAFIX_HOME | `crates/dejafix/tests/cli/write.rs::global_memory_falls_back_to_home_without_the_env_var` |
 | `tests/test_location_parsing.py::test_appending_an_event_stays_inside_an_isolated_home` | M2 | global memory follows DEJAFIX_HOME | `crates/dejafix/tests/cli/write.rs::appending_an_event_stays_inside_an_isolated_home` |
@@ -294,23 +294,23 @@ Rows: 514.
 | `tests/test_log.py::test_fix_issue_closes_target_without_clearing_newer_active_issue` | M2 | write path: log, attempt, fix | `crates/dejafix/tests/cli/write.rs::fix_issue_closes_target_without_clearing_newer_active_issue` |
 | `tests/test_log.py::test_plain_fix_still_closes_active_issue` | M2 | write path: log, attempt, fix | `crates/dejafix/tests/cli/write.rs::plain_fix_still_closes_active_issue` |
 | `tests/test_log.py::test_fix_issue_rejects_unknown_issue` | M2 | write path: log, attempt, fix | `crates/dejafix/tests/cli/write.rs::fix_issue_rejects_unknown_issue` |
-| `tests/test_log.py::test_mcp_record_fix_accepts_target_issue_id` | M4 | MCP `record_fix` | |
+| `tests/test_log.py::test_mcp_record_fix_accepts_target_issue_id` | M4 | MCP `record_fix` | `crates/dejafix-core/src/wiring/mcp/tests.rs::a_pinned_server_writes_and_names_the_project` |
 | `tests/test_log.py::test_attempt_without_open_issue_fails` | M2 | write path: log, attempt, fix | `crates/dejafix/tests/cli/write.rs::attempt_without_open_issue_fails` |
 | `tests/test_log.py::test_attempt_auto_issue_creates_parent` | M2 | write path: log, attempt, fix | `crates/dejafix/tests/cli/write.rs::attempt_auto_issue_creates_parent` |
 | `tests/test_log.py::test_attempt_after_fix_does_not_misattribute` | M2 | write path: log, attempt, fix | `crates/dejafix/tests/cli/write.rs::attempt_after_fix_does_not_misattribute` |
 | `tests/test_mcp_server.py::test_git_helpers_detach_stdin_and_keep_timeouts` | M3 | git adapter: detached stdin and timeouts | `crates/dejafix-core/src/adapters/git/tests.rs::git_returns_nothing_outside_a_repository_or_on_failure` |
-| `tests/test_mcp_server.py::test_mcp_stdio_precheck_file_returns_with_git_backed_analysis` | M4 | MCP server | |
-| `tests/test_mcp_server.py::test_mcp_precheck_file_names_a_memory_file_instead_of_clearing_it` | M4 | MCP server | |
-| `tests/test_mcp_server.py::test_mcp_stdio_add_note_returns_and_writes_event` | M4 | MCP server | |
-| `tests/test_mcp_server.py::test_mcp_server_instantiation` | M4 | MCP server | |
+| `tests/test_mcp_server.py::test_mcp_stdio_precheck_file_returns_with_git_backed_analysis` | M4 | MCP server | `crates/dejafix-core/src/wiring/mcp/tests.rs::precheck_and_context_use_the_resolved_project_s_git, crates/dejafix/tests/golden/m4.rs::mcp_replies_match_python` |
+| `tests/test_mcp_server.py::test_mcp_precheck_file_names_a_memory_file_instead_of_clearing_it` | M4 | MCP server | `crates/dejafix-core/src/core/reply/tests.rs::precheck_names_a_memory_file_instead_of_clearing_it, crates/dejafix/src/mcp/tests.rs::a_client_sees_the_instructions_tools_and_replies` |
+| `tests/test_mcp_server.py::test_mcp_stdio_add_note_returns_and_writes_event` | M4 | MCP server | `crates/dejafix/src/mcp/tests.rs::a_client_sees_the_instructions_tools_and_replies` |
+| `tests/test_mcp_server.py::test_mcp_server_instantiation` | M4 | MCP server | `crates/dejafix/src/mcp/tests.rs::the_table_lists_the_nineteen_tools_in_python_s_order` |
 | `tests/test_mcp_server.py::test_server_builds_when_fastmcp_is_gone` | out of scope | Python MCP SDK packaging; rmcp has no such fallback | |
-| `tests/test_mcp_server.py::test_mcp_precheck_file_matches_every_spelling_of_a_path[src/auth.py]` | M4 | MCP server | |
-| `tests/test_mcp_server.py::test_mcp_precheck_file_matches_every_spelling_of_a_path[./src/auth.py]` | M4 | MCP server | |
-| `tests/test_mcp_server.py::test_mcp_precheck_file_matches_every_spelling_of_a_path[ABSOLUTE]` | M4 | MCP server | |
-| `tests/test_mcp_server.py::test_mcp_precheck_file_matches_an_event_logged_with_an_absolute_path` | M4 | MCP server | |
-| `tests/test_mcp_server.py::test_mcp_get_issue_accepts_unpadded_ids_and_rejects_globs` | M4 | MCP server | |
-| `tests/test_mcp_server.py::test_mcp_get_issue_finds_backfilled_legacy_ids` | M4 | MCP server | |
-| `tests/test_mcp_server.py::test_mcp_precheck_files_matches_single_calls` | M4 | MCP server | |
+| `tests/test_mcp_server.py::test_mcp_precheck_file_matches_every_spelling_of_a_path[src/auth.py]` | M4 | MCP server | `crates/dejafix-core/src/wiring/mcp/tests.rs::precheck_matches_every_spelling_and_names_memory_files` |
+| `tests/test_mcp_server.py::test_mcp_precheck_file_matches_every_spelling_of_a_path[./src/auth.py]` | M4 | MCP server | `crates/dejafix-core/src/wiring/mcp/tests.rs::precheck_matches_every_spelling_and_names_memory_files` |
+| `tests/test_mcp_server.py::test_mcp_precheck_file_matches_every_spelling_of_a_path[ABSOLUTE]` | M4 | MCP server | `crates/dejafix-core/src/wiring/mcp/tests.rs::precheck_matches_every_spelling_and_names_memory_files` |
+| `tests/test_mcp_server.py::test_mcp_precheck_file_matches_an_event_logged_with_an_absolute_path` | M4 | MCP server | `crates/dejafix-core/src/wiring/mcp/tests.rs::precheck_matches_every_spelling_and_names_memory_files` |
+| `tests/test_mcp_server.py::test_mcp_get_issue_accepts_unpadded_ids_and_rejects_globs` | M4 | MCP server | `crates/dejafix-core/src/wiring/mcp/tests.rs::get_issue_accepts_unpadded_and_legacy_ids_and_rejects_globs` |
+| `tests/test_mcp_server.py::test_mcp_get_issue_finds_backfilled_legacy_ids` | M4 | MCP server | `crates/dejafix-core/src/wiring/mcp/tests.rs::get_issue_accepts_unpadded_and_legacy_ids_and_rejects_globs` |
+| `tests/test_mcp_server.py::test_mcp_precheck_files_matches_single_calls` | M4 | MCP server | `crates/dejafix-core/src/wiring/mcp/tests.rs::precheck_matches_every_spelling_and_names_memory_files` |
 | `tests/test_migrate.py::test_dry_run_changes_nothing` | M5 | `djf migrate` | |
 | `tests/test_migrate.py::test_apply_moves_memory_home_and_hooks` | M5 | `djf migrate` | |
 | `tests/test_migrate.py::test_a_second_run_is_a_no_op` | M5 | `djf migrate` | |
@@ -334,7 +334,7 @@ Rows: 514.
 | `tests/test_plan.py::test_plan_md_is_committed_not_gitignored` | M2 | plan.md and `djf plan` | `crates/dejafix/tests/cli/init.rs::plan_md_is_committed_not_gitignored` |
 | `tests/test_plan.py::test_djf_plan_add_appends_to_ideas` | M2 | plan.md and `djf plan` | `crates/dejafix/tests/cli/init.rs::plan_add_appends_to_the_ideas_section` |
 | `tests/test_plan.py::test_plan_add_does_not_touch_events` | M2 | plan.md and `djf plan` | `crates/dejafix/tests/cli/init.rs::plan_add_does_not_touch_events` |
-| `tests/test_plan.py::test_get_plan_mcp_reads_the_file` | M4 | MCP `get_plan` | |
+| `tests/test_plan.py::test_get_plan_mcp_reads_the_file` | M4 | MCP `get_plan` | `crates/dejafix/tests/golden/m4.rs::mcp_replies_match_python` |
 | `tests/test_precheck_lessons.py::test_attempt_without_location_inherits_its_issue_file` | M3 | precheck lessons | `crates/dejafix-core/src/core/precheck/tests.rs::attempt_without_location_inherits_its_issue_file` |
 | `tests/test_precheck_lessons.py::test_partial_attempt_is_a_lesson` | M3 | precheck lessons | `crates/dejafix-core/src/core/precheck/tests.rs::partial_and_old_failures_are_lessons_and_worked_is_not` |
 | `tests/test_precheck_lessons.py::test_failure_older_than_thirty_days_still_warns` | M3 | precheck lessons | `crates/dejafix-core/src/core/precheck/tests.rs::partial_and_old_failures_are_lessons_and_worked_is_not` |
@@ -376,18 +376,18 @@ Rows: 514.
 | `tests/test_session_issue.py::test_sole_open_issue_is_none_without_open_issues` | M2 | open-issue resolution | `crates/dejafix-core/src/core/write/tests.rs::several_open_issues_are_listed_newest_first_and_capped` |
 | `tests/test_session_issue.py::test_sole_open_issue_refuses_and_lists_every_open_issue` | M2 | open-issue resolution | `crates/dejafix-core/src/core/write/tests.rs::several_open_issues_are_listed_newest_first_and_capped` |
 | `tests/test_session_issue.py::test_refusal_caps_the_listing` | M2 | open-issue resolution | `crates/dejafix-core/src/core/write/tests.rs::several_open_issues_are_listed_newest_first_and_capped` |
-| `tests/test_session_issue.py::test_two_mcp_processes_do_not_misfile` | M4 | concurrent MCP writers | |
+| `tests/test_session_issue.py::test_two_mcp_processes_do_not_misfile` | M4 | concurrent MCP writers | `crates/dejafix-core/src/wiring/mcp/tests.rs::several_open_issues_need_an_issue_id` |
 | `tests/test_session_issue.py::test_one_open_issue_still_needs_no_id` | M2 | open-issue resolution | `crates/dejafix-core/src/core/write/tests.rs::several_open_issues_are_listed_newest_first_and_capped` |
-| `tests/test_session_start.py::test_start_session_contains_rules_summary_and_active_plan` | M4 | MCP `start_session` | |
-| `tests/test_session_start.py::test_start_session_omits_ideas_shipped_and_someday` | M4 | MCP `start_session` | |
-| `tests/test_session_start.py::test_start_session_tolerates_missing_files` | M4 | MCP `start_session` | |
-| `tests/test_session_start.py::test_server_instructions_name_start_session_and_allow_parallel_calls` | M4 | MCP `start_session` | |
-| `tests/test_session_start.py::test_start_session_keeps_custom_plan_headings` | M4 | MCP `start_session` | |
-| `tests/test_session_start.py::test_start_session_reads_a_plan_that_starts_with_a_heading` | M4 | MCP `start_session` | |
-| `tests/test_session_start.py::test_start_session_survives_an_empty_trailing_heading` | M4 | MCP `start_session` | |
-| `tests/test_session_start.py::test_start_session_says_the_session_start_reads_are_done` | M4 | MCP `start_session` | |
-| `tests/test_session_start.py::test_start_session_includes_a_placeholder_map_for_setup_mode` | M4 | MCP `start_session` | |
-| `tests/test_session_start.py::test_start_session_leaves_out_a_real_map` | M4 | MCP `start_session` | |
+| `tests/test_session_start.py::test_start_session_contains_rules_summary_and_active_plan` | M4 | MCP `start_session` | `crates/dejafix-core/src/core/session/tests.rs::start_session_contains_rules_summary_and_active_plan` |
+| `tests/test_session_start.py::test_start_session_omits_ideas_shipped_and_someday` | M4 | MCP `start_session` | `crates/dejafix-core/src/core/session/tests.rs::start_session_omits_ideas_shipped_and_someday` |
+| `tests/test_session_start.py::test_start_session_tolerates_missing_files` | M4 | MCP `start_session` | `crates/dejafix-core/src/core/session/tests.rs::start_session_tolerates_missing_files` |
+| `tests/test_session_start.py::test_server_instructions_name_start_session_and_allow_parallel_calls` | M4 | MCP `start_session` | `crates/dejafix/src/mcp/tests.rs::the_instructions_document_supersedes_start_session_and_parallel_calls` |
+| `tests/test_session_start.py::test_start_session_keeps_custom_plan_headings` | M4 | MCP `start_session` | `crates/dejafix-core/src/core/session/tests.rs::start_session_keeps_custom_plan_headings` |
+| `tests/test_session_start.py::test_start_session_reads_a_plan_that_starts_with_a_heading` | M4 | MCP `start_session` | `crates/dejafix-core/src/core/session/tests.rs::start_session_reads_a_plan_that_starts_with_a_heading` |
+| `tests/test_session_start.py::test_start_session_survives_an_empty_trailing_heading` | M4 | MCP `start_session` | `crates/dejafix-core/src/core/session/tests.rs::start_session_survives_an_empty_trailing_heading` |
+| `tests/test_session_start.py::test_start_session_says_the_session_start_reads_are_done` | M4 | MCP `start_session` | `crates/dejafix-core/src/core/session/tests.rs::start_session_says_the_session_start_reads_are_done` |
+| `tests/test_session_start.py::test_start_session_includes_a_placeholder_map_for_setup_mode` | M4 | MCP `start_session` | `crates/dejafix-core/src/core/session/tests.rs::start_session_includes_a_placeholder_map_for_setup_mode` |
+| `tests/test_session_start.py::test_start_session_leaves_out_a_real_map` | M4 | MCP `start_session` | `crates/dejafix-core/src/core/session/tests.rs::start_session_leaves_out_a_real_map` |
 | `tests/test_showoff.py::test_template_has_showoff_nav_and_panel` | out of scope | `djf visualize` is removed in 1.0 | |
 | `tests/test_showoff.py::test_template_has_all_three_scenes` | out of scope | `djf visualize` is removed in 1.0 | |
 | `tests/test_showoff.py::test_template_has_recorder_controls` | out of scope | `djf visualize` is removed in 1.0 | |
@@ -450,16 +450,16 @@ Rows: 514.
 | `tests/test_summary.py::test_key_files_include_locations_that_name_a_file` | M2 | summary.md and issue files | `crates/dejafix-core/src/core/summary/tests.rs::key_files_include_locations_that_name_a_file` |
 | `tests/test_summary.py::test_key_files_merge_line_suffixes_into_one_file` | M2 | summary.md and issue files | `crates/dejafix-core/src/core/summary/tests.rs::key_files_merge_line_suffixes_into_one_file` |
 | `tests/test_summary.py::test_key_files_rank_by_event_count_and_skip_memory_files` | M2 | summary.md and issue files | `crates/dejafix-core/src/core/summary/tests.rs::key_files_rank_by_event_count_and_skip_memory_files` |
-| `tests/test_tool_replies.py::test_add_note_reply_names_the_event_instead_of_echoing_it` | M4 | MCP reply texts | |
-| `tests/test_tool_replies.py::test_add_decision_reply_names_the_event_and_what_it_retires` | M4 | MCP reply texts | |
-| `tests/test_tool_replies.py::test_issue_writes_reply_with_the_issue_id_only` | M4 | MCP reply texts | |
-| `tests/test_tool_replies.py::test_search_clips_long_matches_and_names_each_event` | M4 | MCP reply texts | |
-| `tests/test_tool_replies.py::test_search_full_returns_whole_records` | M4 | MCP reply texts | |
-| `tests/test_tool_replies.py::test_add_decision_reply_resolves_a_supersedes_prefix` | M4 | MCP reply texts | |
-| `tests/test_tool_replies.py::test_search_marks_superseded_decisions` | M4 | MCP reply texts | |
-| `tests/test_tool_replies.py::test_search_shows_the_part_that_matched_past_the_clip` | M4 | MCP reply texts | |
-| `tests/test_tool_replies.py::test_search_shows_a_match_found_only_in_notes` | M4 | MCP reply texts | |
-| `tests/test_tool_replies.py::test_search_full_keeps_one_match_per_line` | M4 | MCP reply texts | |
+| `tests/test_tool_replies.py::test_add_note_reply_names_the_event_instead_of_echoing_it` | M4 | MCP reply texts | `crates/dejafix-core/src/wiring/mcp/tests.rs::a_pinned_server_writes_and_names_the_project` |
+| `tests/test_tool_replies.py::test_add_decision_reply_names_the_event_and_what_it_retires` | M4 | MCP reply texts | `crates/dejafix-core/src/wiring/mcp/tests.rs::a_pinned_server_writes_and_names_the_project` |
+| `tests/test_tool_replies.py::test_issue_writes_reply_with_the_issue_id_only` | M4 | MCP reply texts | `crates/dejafix-core/src/wiring/mcp/tests.rs::a_pinned_server_writes_and_names_the_project` |
+| `tests/test_tool_replies.py::test_search_clips_long_matches_and_names_each_event` | M4 | MCP reply texts | `crates/dejafix-core/src/core/search/tests.rs::excerpt_clips_from_the_start_when_the_match_fits` |
+| `tests/test_tool_replies.py::test_search_full_returns_whole_records` | M4 | MCP reply texts | `crates/dejafix-core/src/core/search/tests.rs::mcp_match_lines_are_python_s` |
+| `tests/test_tool_replies.py::test_add_decision_reply_resolves_a_supersedes_prefix` | M4 | MCP reply texts | `crates/dejafix-core/src/wiring/mcp/tests.rs::a_pinned_server_writes_and_names_the_project` |
+| `tests/test_tool_replies.py::test_search_marks_superseded_decisions` | M4 | MCP reply texts | `crates/dejafix-core/src/core/search/tests.rs::search_reply_lists_the_last_matches_oldest_first` |
+| `tests/test_tool_replies.py::test_search_shows_the_part_that_matched_past_the_clip` | M4 | MCP reply texts | `crates/dejafix-core/src/core/search/tests.rs::excerpt_shows_the_part_that_matched_past_the_clip` |
+| `tests/test_tool_replies.py::test_search_shows_a_match_found_only_in_notes` | M4 | MCP reply texts | `crates/dejafix-core/src/core/search/tests.rs::mcp_match_lines_are_python_s` |
+| `tests/test_tool_replies.py::test_search_full_keeps_one_match_per_line` | M4 | MCP reply texts | `crates/dejafix-core/src/core/search/tests.rs::mcp_match_lines_are_python_s` |
 | `tests/test_v014_features.py::test_supersede_hides_old_decision_from_summary` | M2 | supersede, brief, search | `crates/dejafix/tests/cli/write.rs::supersede_hides_old_decision_from_summary_and_accepts_a_prefix` |
 | `tests/test_v014_features.py::test_supersede_accepts_unique_prefix` | M2 | supersede, brief, search | `crates/dejafix/tests/cli/write.rs::supersede_hides_old_decision_from_summary_and_accepts_a_prefix` |
 | `tests/test_v014_features.py::test_supersede_bad_ref_fails_without_writing` | M2 | supersede, brief, search | `crates/dejafix/tests/cli/write.rs::supersede_bad_ref_fails_without_writing` |
@@ -471,9 +471,9 @@ Rows: 514.
 | `tests/test_v014_features.py::test_parse_snooze_duration` | M3 | precheck, staleness and snooze | `crates/dejafix-core/src/core/precheck/tests.rs::snooze_durations_and_remaining_time` |
 | `tests/test_v014_features.py::test_snooze_silences_and_unsnooze_restores` | M3 | precheck, staleness and snooze | `crates/dejafix/tests/cli/precheck.rs::snooze_silences_logs_and_unsnooze_restores` |
 | `tests/test_v014_features.py::test_expired_snooze_self_cleans` | M3 | precheck, staleness and snooze | `crates/dejafix/tests/cli/precheck.rs::an_expired_or_broken_snooze_cleans_itself_up` |
-| `tests/test_v014_features.py::test_brief_shows_all_sections` | M4 | `djf brief` needs staleness (M3) and score (M4) | |
-| `tests/test_v014_features.py::test_brief_runs_clean_on_fresh_project` | M4 | `djf brief` needs staleness (M3) and score (M4) | |
-| `tests/test_v014_features.py::test_brief_console_helpers_are_cp1252_safe` | M4 | `djf brief` needs staleness (M3) and score (M4) | |
+| `tests/test_v014_features.py::test_brief_shows_all_sections` | M4 | `djf brief` needs staleness (M3) and score (M4) | `crates/dejafix/tests/cli/memory/brief.rs::brief_shows_all_sections` |
+| `tests/test_v014_features.py::test_brief_runs_clean_on_fresh_project` | M4 | `djf brief` needs staleness (M3) and score (M4) | `crates/dejafix/tests/cli/memory/brief.rs::brief_runs_clean_on_fresh_project` |
+| `tests/test_v014_features.py::test_brief_console_helpers_are_cp1252_safe` | M4 | `djf brief` needs staleness (M3) and score (M4) | `crates/dejafix/tests/cli/memory/brief.rs::brief_output_is_utf8_with_the_real_rule` |
 | `tests/test_v014_features.py::test_precheck_lists_failed_approaches` | M3 | precheck, staleness and snooze | `crates/dejafix-core/src/core/precheck/tests.rs::every_check_and_both_renderings` |
 | `tests/test_v014_features.py::test_precheck_console_helpers_are_cp1252_safe` | M3 | precheck, staleness and snooze | `crates/dejafix/tests/cli/precheck.rs::named_files_list_what_already_failed` (Rust writes UTF-8 with the real rule; plan Decision 8) |
 | `tests/test_v014_features.py::test_precheck_named_files_cli` | M3 | precheck, staleness and snooze | `crates/dejafix/tests/cli/precheck.rs::named_files_list_what_already_failed` |
@@ -534,7 +534,7 @@ Rows: 514.
 | `tests/test_windows_hooks_and_context.py::test_baked_path_survives_a_real_shell` | M3 | Windows hooks | `crates/dejafix-core/src/core/hooks/tests.rs::an_escaped_path_reaches_the_shell_unchanged` |
 | `tests/test_windows_hooks_and_context.py::test_windows_falls_back_to_scripts_not_bin` | M3 | Windows hooks | `crates/dejafix-core/src/adapters/git/tests.rs::windows_finds_scripts_djf_exe_with_forward_slashes` |
 | `tests/test_windows_hooks_and_context.py::test_installed_hook_does_not_block_a_commit` | M3 | Windows hooks | `crates/dejafix/tests/cli/hooks.rs::a_real_commit_records_the_event_and_is_never_blocked` |
-| `tests/test_windows_hooks_and_context.py::test_get_context_uses_the_resolved_project_not_cwd` | M4 | MCP tools use the resolved project | |
-| `tests/test_windows_hooks_and_context.py::test_precheck_file_uses_the_resolved_project_not_cwd` | M4 | MCP tools use the resolved project | |
-| `tests/test_windows_hooks_and_context.py::test_precheck_churn_counts_the_projects_git_not_the_servers` | M4 | MCP tools use the resolved project | |
+| `tests/test_windows_hooks_and_context.py::test_get_context_uses_the_resolved_project_not_cwd` | M4 | MCP tools use the resolved project | `crates/dejafix/tests/golden/m4.rs::mcp_replies_match_python (server started outside the project in mcp_routing_matches_python)` |
+| `tests/test_windows_hooks_and_context.py::test_precheck_file_uses_the_resolved_project_not_cwd` | M4 | MCP tools use the resolved project | `crates/dejafix-core/src/wiring/mcp/tests.rs::precheck_and_context_use_the_resolved_project_s_git` |
+| `tests/test_windows_hooks_and_context.py::test_precheck_churn_counts_the_projects_git_not_the_servers` | M4 | MCP tools use the resolved project | `crates/dejafix-core/src/wiring/mcp/tests.rs::precheck_and_context_use_the_resolved_project_s_git` |
 | `tests/test_windows_hooks_and_context.py::test_an_expected_error_prints_no_traceback` | M2 | CLI error output | `crates/dejafix/tests/cli/write.rs::an_expected_error_prints_no_traceback` |

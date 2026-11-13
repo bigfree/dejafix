@@ -10,9 +10,16 @@ pub type Arguments<'a> =
 pub type Payload<'a> =
     Box<dyn Fn(&std::path::Path) -> Result<String, Box<dyn std::error::Error>> + 'a>;
 
+pub struct McpSession<'a> {
+    pub args: Vec<String>,
+    pub cwd: Option<&'a str>,
+    pub calls: Vec<(&'a str, serde_json::Value)>,
+}
+
 pub enum Action<'a> {
     Djf(Arguments<'a>),
     EditHook(Payload<'a>),
+    Mcp(McpSession<'a>),
 }
 
 #[derive(Clone, Copy)]

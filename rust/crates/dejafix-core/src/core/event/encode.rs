@@ -45,7 +45,7 @@ impl Event<'_> {
             self.extra
                 .0
                 .iter()
-                .map(|(key, raw)| (key.as_ref(), Value::Raw(raw))),
+                .map(|(key, raw)| (key.as_ref(), Value::Raw(raw.as_ref()))),
         )
         .collect();
         entries.sort_unstable_by(|left, right| left.0.cmp(right.0));

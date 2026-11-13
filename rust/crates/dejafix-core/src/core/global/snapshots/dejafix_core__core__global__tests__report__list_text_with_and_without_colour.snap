@@ -1,0 +1,16 @@
+---
+source: crates/dejafix-core/src/core/global/tests.rs
+expression: "global_report(&list(None, None, false), false)"
+---
+
+Patterns (2)
+────────────────────────────────────────────────────────────
+  pat_1  keep it small
+    tags: python, web · from: alpha · confidence: high
+  pat_2  bare
+
+Library Gotchas (2)
+────────────────────────────────────────────────────────────
+  got_1  [sqlalchemy] close sessions
+    version: >=2 · from: beta
+  got_2  [unknown] no library

@@ -1,0 +1,15 @@
+---
+source: crates/dejafix-core/src/core/global/tests.rs
+expression: "global_report(&detected(stack(), 2, 1, false), false)"
+---
+
+Detected Stack: demo
+──────────────────────────────────────────────────
+  Tags:       python, fastapi
+  Libraries:  lib01, lib02, lib03, lib04, lib05, lib06, lib07, lib08, lib09, lib10, lib11, lib12, lib13, lib14, lib15
+              ... and 2 more
+  Frameworks: fastapi
+  Manifests:  pyproject.toml, Dockerfile
+
+  Would inherit:
+    2 patterns, 1 library gotchas

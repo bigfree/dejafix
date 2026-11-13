@@ -2,6 +2,7 @@ mod decode;
 mod encode;
 mod ids;
 mod names;
+mod owned;
 mod types;
 
 pub(crate) use decode::{decode_line, text as raw_text};

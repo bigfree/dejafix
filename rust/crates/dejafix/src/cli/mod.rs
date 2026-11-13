@@ -2,6 +2,7 @@ mod args;
 mod doctor;
 mod hooks;
 mod init;
+mod memory;
 mod notice;
 mod output;
 mod project;
@@ -129,6 +130,8 @@ fn dispatch(
             return hooks::run_capture(&trigger, config, settings, out, err);
         }
         Commands::Precheck(args) => return hooks::run_precheck(args, config, settings, out, err),
+        Commands::Brief => return memory::run_brief(config, settings, out),
+        Commands::Global(args) => return memory::run_global(args, config, settings, out),
         Commands::Project { action } => return project::run(action, config, settings, out),
         Commands::Doctor { fix, depth, path } => {
             let Some(paths) = config.client_paths() else {

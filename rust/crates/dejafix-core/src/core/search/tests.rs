@@ -1,6 +1,8 @@
 use serde_json::json;
 
-use super::{SearchQuery, match_line, no_match_message, search};
+use super::{
+    SearchQuery, excerpt, match_line, mcp_match_line, no_match_message, search, search_reply,
+};
 use crate::core::log::EventLog;
 use crate::core::path::PathContext;
 use crate::testing::{NoResolve, fixed_clock};
@@ -108,5 +110,126 @@ fn lines_and_messages_match_python() {
             ..plain
         }),
         "No matches."
+    );
+}
+
+fn long_text() -> String {
+    let words: Vec<String> = (0..120).map(|index| format!("word{index}")).collect();
+    format!("gotcha: {}", words.join(" "))
+}
+
+fn words(prefix: &str, range: std::ops::Range<usize>) -> String {
+    range
+        .map(|index| format!("{prefix}{index}"))
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+#[test]
+fn excerpt_clips_from_the_start_when_the_match_fits() {
+    assert_eq!(
+        excerpt(&long_text(), "gotcha"),
+        format!("gotcha: {}...", words("word", 0..42))
+    );
+    assert_eq!(excerpt("x", "y"), "x");
+}
+
+#[test]
+fn excerpt_shows_the_part_that_matched_past_the_clip() {
+    assert_eq!(
+        excerpt(&long_text(), "word100"),
+        format!("...{}", words("word", 86..120))
+    );
+    let text = format!(
+        "{} the argon2 migration broke logins",
+        words("filler", 0..80)
+    );
+    assert_eq!(
+        excerpt(&text, "argon2"),
+        format!(
+            "...{} the argon2 migration broke logins",
+            words("filler", 70..80)
+        )
+    );
+}
+
+#[test]
+fn excerpt_offsets_follow_python_when_casefold_changes_length() {
+    let text = format!("{} MATCH here", "Straße ".repeat(60));
+    assert_eq!(
+        excerpt(&text, "match"),
+        "...Straße Straße Straße Straße Straße MATCH here"
+    );
+}
+
+fn one(line: &serde_json::Value) -> EventLog<'static> {
+    let text = format!("{line}\n");
+    let context = PathContext {
+        root: "/p".into(),
+        cwd: "/p".into(),
+        fold_case: false,
+    };
+    EventLog::parse(text.as_bytes(), &fixed_clock(), &context, &NoResolve).into_owned()
+}
+
+#[test]
+fn mcp_match_lines_are_python_s() {
+    let notes = one(
+        &json!({"id": "evt_1", "type": "note", "summary": "queue tuning", "notes": "retry storm after the argon2 upgrade", "timestamp": "2027-01-02T03:04:05Z"}),
+    );
+    let event = notes.events().first();
+    assert_eq!(
+        event
+            .map(|event| mcp_match_line(event, "argon2", false, false))
+            .as_deref(),
+        Some(
+            "  [note] evt_1 2027-01-02: queue tuning | notes: retry storm after the argon2 upgrade"
+        )
+    );
+    let multi = one(
+        &json!({"id": "evt_2", "type": "attempt", "issue_id": "0003", "outcome": "failed", "summary": "multi\nline\nterm note", "location": "src/a.py\n:3", "timestamp": "2027-01-02T03:04:05Z"}),
+    );
+    let event = multi.events().first();
+    assert_eq!(
+        event
+            .map(|event| mcp_match_line(event, "term", true, true))
+            .as_deref(),
+        Some(
+            "  [attempt #0003 (failed)] evt_2 2027-01-02: multi line term note @ src/a.py :3 (superseded)"
+        )
+    );
+    let clipped = one(
+        &json!({"id": "evt_3", "type": "note", "summary": long_text(), "notes": "n", "timestamp": "2027-01-02T03:04:05Z"}),
+    );
+    let event = clipped.events().first();
+    assert_eq!(
+        event.map(|event| mcp_match_line(event, "n", false, false)),
+        Some(format!(
+            "  [note] evt_3 2027-01-02: gotcha: {}... | notes: n",
+            words("word", 0..42)
+        ))
+    );
+}
+
+#[test]
+fn search_reply_lists_the_last_matches_oldest_first() {
+    let lines = log_text();
+    let context = PathContext {
+        root: "/p".into(),
+        cwd: "/p".into(),
+        fold_case: false,
+    };
+    let log = EventLog::parse(lines.as_bytes(), &fixed_clock(), &context, &NoResolve);
+    assert_eq!(
+        search_reply(&log, "use", 1, false),
+        "Found 1 match(es) for 'use':\n  [decision] evt_6 2027-01-01: use argon2"
+    );
+    assert_eq!(
+        search_reply(&log, "use", 10, false),
+        "Found 3 match(es) for 'use':\n  [attempt #0001 (worked)] evt_4 2027-01-01: rewrote the carousel\n  [decision] evt_5 2027-01-01: use bcrypt (superseded)\n  [decision] evt_6 2027-01-01: use argon2"
+    );
+    assert_eq!(
+        search_reply(&log, "zebra", 10, false),
+        "No events match 'zebra'."
     );
 }

@@ -12,13 +12,21 @@ use crate::core::global::{gotcha_entry, promotable_libraries, promotable_set, pr
 use crate::core::log::EventLog;
 use crate::core::time::iso_micros;
 use crate::core::write::{
-    Command, Ids, MarkerChange, MarkerState, WriteContext, checks_marker, marker_state,
-    plan_command,
+    Command, Ids, MarkerChange, MarkerState, ValidationError, WriteContext, checks_marker,
+    marker_state, plan_command,
 };
 
 pub fn record(
     project: &Project,
     command: Command,
+    ids: &mut impl Ids,
+) -> Result<Recorded, WiringError> {
+    record_with(project, |_| Ok(command), ids)
+}
+
+pub(crate) fn record_with(
+    project: &Project,
+    command: impl FnOnce(&EventLog<'_>) -> Result<Command, ValidationError>,
     ids: &mut impl Ids,
 ) -> Result<Recorded, WiringError> {
     let dir = &project.memory.dir;
@@ -30,6 +38,7 @@ pub fn record(
         &project.context,
         &FsResolver,
     );
+    let command = command(&log)?;
     let marker = if checks_marker(&command) {
         let marker = read_marker(dir);
         if marker_state(&log, marker.as_deref()) == MarkerState::Stale {
@@ -46,6 +55,11 @@ pub fn record(
         redact: project.settings.redact,
     };
     let plan = plan_command(&log, command, &context, ids)?;
+    let events = plan
+        .events
+        .iter()
+        .map(|event| event.id.as_str().to_owned())
+        .collect();
     let incomplete = commit_events(
         project,
         &mut locked,
@@ -57,6 +71,7 @@ pub fn record(
     )?;
     drop(locked);
     Ok(Recorded {
+        events,
         outcome: plan.outcome,
         notices: plan.notices,
         incomplete,

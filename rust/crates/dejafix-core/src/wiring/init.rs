@@ -148,7 +148,7 @@ fn write_bridges(
     Ok(written)
 }
 
-fn detect_and_record(root: &Path, settings: &Settings) -> Stack {
+pub(super) fn detect_and_record(root: &Path, settings: &Settings) -> Stack {
     let stack = detect_stack(root);
     let _ =
         GlobalStore::new(&settings.dejafix_home).record_promotable(&promotable_libraries(&stack));

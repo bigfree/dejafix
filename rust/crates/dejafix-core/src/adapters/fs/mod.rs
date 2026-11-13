@@ -12,6 +12,7 @@ mod types;
 mod write;
 
 pub use events::{events_path, lock_events, read_events_file, read_events_unlocked};
+pub(crate) use global::read_json_text;
 pub use manifest::manifest_info;
 pub use marker::{
     clear_marker, read_marker, read_snooze, remove_snooze, write_marker, write_snooze,

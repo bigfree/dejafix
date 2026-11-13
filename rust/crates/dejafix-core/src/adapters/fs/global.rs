@@ -1,19 +1,21 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashSet};
 use std::fs::{self, OpenOptions};
-use std::io::{Read, Write};
+use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 
-use serde_json::Value;
+use jiff::tz::TimeZone;
+use serde_json::{Map, Value};
 
 use super::store::read_python_text;
 use super::types::{GlobalStore, StoreError};
 use super::write::write_text;
-use crate::core::global::{Entry, PROMOTABLE_SEED};
+use crate::core::global::{Entry, PROMOTABLE_SEED, is_prunable};
 use crate::core::json::{write_canonical, write_python_json_indented};
 use crate::core::text::{platform_newlines, python_lines, python_strip, universal_newlines};
 
 const PATTERNS_FILE: &str = "patterns.jsonl";
 const GOTCHAS_FILE: &str = "library_gotchas.jsonl";
+const PREFERENCES_FILE: &str = "stack_preferences.md";
 const PROMOTABLE_FILE: &str = ".promotable.json";
 
 fn write_error(path: &Path) -> impl Fn(std::io::Error) -> StoreError + '_ {
@@ -21,6 +23,18 @@ fn write_error(path: &Path) -> impl Fn(std::io::Error) -> StoreError + '_ {
         path: path.to_path_buf(),
         source,
     }
+}
+
+pub fn read_json_text(path: &Path) -> Result<Option<String>, StoreError> {
+    if !path.exists() {
+        return Ok(None);
+    }
+    read_python_text(path, true)
+        .map(Some)
+        .map_err(|source| StoreError::Read {
+            path: path.to_path_buf(),
+            source,
+        })
 }
 
 fn parse_entries(text: &str) -> Option<Vec<Entry>> {
@@ -71,7 +85,7 @@ impl GlobalStore {
         self.dir.join(name)
     }
 
-    fn ensure(&self) -> Result<(), StoreError> {
+    pub fn ensure(&self) -> Result<(), StoreError> {
         fs::create_dir_all(&self.dir).map_err(write_error(&self.dir))
     }
 
@@ -150,6 +164,189 @@ impl GlobalStore {
             Ok(None) => Some(Vec::new()),
             Err(()) => None,
         }
+    }
+
+    fn load(&self, name: &str) -> Result<Vec<Entry>, StoreError> {
+        self.ensure()?;
+        let path = self.path(name);
+        match read_python_text(&path, false) {
+            Ok(text) => parse_entries(&text).ok_or_else(|| StoreError::Read {
+                path,
+                source: std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "a line is not a JSON object",
+                ),
+            }),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(Vec::new()),
+            Err(source) => Err(StoreError::Read { path, source }),
+        }
+    }
+
+    pub fn load_patterns(&self) -> Result<Vec<Entry>, StoreError> {
+        self.load(PATTERNS_FILE)
+    }
+
+    pub fn load_gotchas(&self) -> Result<Vec<Entry>, StoreError> {
+        self.load(GOTCHAS_FILE)
+    }
+
+    #[must_use]
+    pub fn has_preferences(&self) -> bool {
+        self.path(PREFERENCES_FILE).exists()
+    }
+
+    fn canonical_lines(path: &Path, entries: &[&Entry]) -> Result<String, StoreError> {
+        let mut bytes = Vec::new();
+        for entry in entries {
+            write_canonical(&mut bytes, &Value::Object((*entry).clone()))
+                .map_err(|error| write_error(path)(error.into()))?;
+            bytes.push(b'\n');
+        }
+        Ok(String::from_utf8_lossy(&bytes).into_owned())
+    }
+
+    fn append(&self, name: &str, entry: &Entry) -> Result<(), StoreError> {
+        self.ensure()?;
+        let path = self.path(name);
+        let text = Self::canonical_lines(&path, &[entry])?;
+        OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&path)
+            .and_then(|mut file| file.write_all(platform_newlines(&text).as_bytes()))
+            .map_err(write_error(&path))
+    }
+
+    pub fn append_pattern(&self, entry: &Entry) -> Result<(), StoreError> {
+        self.append(PATTERNS_FILE, entry)
+    }
+
+    pub fn append_gotcha(&self, entry: &Entry) -> Result<(), StoreError> {
+        self.append(GOTCHAS_FILE, entry)
+    }
+
+    fn retain_locked(
+        &self,
+        name: &str,
+        mut keep: impl FnMut(&Entry) -> bool,
+    ) -> Result<usize, StoreError> {
+        self.ensure()?;
+        let path = self.path(name);
+        let read_error = |source| StoreError::Read {
+            path: path.clone(),
+            source,
+        };
+        let mut file = match OpenOptions::new().read(true).write(true).open(&path) {
+            Ok(file) => file,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(0),
+            Err(error) => return Err(read_error(error)),
+        };
+        file.lock().map_err(|source| StoreError::Lock {
+            path: path.clone(),
+            source,
+        })?;
+        let mut text = String::new();
+        file.read_to_string(&mut text).map_err(read_error)?;
+        let entries = parse_entries(&universal_newlines(&text)).ok_or_else(|| {
+            read_error(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "a line is not a JSON object",
+            ))
+        })?;
+        let kept: Vec<&Entry> = entries.iter().filter(|entry| keep(entry)).collect();
+        let removed = entries.len() - kept.len();
+        if removed == 0 {
+            return Ok(0);
+        }
+        let lines = Self::canonical_lines(&path, &kept)?;
+        file.set_len(0)
+            .and_then(|()| file.seek(SeekFrom::Start(0)))
+            .and_then(|_| file.write_all(platform_newlines(&lines).as_bytes()))
+            .map_err(write_error(&path))?;
+        Ok(removed)
+    }
+
+    pub fn remove(&self, id: &str) -> Result<bool, StoreError> {
+        for name in [PATTERNS_FILE, GOTCHAS_FILE] {
+            let removed = self.retain_locked(name, |entry| {
+                entry.get("id").and_then(Value::as_str) != Some(id)
+            })?;
+            if removed > 0 {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+
+    pub fn prune(
+        &self,
+        now: jiff::Timestamp,
+        zone: &TimeZone,
+        older_than: i64,
+        confidence: Option<&str>,
+    ) -> Result<usize, StoreError> {
+        let mut removed = 0;
+        for name in [PATTERNS_FILE, GOTCHAS_FILE] {
+            removed += self.retain_locked(name, |entry| {
+                !is_prunable(entry, now, zone, older_than, confidence)
+            })?;
+        }
+        Ok(removed)
+    }
+
+    pub fn export(&self, exported_at: &str) -> Result<Value, StoreError> {
+        let path = self.path(PREFERENCES_FILE);
+        let preferences = match read_python_text(&path, false) {
+            Ok(text) => text,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => String::new(),
+            Err(source) => return Err(StoreError::Read { path, source }),
+        };
+        Ok(serde_json::json!({
+            "version": "1.0",
+            "exported_at": exported_at,
+            "patterns": self.load_patterns()?,
+            "gotchas": self.load_gotchas()?,
+            "preferences": preferences,
+        }))
+    }
+
+    pub fn import(&self, data: &Map<String, Value>) -> Result<(usize, usize), StoreError> {
+        let known = |entries: Vec<Entry>| -> HashSet<String> {
+            entries
+                .iter()
+                .filter_map(|entry| entry.get("id"))
+                .map(Value::to_string)
+                .collect()
+        };
+        let known_patterns = known(self.load_patterns()?);
+        let known_gotchas = known(self.load_gotchas()?);
+        let mut added = [0_usize; 2];
+        for (slot, (key, name, known)) in added.iter_mut().zip([
+            ("patterns", PATTERNS_FILE, &known_patterns),
+            ("gotchas", GOTCHAS_FILE, &known_gotchas),
+        ]) {
+            let Some(Value::Array(items)) = data.get(key) else {
+                continue;
+            };
+            for entry in items.iter().filter_map(Value::as_object) {
+                if entry
+                    .get("id")
+                    .is_some_and(|id| known.contains(&id.to_string()))
+                {
+                    continue;
+                }
+                self.append(name, entry)?;
+                *slot += 1;
+            }
+        }
+        if let Some(Value::String(preferences)) = data.get("preferences")
+            && !preferences.is_empty()
+            && !self.has_preferences()
+        {
+            write_text(&self.path(PREFERENCES_FILE), preferences)?;
+        }
+        let [patterns, gotchas] = added;
+        Ok((patterns, gotchas))
     }
 
     pub fn append_gotcha_if_new(

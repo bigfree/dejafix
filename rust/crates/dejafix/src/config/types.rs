@@ -24,3 +24,13 @@ pub struct HookConfig {
     pub temp: PathBuf,
     pub log: Option<PathBuf>,
 }
+
+#[derive(Debug, Clone)]
+pub struct McpConfig {
+    pub root: Option<PathBuf>,
+    pub cwd: PathBuf,
+    pub home: Option<PathBuf>,
+    pub dejafix_home: Option<PathBuf>,
+    pub redact: bool,
+    pub zone: TimeZone,
+}

@@ -7,8 +7,8 @@ use jiff::tz::TimeZone;
 
 use super::types::{Project, Settings, WiringError};
 use crate::adapters::fs::{
-    StoreError, find_memory_dir, issues_dir, path_context, project_name, read_optional_text,
-    write_text, write_text_if_changed,
+    MEMORY_DIR, MemoryDir, StoreError, find_memory_dir, issues_dir, path_context, project_name,
+    read_optional_text, write_text, write_text_if_changed,
 };
 use crate::core::log::EventLog;
 use crate::core::summary::{
@@ -23,6 +23,19 @@ impl Project {
     pub fn open(cwd: &Path, settings: Settings) -> Result<Self, WiringError> {
         let memory = find_memory_dir(cwd)?;
         let context = path_context(&memory.root)?;
+        Ok(Self {
+            memory,
+            settings,
+            context,
+        })
+    }
+
+    pub fn at(root: &Path, settings: Settings) -> Result<Self, WiringError> {
+        let memory = MemoryDir {
+            root: root.to_path_buf(),
+            dir: root.join(MEMORY_DIR),
+        };
+        let context = path_context(root)?;
         Ok(Self {
             memory,
             settings,

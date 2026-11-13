@@ -1,0 +1,16 @@
+---
+source: crates/dejafix-core/src/core/global/tests.rs
+expression: "global_report(&list(None, None, false), true)"
+---
+
+[1mPatterns (2)[0m
+[2m────────────────────────────────────────────────────────────[0m
+  [36mpat_1[0m  keep it small
+    [2mtags: python, web · from: alpha · confidence: high[0m
+  [36mpat_2[0m  bare
+
+[1mLibrary Gotchas (2)[0m
+[2m────────────────────────────────────────────────────────────[0m
+  [33mgot_1[0m  [[1msqlalchemy[0m] close sessions
+    [2mversion: >=2 · from: beta[0m
+  [33mgot_2[0m  [[1munknown[0m] no library

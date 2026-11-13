@@ -44,7 +44,7 @@ pub(crate) fn decode_line<'a>(
     let mut origin = Origin::default();
     let mut extra = Vec::new();
     for (key, raw) in &entries {
-        let mut keep = || extra.push((key.clone(), *raw));
+        let mut keep = || extra.push((key.clone(), Cow::Borrowed(*raw)));
         match key.as_ref() {
             "type" => {
                 kind = choice(raw, EventKind::parse, LineError::Kind)?;

@@ -9,6 +9,7 @@ use crate::adapters::fs::{
     report_is_new, resolve_path,
 };
 use crate::core::lessons::{Memory, edited_paths, hook_output, is_skipped, main_checkout, records};
+use crate::wiring::python::python_io_error;
 
 const RESET_EVENTS: [&str; 2] = ["SessionStart", "PostCompact"];
 const ERROR_CHARS: usize = 300;
@@ -154,20 +155,6 @@ fn locate(path: &Path) -> Option<(PathBuf, String)> {
 }
 
 fn python_error(error: &io::Error, path: &Path) -> String {
-    let name = match error.kind() {
-        io::ErrorKind::PermissionDenied => "PermissionError",
-        io::ErrorKind::NotFound => "FileNotFoundError",
-        io::ErrorKind::IsADirectory => "IsADirectoryError",
-        io::ErrorKind::NotADirectory => "NotADirectoryError",
-        _ => "OSError",
-    };
-    let message = error.to_string();
-    let message = message
-        .split(" (os error")
-        .next()
-        .unwrap_or(message.as_str());
-    match error.raw_os_error() {
-        Some(code) => format!("{name}: [Errno {code}] {message}: '{}'", path.display()),
-        None => format!("{name}: {message}: '{}'", path.display()),
-    }
+    let (class, message) = python_io_error(error, path);
+    format!("{class}: {message}")
 }

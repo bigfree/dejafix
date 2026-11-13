@@ -1,11 +1,11 @@
 use std::env;
 use std::ffi::OsString;
 use std::io::IsTerminal;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use dejafix_core::ClientPaths;
 
-use super::types::{Config, HookConfig};
+use super::types::{Config, HookConfig, McpConfig};
 
 const NO_REDACT_VALUES: [&str; 3] = ["1", "true", "yes"];
 
@@ -61,5 +61,39 @@ impl HookConfig {
 
     pub fn zone() -> jiff::tz::TimeZone {
         jiff::tz::TimeZone::system()
+    }
+}
+
+fn expand_user(path: PathBuf, home: Option<&Path>) -> PathBuf {
+    let Some(home) = home else {
+        return path;
+    };
+    match path.strip_prefix("~") {
+        Ok(rest) => home.join(rest),
+        Err(_) => path,
+    }
+}
+
+impl McpConfig {
+    pub fn from_env(arguments: impl IntoIterator<Item = OsString>) -> std::io::Result<Self> {
+        let config = Config::from_env()?;
+        let mut arguments = arguments.into_iter().skip(1);
+        let flagged = arguments
+            .by_ref()
+            .find(|argument| argument == "--root")
+            .and_then(|_| arguments.next());
+        let root = flagged.or_else(|| non_empty("DEJAFIX_ROOT")).map(|root| {
+            let expanded = expand_user(PathBuf::from(root), config.home.as_deref());
+            let absolute = config.cwd.join(expanded);
+            std::fs::canonicalize(&absolute).unwrap_or(absolute)
+        });
+        Ok(Self {
+            root,
+            cwd: config.cwd,
+            home: config.home,
+            dejafix_home: config.dejafix_home,
+            redact: config.redact,
+            zone: config.zone,
+        })
     }
 }

@@ -65,7 +65,7 @@ pub fn relevant_entries<'e>(
     }
 }
 
-fn is_truthy(value: &Value) -> bool {
+pub(crate) fn is_truthy(value: &Value) -> bool {
     match value {
         Value::Null => false,
         Value::Bool(flag) => *flag,

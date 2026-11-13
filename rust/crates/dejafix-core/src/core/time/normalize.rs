@@ -96,6 +96,14 @@ fn local_offset_micros(civil: DateTime, zone: &TimeZone) -> Option<i64> {
 
 impl Timestamp<'_> {
     #[must_use]
+    pub fn into_owned(self) -> Timestamp<'static> {
+        Timestamp {
+            text: Cow::Owned(self.text.into_owned()),
+            utc: self.utc,
+        }
+    }
+
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.text
     }

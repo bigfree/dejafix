@@ -561,3 +561,26 @@ fn no_gotcha_file_is_created_when_nothing_is_promoted() {
     );
     assert!(store.dir.join("library_gotchas.jsonl").exists());
 }
+
+#[cfg(unix)]
+#[test]
+fn global_removal_rewrites_in_place_so_a_locked_append_is_never_lost() {
+    use std::os::unix::fs::MetadataExt;
+    let home = tempfile::tempdir().unwrap();
+    let store = super::GlobalStore::new(home.path());
+    store.ensure().unwrap();
+    let path = store.path("library_gotchas.jsonl");
+    fs::write(
+        &path,
+        "{\"gotcha\": \"a\", \"id\": \"got_a\", \"library\": \"x\"}\n{\"gotcha\": \"b\", \"id\": \"got_b\", \"library\": \"x\"}\n",
+    )
+    .unwrap();
+    let inode = fs::metadata(&path).unwrap().ino();
+    assert!(store.remove("got_a").unwrap());
+    assert!(!store.remove("got_zzz").unwrap());
+    assert_eq!(fs::metadata(&path).unwrap().ino(), inode);
+    assert_eq!(
+        fs::read_to_string(&path).unwrap(),
+        "{\"gotcha\": \"b\", \"id\": \"got_b\", \"library\": \"x\"}\n"
+    );
+}

@@ -137,6 +137,43 @@ pub enum Commands {
     },
     #[command(about = "Check staged changes (or named files) against project memory.")]
     Precheck(PrecheckArgs),
+    #[command(
+        about = "One-screen session-start briefing: warnings, stale memories, open issues, recent decisions, stack gotchas, and the prevention score."
+    )]
+    Brief,
+    #[command(name = "global", about = "Manage cross-project global memory.")]
+    Global(GlobalArgs),
+}
+
+#[derive(Debug, Args)]
+pub struct GlobalArgs {
+    #[arg(
+        default_value = "status",
+        help = "Action: status, list, add, add-gotcha, remove, export, import, prune, detect."
+    )]
+    pub action: String,
+    #[arg(help = "Pattern text, gotcha text, entry ID, or import file path.")]
+    pub text: Option<String>,
+    #[arg(long, help = "Filter or tag entries.")]
+    pub tag: Option<String>,
+    #[arg(long, help = "Filter by or specify library.")]
+    pub library: Option<String>,
+    #[arg(
+        long = "older-than",
+        default_value_t = 365,
+        allow_negative_numbers = true,
+        help = "Days threshold for prune."
+    )]
+    pub older_than: i64,
+    #[arg(long, help = "Confidence filter for prune.")]
+    pub confidence: Option<String>,
+    #[arg(
+        short = 'f',
+        long = "format",
+        default_value = "text",
+        help = "Output format for list/detect: text, json."
+    )]
+    pub format: String,
 }
 
 #[derive(Debug, Args)]

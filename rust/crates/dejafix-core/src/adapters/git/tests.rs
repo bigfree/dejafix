@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 
 use super::{
     head_short, hooks_dir, last_changes, last_message, read_hook, remove_hook, resolve_djf_binary,
-    staged_files, working_files, write_hook,
+    staged_files, status_files, working_files, write_hook,
 };
 use crate::core::capture::Change;
 
@@ -537,4 +537,38 @@ fn a_failing_git_is_told_apart_from_a_missing_one() {
         super::git_status(&dir.path().join("missing"), &["--version"]),
         Err(GitFailure::Unavailable)
     );
+}
+
+fn repository_with_changes() -> tempfile::TempDir {
+    let dir = tempfile::tempdir().unwrap();
+    git(dir.path(), &["init", "-q"]);
+    fs::write(dir.path().join("tracked.txt"), "one").unwrap();
+    git(dir.path(), &["add", "tracked.txt"]);
+    git(dir.path(), &["commit", "-q", "-m", "x"]);
+    fs::write(dir.path().join("tracked.txt"), "two").unwrap();
+    fs::write(dir.path().join("new.txt"), "n").unwrap();
+    dir
+}
+
+#[test]
+fn status_files_lists_staged_and_untracked_files() {
+    let dir = repository_with_changes();
+    git(dir.path(), &["add", "tracked.txt"]);
+    assert_eq!(status_files(dir.path()), ["tracked.txt", "new.txt"]);
+}
+
+#[test]
+fn status_files_cut_the_first_line_after_the_trimmed_output_like_python() {
+    let dir = repository_with_changes();
+    assert_eq!(status_files(dir.path()), ["racked.txt", "new.txt"]);
+}
+
+#[test]
+fn status_files_are_empty_for_a_clean_tree_or_no_repository() {
+    let dir = tempfile::tempdir().unwrap();
+    let none = Vec::<String>::new();
+    assert_eq!(status_files(dir.path()), none);
+    git(dir.path(), &["init", "-q"]);
+    assert_eq!(status_files(dir.path()), none);
+    assert_eq!(status_files(&dir.path().join("missing")), none);
 }

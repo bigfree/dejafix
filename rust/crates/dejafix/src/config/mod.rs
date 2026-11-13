@@ -1,4 +1,4 @@
 mod env;
 mod types;
 
-pub use types::{Config, HookConfig};
+pub use types::{Config, HookConfig, McpConfig};

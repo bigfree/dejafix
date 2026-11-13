@@ -298,3 +298,314 @@ fn the_block_renders_like_python() {
     assert!(!block.contains("### Library Gotchas"));
     assert!(block.ends_with("- 1.5\n"));
 }
+
+mod report {
+    use serde_json::{Value, json};
+
+    use crate::core::global::{Entry, GlobalOutcome, Stack, Usage, filtered, global_report};
+
+    fn entries(values: &[Value]) -> Vec<Entry> {
+        values
+            .iter()
+            .filter_map(|value| value.as_object().cloned())
+            .collect()
+    }
+
+    fn patterns() -> Vec<Entry> {
+        entries(&[
+            json!({"id": "pat_1", "pattern": "keep it small", "tags": ["python", "web"], "source_project": "alpha", "confidence": "high"}),
+            json!({"id": "pat_2", "pattern": "bare", "tags": [], "source_project": null}),
+        ])
+    }
+
+    fn gotchas() -> Vec<Entry> {
+        entries(&[
+            json!({"id": "got_1", "library": "sqlalchemy", "gotcha": "close sessions", "tags": ["python"], "source_project": "beta", "version_range": ">=2"}),
+            json!({"id": "got_2", "gotcha": "no library", "tags": []}),
+        ])
+    }
+
+    fn list(tag: Option<&str>, library: Option<&str>, json: bool) -> GlobalOutcome {
+        let (patterns, gotchas) = filtered(patterns(), gotchas(), tag, library);
+        GlobalOutcome::List {
+            patterns,
+            gotchas,
+            tag: tag.map(str::to_owned),
+            library: library.map(str::to_owned),
+            json,
+        }
+    }
+
+    #[test]
+    fn status_counts_and_sorts() {
+        let outcome = GlobalOutcome::Status {
+            location: "/home/x/.dejafix/global".to_owned(),
+            patterns: patterns(),
+            gotchas: gotchas(),
+            preferences: true,
+        };
+        insta::assert_snapshot!(global_report(&outcome, false));
+        insta::assert_snapshot!(global_report(&outcome, true));
+    }
+
+    #[test]
+    fn status_of_nothing_omits_the_lists() {
+        let outcome = GlobalOutcome::Status {
+            location: "/g".to_owned(),
+            patterns: Vec::new(),
+            gotchas: Vec::new(),
+            preferences: false,
+        };
+        let out = global_report(&outcome, false);
+        assert!(out.contains("Stack preferences:   not set\n"));
+        assert!(!out.contains("Tags:"));
+        assert!(!out.contains("Projects:"));
+    }
+
+    #[test]
+    fn list_text_with_and_without_colour() {
+        insta::assert_snapshot!(global_report(&list(None, None, false), false));
+        insta::assert_snapshot!(global_report(&list(None, None, false), true));
+    }
+
+    #[test]
+    fn list_json_is_python_indent_two() {
+        let out = global_report(&list(None, None, true), false);
+        assert!(out.starts_with("{\n  \"patterns\": [\n    {\n      \"id\": \"pat_1\","));
+        assert!(out.ends_with("  ]\n}\n"));
+    }
+
+    #[test]
+    fn filters_by_tag_case_insensitively_and_by_library_substring() {
+        let (patterns, gotchas) = filtered(self::patterns(), self::gotchas(), Some("PYTHON"), None);
+        assert_eq!((patterns.len(), gotchas.len()), (1, 1));
+        let (patterns, gotchas) = filtered(self::patterns(), self::gotchas(), None, Some("ALCH"));
+        assert_eq!((patterns.len(), gotchas.len()), (2, 1));
+        let (patterns, gotchas) = filtered(self::patterns(), self::gotchas(), Some(""), Some(""));
+        assert_eq!((patterns.len(), gotchas.len()), (2, 2));
+    }
+
+    #[test]
+    fn nothing_found_names_the_filter() {
+        let out = global_report(&list(Some("zzz"), None, false), false);
+        assert_eq!(
+            out,
+            "No entries found. (filter: tag=zzz, library=None)\n  Add patterns:  djf global add \"your pattern here\"\n  Add gotchas:   djf global add-gotcha \"gotcha text\" --library <library>\n"
+        );
+        let bare = global_report(&list(Some("zzz"), Some("nothing"), false), false);
+        assert!(bare.starts_with("No entries found. (filter: tag=zzz, library=nothing)\n"));
+    }
+
+    #[test]
+    fn short_messages_match_python() {
+        let green = "\u{1b}[32m[global]\u{1b}[0m";
+        let cases = [
+            (
+                GlobalOutcome::PatternAdded {
+                    id: "pat_1".into(),
+                    text: "t".into(),
+                },
+                format!("{green} Pattern added: pat_1\n  t\n"),
+            ),
+            (
+                GlobalOutcome::GotchaAdded {
+                    id: "got_1".into(),
+                    library: "SQL".into(),
+                    text: "t".into(),
+                },
+                format!("{green} Gotcha added: got_1\n  [SQL] t\n"),
+            ),
+            (
+                GlobalOutcome::Removed("x".into()),
+                format!("{green} Removed: x\n"),
+            ),
+            (
+                GlobalOutcome::Imported {
+                    patterns: 2,
+                    gotchas: 1,
+                },
+                format!("{green} Imported: 2 patterns, 1 gotchas\n"),
+            ),
+            (
+                GlobalOutcome::Pruned {
+                    removed: 3,
+                    older_than: 365,
+                },
+                format!("{green} Pruned 3 entries (older than 365 days)\n"),
+            ),
+        ];
+        for (outcome, expected) in cases {
+            assert_eq!(global_report(&outcome, true), expected);
+            assert_eq!(
+                global_report(&outcome, false),
+                expected.replace("\u{1b}[32m", "").replace("\u{1b}[0m", "")
+            );
+        }
+        assert_eq!(
+            global_report(&GlobalOutcome::NotFound("x".into()), true),
+            "Entry not found: x\n"
+        );
+        assert_eq!(
+            global_report(&GlobalOutcome::FileNotFound("f.json".into()), true),
+            "File not found: f.json\n"
+        );
+        assert_eq!(
+            global_report(&GlobalOutcome::InvalidJson("boom".into()), true),
+            "Invalid JSON: boom\n"
+        );
+        assert_eq!(
+            global_report(
+                &GlobalOutcome::Pruned {
+                    removed: 0,
+                    older_than: 9
+                },
+                true
+            ),
+            "No entries to prune.\n"
+        );
+    }
+
+    #[test]
+    fn usage_and_unknown_lines() {
+        let usage = |usage| global_report(&GlobalOutcome::Usage(usage), true);
+        assert_eq!(
+            usage(Usage::Add),
+            "Usage: djf global add \"your pattern here\" [--tag python]\n"
+        );
+        assert_eq!(
+            usage(Usage::AddGotcha),
+            "Usage: djf global add-gotcha --library sqlalchemy \"gotcha text\" [--tag python]\n"
+        );
+        assert_eq!(usage(Usage::Remove), "Usage: djf global remove <id>\n");
+        assert_eq!(
+            usage(Usage::Import),
+            "Usage: djf global import <file.json>\n"
+        );
+        assert_eq!(
+            global_report(&GlobalOutcome::Unknown("frob".into()), true),
+            "Unknown action: frob\nAvailable: status, list, add, add-gotcha, remove, export, import, prune, detect\n"
+        );
+    }
+
+    #[test]
+    fn export_is_ascii_json() {
+        let value = json!({"version": "1.0", "preferences": "š"});
+        assert_eq!(
+            global_report(&GlobalOutcome::Exported(value), false),
+            "{\n  \"version\": \"1.0\",\n  \"preferences\": \"\\u0161\"\n}\n"
+        );
+    }
+
+    fn stack() -> Stack {
+        Stack {
+            tags: vec!["python".into(), "fastapi".into()],
+            libraries: (1..=17).map(|n| format!("lib{n:02}")).collect(),
+            frameworks: vec!["fastapi".into()],
+            manifest_files: vec!["pyproject.toml", "Dockerfile"],
+        }
+    }
+
+    fn detected(stack: Stack, patterns: usize, gotchas: usize, json: bool) -> GlobalOutcome {
+        GlobalOutcome::Detected {
+            name: "demo".into(),
+            stack,
+            inherited_patterns: patterns,
+            inherited_gotchas: gotchas,
+            json,
+        }
+    }
+
+    #[test]
+    fn detect_text_clips_libraries_at_fifteen() {
+        insta::assert_snapshot!(global_report(&detected(stack(), 2, 1, false), false));
+        insta::assert_snapshot!(global_report(&detected(stack(), 2, 1, false), true));
+    }
+
+    #[test]
+    fn detect_of_an_empty_project_says_so() {
+        let out = global_report(&detected(Stack::default(), 0, 0, false), false);
+        assert_eq!(
+            out,
+            "\nDetected Stack: demo\n──────────────────────────────────────────────────\n  Tags:       (none detected)\n  Libraries:  (none detected)\n  Manifests:  \n\n  No matching global entries for this stack.\n\n"
+        );
+    }
+
+    #[test]
+    fn detect_json_leads_with_the_name() {
+        let out = global_report(&detected(stack(), 0, 0, true), false);
+        assert!(out.starts_with("{\n  \"name\": \"demo\",\n  \"tags\": [\n    \"python\","));
+        assert!(out.contains(
+            "  \"manifest_files\": [\n    \"pyproject.toml\",\n    \"Dockerfile\"\n  ]\n}\n"
+        ));
+    }
+}
+
+mod prune {
+    use jiff::tz::TimeZone;
+    use serde_json::{Value, json};
+
+    use crate::core::global::{Entry, is_prunable};
+    use crate::testing::fixed_clock;
+
+    fn entry(value: &Value) -> Entry {
+        value.as_object().cloned().unwrap_or_default()
+    }
+
+    fn prunable(value: &Value, older_than: i64, confidence: Option<&str>) -> bool {
+        is_prunable(
+            &entry(value),
+            fixed_clock().now,
+            &TimeZone::UTC,
+            older_than,
+            confidence,
+        )
+    }
+
+    #[test]
+    fn age_decides_and_the_boundary_is_strict() {
+        let at = |text: &str| json!({"created": text});
+        assert!(prunable(&at("2026-01-14T08:00:00Z"), 365, None));
+        assert!(!prunable(&at("2026-01-15T08:00:00Z"), 365, None));
+        assert!(!prunable(&at("2026-01-15T08:00:01Z"), 365, None));
+        assert!(prunable(&at("2026-01-15T07:59:59Z"), 365, None));
+    }
+
+    #[test]
+    fn discovered_is_read_when_created_is_missing_or_empty() {
+        assert!(prunable(
+            &json!({"discovered": "2020-01-01T00:00:00Z"}),
+            365,
+            None
+        ));
+        assert!(prunable(
+            &json!({"created": "", "discovered": "2020-01-01T00:00:00Z"}),
+            365,
+            None
+        ));
+        assert!(!prunable(
+            &json!({"created": "2099-01-01T00:00:00Z", "discovered": "2020-01-01T00:00:00Z"}),
+            365,
+            None
+        ));
+    }
+
+    #[test]
+    fn unreadable_dates_count_as_the_epoch() {
+        assert!(prunable(&json!({}), 365, None));
+        assert!(prunable(&json!({"created": "junk"}), 365, None));
+        assert!(prunable(&json!({"created": 5}), 365, None));
+        assert!(!prunable(&json!({}), 100_000, None));
+    }
+
+    #[test]
+    fn confidence_narrows_the_match() {
+        let old = json!({"created": "2020-01-01T00:00:00Z", "confidence": "high"});
+        assert!(prunable(&old, 365, Some("high")));
+        assert!(!prunable(&old, 365, Some("low")));
+        assert!(!prunable(
+            &json!({"created": "2020-01-01T00:00:00Z"}),
+            365,
+            Some("high")
+        ));
+    }
+}

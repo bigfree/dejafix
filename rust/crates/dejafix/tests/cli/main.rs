@@ -3,6 +3,7 @@ mod edit_hook;
 mod guidance;
 mod hooks;
 mod init;
+mod memory;
 mod precheck;
 mod project;
 mod read;

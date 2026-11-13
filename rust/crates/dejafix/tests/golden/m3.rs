@@ -53,15 +53,15 @@ if [ -d \".dejafix\" ] && [ -n \"$DJF_BIN\" ]; then\n\
 \x20   \"$DJF_BIN\" _auto-capture \"merge\" >/dev/null 2>&1 &\n\
 fi\n";
 
-fn args(list: &[&str]) -> Vec<String> {
+pub(crate) fn args(list: &[&str]) -> Vec<String> {
     list.iter().map(|arg| (*arg).to_owned()).collect()
 }
 
-fn djf(list: &'static [&'static str]) -> Action<'static> {
+pub(crate) fn djf(list: &'static [&'static str]) -> Action<'static> {
     Action::Djf(fixed(list))
 }
 
-fn git(dir: &Path, list: &[&str], date: &str) -> Result<String, Box<dyn Error>> {
+pub(crate) fn git(dir: &Path, list: &[&str], date: &str) -> Result<String, Box<dyn Error>> {
     let output = Command::new("git")
         .args(["-c", "user.name=t", "-c", "user.email=t@example.invalid"])
         .args([
@@ -87,13 +87,13 @@ fn git(dir: &Path, list: &[&str], date: &str) -> Result<String, Box<dyn Error>> 
     Ok(String::from_utf8(output.stdout)?)
 }
 
-fn repository(dir: &Path) -> Result<(), Box<dyn Error>> {
+pub(crate) fn repository(dir: &Path) -> Result<(), Box<dyn Error>> {
     fs::create_dir_all(dir)?;
     git(dir, &["init", "-q", "-b", "main"], EPOCH)?;
     Ok(())
 }
 
-fn write(root: &Path, relative: &str, text: &str) -> Result<(), Box<dyn Error>> {
+pub(crate) fn write(root: &Path, relative: &str, text: &str) -> Result<(), Box<dyn Error>> {
     let path = root.join(relative);
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
@@ -102,7 +102,7 @@ fn write(root: &Path, relative: &str, text: &str) -> Result<(), Box<dyn Error>> 
     Ok(())
 }
 
-fn commit(
+pub(crate) fn commit(
     project: &Path,
     files: &[(String, String)],
     message: &str,
@@ -128,7 +128,7 @@ fn pairs(list: &[(&str, &str)]) -> Vec<(String, String)> {
         .collect()
 }
 
-fn compare(
+pub(crate) fn compare(
     fixture: &Path,
     actions: &[Action<'_>],
     clean: fn(Run) -> Cleaned,
@@ -158,7 +158,7 @@ const DIAGNOSES: &[(&str, &str)] = &[(
      a gotcha is promoted",
 )];
 
-fn assert_same(scenario: &str, differences: &[String]) {
+pub(crate) fn assert_same(scenario: &str, differences: &[String]) {
     let explained: Vec<String> = differences
         .iter()
         .map(|line| {
@@ -414,7 +414,7 @@ fn auto_capture_matches_python() -> TestResult {
     Ok(())
 }
 
-fn days_ago(now: i64, days: i64) -> Result<String, Box<dyn Error>> {
+pub(crate) fn days_ago(now: i64, days: i64) -> Result<String, Box<dyn Error>> {
     Ok(jiff::Timestamp::from_second(now - days * 86_400)?.to_string())
 }
 
@@ -450,7 +450,7 @@ fn precheck_events(now: i64) -> Result<String, Box<dyn Error>> {
     Ok(text)
 }
 
-fn precheck_fixture(root: &Path, now: i64) -> Result<(), Box<dyn Error>> {
+pub(crate) fn precheck_fixture(root: &Path, now: i64) -> Result<(), Box<dyn Error>> {
     write_project(root, 3_000, FIXTURE_SEED)?;
     let mut log = fs::OpenOptions::new()
         .append(true)
@@ -504,7 +504,7 @@ fn absolute(project: &Path) -> Vec<String> {
     ]
 }
 
-fn clock(run: Run) -> Cleaned {
+pub(crate) fn clock(run: Run) -> Cleaned {
     let minutes = Regex::new(r"\d\d:\d\d UTC")?;
     let seconds = Regex::new(r"\d\d:\d\d:\d\d\+00:00")?;
     let clean = |text: &str| {

@@ -1,0 +1,25 @@
+---
+source: crates/dejafix-core/src/core/brief/tests.rs
+expression: "render(&busy(), &gotchas, &stale, false)"
+---
+
+dejafix brief — demo
+────────────────────────────────────────────────────────────
+⚠ Active warnings
+   cart.js — 2 failed attempts (last: tried contain layout)
+   pay.py — 1 failed attempt (last: ščřžýáíé ščřžýáíé ščřžýáíé ščřžýáíé ščřžýáíé ščřžýáíé ščřžýá)
+   ui.js — 1 failed attempt (last: files only attempt)
+   (no file) — 1 failed attempt (last: no file attempt)
+⏳ Possibly stale
+   decision [evt_11] core uses a registry — core.py changed 5x since
+   confirm, or retire: djf decision "..." --supersedes <id>
+📋 Open issues
+   #0001 login redirect loop
+   #0002 checkout 500 on empty cart
+🕑 Recent decisions
+   core uses a registry
+   replacement decision
+💡 Stack gotchas
+   sqlalchemy: a text key
+📈 Score  D (21/100) ▲ +13 this week
+────────────────────────────────────────────────────────────

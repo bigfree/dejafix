@@ -11,18 +11,23 @@ pub use crate::adapters::fs::{
 pub use crate::adapters::fs::{forget_session, report_is_new, seen_root};
 pub use crate::adapters::git::{GitHistory, recent_changes};
 pub use crate::adapters::git::{hooks_dir, read_hook, remove_hook, resolve_djf_binary, write_hook};
-pub use crate::adapters::git::{last_changes, last_message, staged_files, working_files};
+pub use crate::adapters::git::{
+    last_changes, last_message, staged_files, status_files, working_files,
+};
+pub use crate::core::brief::{BriefInput, render_brief};
 pub use crate::core::capture::{
     Change, Classified, capture_event, capture_files, classify, first_line, location_rank,
     meets_threshold, merge_event, parse_name_status, pick_location,
 };
+pub use crate::core::context::{ContextInput, generate_context};
 pub use crate::core::doctor::{Reverted, SeenConfig, track_pins};
 pub use crate::core::event::{
     CaptureSource, Confidence, Event, EventId, EventKind, Extra, IssueId, LineError, Origin,
     Outcome, Summary,
 };
 pub use crate::core::global::{
-    Entry, PROMOTABLE_SEED, Relevant, Stack, gotcha_entry, inherited_block, is_gotcha_signal,
+    Entry, GlobalAction, GlobalOutcome, PROMOTABLE_SEED, Relevant, Stack, Usage, filtered,
+    global_report, gotcha_entry, inherited_block, is_gotcha_signal, is_prunable,
     promotable_libraries, promotable_set, promotion, relevant_entries, similar,
 };
 pub use crate::core::hooks::{
@@ -50,6 +55,8 @@ pub use crate::core::registry::{
     list_payload, load as load_registry, meta_payload, normalize_path, same_path, slugify,
     unique_id,
 };
+pub use crate::core::reply::{current_reply, gotchas_reply, precheck_report, projects_reply};
+pub use crate::core::resolve::{Probe, Resolution, ResolveError, Source, resolve};
 pub use crate::core::scaffold::{
     BRIDGE_END, BRIDGE_START, BridgeChange, INITIAL_CONFIG, INSTRUCTIONS_BACKUP_FILE,
     INSTRUCTIONS_VERSION, ManifestInfo, TITLE_CHARS, ai_instructions, apply_bridge, bridge_block,
@@ -57,7 +64,16 @@ pub use crate::core::scaffold::{
     instructions_version, plan_with_idea, project_map_from_stack, splice_global_block,
     stack_summary_suffix,
 };
-pub use crate::core::search::{SearchQuery, match_line, no_match_message, search};
+pub use crate::core::score::{
+    Score, ScoreError, ScoreEvent, calculate_score, raw_events, score_event, score_event_of,
+    score_reply,
+};
+pub use crate::core::search::{
+    SearchQuery, excerpt, match_line, mcp_match_line, no_match_message, search, search_reply,
+};
+pub use crate::core::session::{
+    MAP_POINTER, SESSION_START_DONE, current_plan, placeholder_map, session_start,
+};
 pub use crate::core::stale::{
     CommitsSince, FileHistory, STALE_COMMIT_THRESHOLD, Stale, find_stale, stale_label,
 };
@@ -78,10 +94,11 @@ pub use crate::wiring::{
     FoundProject, HooksAction, HooksOutcome, HooksReport, Inherited, InitHooks, InitOptions,
     InitReport, ListedProject, MemoryFile, PrecheckOutcome, PrecheckRequest, Project, Recorded,
     RegistryOp, RegistryReply, ScanReport, SearchOutput, Settings, UpgradeNotice, WiringError,
-    add_plan_idea, auto_capture, doctor, edit_hook, hooks_action, init_project, other_projects,
-    precheck, read_memory_file, record, regenerate, register_project, registry_op, scan_projects,
-    search_project, show, upgrade_notice,
+    add_plan_idea, auto_capture, brief, doctor, edit_hook, global, hooks_action, init_project,
+    other_projects, precheck, read_memory_file, record, regenerate, register_project, registry_op,
+    scan_projects, search_project, show, upgrade_notice,
 };
+pub use crate::wiring::{CachedLog, McpSettings, McpState, ToolCall, ToolReply, WriteCall};
 
 #[cfg(any(test, feature = "testing"))]
 pub mod testing;

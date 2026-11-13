@@ -12,9 +12,10 @@ use crate::adapters::fs::{
 use crate::adapters::git::{GitHistory, recent_changes, staged_files, working_files};
 use crate::core::event::{Event, EventId, EventKind, Extra, Origin, Summary};
 use crate::core::log::EventLog;
+use crate::core::path::PathContext;
 use crate::core::precheck::{
-    RECENT_DAYS, Severity, Targets, analyze, expiry_iso, parse_snooze, read_expiry, remaining,
-    snooze_note, snoozed_until, targets,
+    RECENT_DAYS, Severity, Targets, Warning, analyze, expiry_iso, parse_snooze, read_expiry,
+    remaining, snooze_note, snoozed_until, targets,
 };
 use crate::core::redact::{redact_event, redaction_notice};
 use crate::core::stale::{STALE_COMMIT_THRESHOLD, find_stale};
@@ -78,26 +79,7 @@ pub fn precheck(
     let (Some(log), Some(context)) = (parsed, context.as_ref()) else {
         return Ok(PrecheckOutcome::Unreadable);
     };
-    let found = targets(&files, &log, context, &FsResolver);
-    let history = GitHistory {
-        root: cwd.to_path_buf(),
-    };
-    let only: HashSet<&str> = found.files.iter().map(String::as_str).collect();
-    let (churn, stale) = thread::scope(|scope| {
-        let stale = scope.spawn(|| {
-            find_stale(
-                &log,
-                context,
-                &FsResolver,
-                &history,
-                Some(&only),
-                STALE_COMMIT_THRESHOLD,
-            )
-        });
-        let churn = churn_counts(cwd, &found);
-        (churn, stale.join().unwrap_or_default())
-    });
-    let warnings = analyze(&log, &found, &churn, &stale, now);
+    let warnings = analyze_files(cwd, &log, context, &files, now);
     if warnings.is_empty() {
         return Ok(PrecheckOutcome::Clean);
     }
@@ -105,6 +87,35 @@ pub fn precheck(
         .iter()
         .any(|warning| warning.severity == Severity::Block);
     Ok(PrecheckOutcome::Warnings { warnings, blocking })
+}
+
+pub(crate) fn analyze_files(
+    root: &Path,
+    log: &EventLog<'_>,
+    context: &PathContext,
+    files: &[String],
+    now: jiff::Timestamp,
+) -> Vec<Warning> {
+    let found = targets(files, log, context, &FsResolver);
+    let history = GitHistory {
+        root: root.to_path_buf(),
+    };
+    let only: HashSet<&str> = found.files.iter().map(String::as_str).collect();
+    let (churn, stale) = thread::scope(|scope| {
+        let stale = scope.spawn(|| {
+            find_stale(
+                log,
+                context,
+                &FsResolver,
+                &history,
+                Some(&only),
+                STALE_COMMIT_THRESHOLD,
+            )
+        });
+        let churn = churn_counts(root, &found);
+        (churn, stale.join().unwrap_or_default())
+    });
+    analyze(log, &found, &churn, &stale, now)
 }
 
 fn churn_counts(cwd: &Path, found: &Targets) -> Vec<Option<usize>> {

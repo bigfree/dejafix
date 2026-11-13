@@ -123,6 +123,16 @@ pub fn run_actions(
                 Vec::new(),
                 Some(payload(&project)?),
             ),
+            Action::Mcp(session) => (
+                env!("CARGO_BIN_EXE_djf-mcp"),
+                "dejafix.mcp_server",
+                session
+                    .args
+                    .iter()
+                    .map(|arg| arg.replace("{project}", &project.to_string_lossy()))
+                    .collect(),
+                None,
+            ),
         };
         let mut command = match implementation {
             Implementation::Python => {
@@ -136,9 +146,18 @@ pub fn run_actions(
             command.env(name, &scratch);
         }
         command.args(&args).current_dir(&project);
-        outputs.push(match stdin {
-            Some(stdin) => output_with_stdin(&mut command, &stdin)?,
-            None => output(&mut command)?,
+        outputs.push(match (action, stdin) {
+            (Action::Mcp(session), _) => {
+                let cwd = match session.cwd {
+                    Some(relative) => temp.path().join(relative),
+                    None => project.clone(),
+                };
+                fs::create_dir_all(&cwd)?;
+                command.current_dir(&cwd);
+                mcp_session(&mut command, &session.calls)?
+            }
+            (_, Some(stdin)) => output_with_stdin(&mut command, &stdin)?,
+            (_, None) => output(&mut command)?,
         });
     }
     let mut files = BTreeMap::new();
@@ -172,6 +191,139 @@ pub fn run_actions(
         })
         .collect();
     Ok(Run { steps, files })
+}
+
+fn sorted(value: &serde_json::Value) -> serde_json::Value {
+    match value {
+        serde_json::Value::Object(map) => {
+            let ordered: BTreeMap<&String, serde_json::Value> = map
+                .iter()
+                .map(|(key, value)| (key, sorted(value)))
+                .collect();
+            serde_json::Value::Object(
+                ordered
+                    .into_iter()
+                    .map(|(key, value)| (key.clone(), value))
+                    .collect(),
+            )
+        }
+        serde_json::Value::Array(items) => {
+            serde_json::Value::Array(items.iter().map(sorted).collect())
+        }
+        other => other.clone(),
+    }
+}
+
+fn mcp_transcript(name: &str, response: &serde_json::Value) -> Result<String, Box<dyn Error>> {
+    let result = response
+        .get("result")
+        .ok_or_else(|| format!("{name}: {response}"))?;
+    Ok(match name {
+        "initialize" => format!(
+            "### initialize\n{}\n",
+            result
+                .get("instructions")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or_default()
+        ),
+        "tools/list" => format!(
+            "### tools/list\n{}\n",
+            serde_json::to_string_pretty(&sorted(
+                result.get("tools").unwrap_or(&serde_json::Value::Null)
+            ))?
+        ),
+        _ => {
+            let text = result
+                .pointer("/content/0/text")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or_default();
+            let failed = result
+                .get("isError")
+                .and_then(serde_json::Value::as_bool)
+                .unwrap_or(false)
+                || text.starts_with("dejafix tool error: ");
+            let structured = result
+                .pointer("/structuredContent/result")
+                .and_then(serde_json::Value::as_str)
+                == Some(text);
+            format!("### {name} error={failed} structured={structured}\n{text}\n")
+        }
+    })
+}
+
+fn mcp_session(
+    command: &mut Command,
+    calls: &[(&str, serde_json::Value)],
+) -> Result<Output, Box<dyn Error>> {
+    use std::io::{BufRead, BufReader};
+    let mut child = command
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .map_err(|error| format!("cannot run {}: {error}", command.get_program().display()))?;
+    let mut stdin = child.stdin.take().ok_or("no stdin")?;
+    let reader = BufReader::new(child.stdout.take().ok_or("no stdout")?);
+    let (sender, lines) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        for line in reader.lines() {
+            if sender.send(line).is_err() {
+                break;
+            }
+        }
+    });
+    let mut ask = |id: Option<usize>,
+                   method: &str,
+                   params: serde_json::Value|
+     -> Result<serde_json::Value, Box<dyn Error>> {
+        let mut message = serde_json::json!({"jsonrpc": "2.0", "method": method, "params": params});
+        if let Some(id) = id
+            && let Some(object) = message.as_object_mut()
+        {
+            object.insert("id".to_owned(), serde_json::json!(id));
+        }
+        writeln!(stdin, "{message}")?;
+        stdin.flush()?;
+        let Some(id) = id else {
+            return Ok(serde_json::Value::Null);
+        };
+        loop {
+            let line = lines
+                .recv_timeout(std::time::Duration::from_secs(60))
+                .map_err(|error| format!("no reply from the MCP server: {error}"))??;
+            let response: serde_json::Value = serde_json::from_str(&line)?;
+            if response.get("id") == Some(&serde_json::json!(id)) {
+                return Ok(response);
+            }
+        }
+    };
+    let initialized = ask(
+        Some(0),
+        "initialize",
+        serde_json::json!({"protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": {"name": "golden", "version": "1"}}),
+    )?;
+    let mut transcript = mcp_transcript("initialize", &initialized)?;
+    ask(None, "notifications/initialized", serde_json::json!({}))?;
+    for (index, (name, arguments)) in calls.iter().enumerate() {
+        let response = if *name == "tools/list" {
+            ask(Some(index + 1), "tools/list", serde_json::json!({}))?
+        } else {
+            ask(
+                Some(index + 1),
+                "tools/call",
+                serde_json::json!({"name": name, "arguments": arguments}),
+            )?
+        };
+        transcript.push_str(&mcp_transcript(name, &response)?);
+    }
+    drop(ask);
+    drop(stdin);
+    let status = child.wait()?;
+    Ok(Output {
+        status,
+        stdout: transcript.into_bytes(),
+        stderr: Vec::new(),
+    })
 }
 
 fn output_with_stdin(command: &mut Command, stdin: &str) -> Result<Output, Box<dyn Error>> {

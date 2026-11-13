@@ -27,6 +27,10 @@ path = "src/bin/djf-edit-hook.rs"
 name = "hooks"
 harness = false
 
+[[bench]]
+name = "mcp"
+harness = false
+
 [[test]]
 name = "cli"
 path = "tests/cli/main.rs"
@@ -39,9 +43,14 @@ path = "tests/golden/main.rs"
 clap.workspace = true
 dejafix-core.workspace = true
 jiff.workspace = true
+rmcp.workspace = true
+serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
 
 [dev-dependencies]
+rmcp = { workspace = true, features = ["client"] }
 assert_cmd.workspace = true
 criterion.workspace = true
 insta.workspace = true

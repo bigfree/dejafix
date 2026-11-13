@@ -304,3 +304,58 @@ fn skipped_lines_agree_with_the_full_parse() {
     assert_eq!(skipped_lines(b"\xff\n{}\n", &clock()).len(), 2);
     assert_eq!(skipped_lines(b"", &clock()).len(), 0);
 }
+
+fn owned_log() -> EventLog<'static> {
+    let bytes = LOG.as_bytes().to_vec();
+    let log = EventLog::parse(&bytes, &clock(), &context(), &NoResolve).into_owned();
+    drop(bytes);
+    log
+}
+
+#[test]
+fn an_owned_log_outlives_its_bytes_and_keeps_every_index() {
+    let owned = owned_log();
+    let borrowed = parse(LOG);
+    assert_eq!(index_snapshot(&owned), index_snapshot(&borrowed));
+    assert_eq!(owned.skipped(), borrowed.skipped());
+    let lines = |log: &EventLog<'_>| -> Vec<Vec<u8>> {
+        log.events()
+            .iter()
+            .map(|event| {
+                let mut line = Vec::new();
+                event
+                    .write_line(&mut line)
+                    .map(|()| line)
+                    .unwrap_or_default()
+            })
+            .collect()
+    };
+    assert_eq!(lines(&owned), lines(&borrowed));
+    assert_eq!(
+        owned
+            .events()
+            .iter()
+            .map(|event| event.at.as_str())
+            .collect::<Vec<_>>(),
+        borrowed
+            .events()
+            .iter()
+            .map(|event| event.at.as_str())
+            .collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn an_owned_event_keeps_unknown_fields() {
+    let text = r#"{"id": "evt_x", "summary": "s", "timestamp": "2026-01-01T00:00:00Z", "type": "note", "zeta": {"a": [1, 2.50]}, "alpha": null}"#;
+    let owned = EventLog::parse(text.as_bytes(), &clock(), &context(), &NoResolve).into_owned();
+    let mut line = Vec::new();
+    let written = owned
+        .events()
+        .first()
+        .map(|event| event.write_line(&mut line));
+    assert!(matches!(written, Some(Ok(()))));
+    let line = String::from_utf8_lossy(&line);
+    assert!(line.contains(r#""zeta": {"a": [1, 2.5]}"#), "{line}");
+    assert!(line.contains(r#""alpha": null"#), "{line}");
+}

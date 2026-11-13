@@ -1,0 +1,33 @@
+---
+source: crates/dejafix-core/src/core/context/tests.rs
+expression: "run(MAIN, 2000, None, &[], Some(MAP))"
+---
+## dejafix context (budget: 2000 tokens)
+
+### WARNINGS — Do Not Repeat
+- FAILED: wrapped the refresh in a global lock. It deadlocked under load because the callback re-entered the lock and the worker pool starved. [src/auth/session.py:88] (2h ago)
+- FAILED: rounded cents per line item [src/billing/ledger.py:12] (3d ago)
+- FAILED: tried a longer timeout with a broken clock [src/api/client.ts:7] (unknown)
+- FAILED: pinned the clock skew to a constant, which hid the drift in staging for a week before anyone noticed [src/auth/clock.py] (3mo ago)
+
+### Recent Decisions
+- Use sqlite for the local cache (2d ago)
+- Run the importer nightly, never during the day, because the lock table is shared with billing (1w ago)
+
+### Relevant Fixes
+- Fixed: Fixed the double submit by disabling the button on the first click; reproduced with the e2e suite (5h ago)
+  Files: web/form.ts, web/button.ts, web/test.ts
+- Fixed: Bumped the pool size (2w ago)
+
+### File Gotchas
+- `src/auth/session.py`: ATTEMPT (failed): wrapped the refresh in a global lock. It deadlocked under …
+- `src/billing/ledger.py`: ATTEMPT (failed): rounded cents per line item
+- `src/api/client.ts`: ATTEMPT (failed): tried a longer timeout with a broken clock
+- `web/form.ts`: FIX: Fixed the double submit by disabling the button on the …
+- `web/button.ts`: FIX: Fixed the double submit by disabling the button on the …
+
+### Architecture Context
+- `src/auth/` session handling
+- `src/billing/` ledger
+- src/api client wrappers
+- `web/` front end

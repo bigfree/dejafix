@@ -58,7 +58,7 @@ pub struct Origin<'a> {
 }
 
 #[derive(Debug, Clone, Default)]
-pub struct Extra<'a>(pub(super) Vec<(Cow<'a, str>, &'a RawValue)>);
+pub struct Extra<'a>(pub(super) Vec<(Cow<'a, str>, Cow<'a, RawValue>)>);
 
 #[derive(Debug, Clone)]
 pub struct Event<'a> {

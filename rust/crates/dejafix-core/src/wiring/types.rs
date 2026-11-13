@@ -25,6 +25,7 @@ pub struct Project {
 
 #[derive(Debug)]
 pub struct Recorded {
+    pub events: Vec<String>,
     pub outcome: WriteOutcome,
     pub notices: Vec<String>,
     pub incomplete: Option<WiringError>,
