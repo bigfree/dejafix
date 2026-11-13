@@ -2,7 +2,7 @@ use std::path::Path;
 
 use super::types::{HooksAction, HooksOutcome, HooksReport};
 use crate::adapters::fs::StoreError;
-use crate::adapters::git::{hooks_dir, read_hook, remove_hook, write_hook};
+use crate::adapters::git::{hook_has_crlf, hooks_dir, read_hook, remove_hook, write_hook};
 use crate::core::hooks::{HookChange, HookKind, Removal, remove_blocks, sync_hook};
 
 pub fn hooks_action(root: &Path, action: HooksAction) -> Result<HooksOutcome, StoreError> {
@@ -34,7 +34,14 @@ pub(crate) fn install(directory: &Path, djf: &str) -> Result<HooksReport, StoreE
                 write_hook(&path, &text, true)?;
                 report.refreshed.push(kind);
             }
-            HookChange::Current => {}
+            HookChange::Current => {
+                if let Some(text) = existing.as_deref()
+                    && hook_has_crlf(&path)
+                {
+                    write_hook(&path, text, true)?;
+                    report.refreshed.push(kind);
+                }
+            }
             HookChange::Skipped => report.skipped.push(kind),
         }
     }

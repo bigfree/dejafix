@@ -1,8 +1,7 @@
-use std::fs;
 use std::path::{Path, PathBuf};
 
 use super::types::FsProbe;
-use crate::adapters::fs::{MEMORY_DIR, find_memory_dir, resolve_path};
+use crate::adapters::fs::{MEMORY_DIR, canonical_path, find_memory_dir, resolve_path};
 use crate::core::resolve::Probe;
 
 impl FsProbe<'_> {
@@ -32,7 +31,7 @@ impl Probe for FsProbe<'_> {
 
     fn resolve(&self, path: &Path) -> Option<PathBuf> {
         let absolute = self.absolute(path);
-        Some(fs::canonicalize(&absolute).unwrap_or(absolute))
+        Some(canonical_path(&absolute).unwrap_or(absolute))
     }
 
     fn lookup(&self, text: &str) -> Option<PathBuf> {

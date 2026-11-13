@@ -107,7 +107,7 @@ impl McpConfig {
         let root = flagged.or_else(|| non_empty("DEJAFIX_ROOT")).map(|root| {
             let expanded = expand_user(PathBuf::from(root), config.home.as_deref());
             let absolute = config.cwd.join(expanded);
-            std::fs::canonicalize(&absolute).unwrap_or(absolute)
+            dejafix_core::canonical_path(&absolute).unwrap_or(absolute)
         });
         Ok(Self {
             root,

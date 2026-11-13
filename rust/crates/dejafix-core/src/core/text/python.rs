@@ -94,6 +94,32 @@ pub fn decimal_value(text: &str) -> Option<DecimalKey> {
     })
 }
 
+#[must_use]
+pub fn python_int(text: &str) -> Option<i64> {
+    let text = python_strip(text);
+    let (negative, digits) = match text.as_bytes().first() {
+        Some(b'-') => (true, text.get(1..)?),
+        Some(b'+') => (false, text.get(1..)?),
+        _ => (false, text),
+    };
+    if digits.is_empty()
+        || digits.starts_with('_')
+        || digits.ends_with('_')
+        || digits.contains("__")
+    {
+        return None;
+    }
+    let magnitude = digits
+        .chars()
+        .filter(|character| *character != '_')
+        .try_fold(0_i64, |value, character| {
+            value
+                .checked_mul(10)?
+                .checked_add(i64::from(digit_value(character)?))
+        })?;
+    Some(if negative { -magnitude } else { magnitude })
+}
+
 pub fn python_split(text: &str) -> impl Iterator<Item = &str> {
     text.split(is_python_space).filter(|part| !part.is_empty())
 }

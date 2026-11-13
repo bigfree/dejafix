@@ -333,8 +333,11 @@ fn leftovers(
 ) -> Result<(), Halt> {
     let home = &options.clients.home;
     let mut files = client_configs(&options.clients, None);
-    files.push(("Claude Code hooks", home.join(".claude/settings.json")));
-    files.push(("Codex hooks", home.join(".codex/hooks.json")));
+    files.push((
+        "Claude Code hooks",
+        home.join(".claude").join("settings.json"),
+    ));
+    files.push(("Codex hooks", home.join(".codex").join("hooks.json")));
     let configs: Vec<(&'static str, PathBuf)> = files
         .into_iter()
         .filter(|(_, path)| read_universal(path).is_some_and(|text| is_stale_config(&text)))

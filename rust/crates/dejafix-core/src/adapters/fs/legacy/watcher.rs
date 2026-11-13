@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::Path;
 
-use crate::core::text::python_strip;
+use crate::core::text::python_int;
 
 const PID_FILE: &str = "watch.pid";
 
@@ -30,11 +30,7 @@ fn alive(pid: u32) -> bool {
 #[must_use]
 pub fn live_watcher(legacy: &Path) -> Option<u32> {
     let text = fs::read_to_string(legacy.join(PID_FILE)).ok()?;
-    let digits = python_strip(&text);
-    let pid: u32 = digits
-        .strip_prefix('+')
-        .unwrap_or(digits)
-        .parse()
+    let pid = u32::try_from(python_int(&text)?)
         .ok()
         .filter(|pid| *pid > 0)?;
     alive(pid).then_some(pid)

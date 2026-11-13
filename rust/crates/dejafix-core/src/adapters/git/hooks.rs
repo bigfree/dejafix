@@ -5,7 +5,6 @@ use std::path::{Path, PathBuf};
 
 use crate::adapters::fs::{StoreError, read_optional_text};
 use crate::core::hooks::shell_path;
-use crate::core::text::platform_newlines;
 
 #[must_use]
 pub fn hooks_dir(root: &Path) -> PathBuf {
@@ -92,15 +91,19 @@ fn make_executable(_path: &Path) -> io::Result<()> {
 }
 
 pub fn write_hook(path: &Path, text: &str, existing: bool) -> Result<(), StoreError> {
-    let bytes = platform_newlines(text);
     let failed = write_failure(path);
     if existing {
-        fs::write(path, bytes.as_bytes())
+        fs::write(path, text.as_bytes())
     } else {
-        File::create_new(path).and_then(|mut file| file.write_all(bytes.as_bytes()))
+        File::create_new(path).and_then(|mut file| file.write_all(text.as_bytes()))
     }
     .map_err(&failed)?;
     make_executable(path).map_err(failed)
+}
+
+#[must_use]
+pub fn hook_has_crlf(path: &Path) -> bool {
+    fs::read(path).is_ok_and(|bytes| bytes.windows(2).any(|pair| pair == b"\r\n"))
 }
 
 pub fn remove_hook(path: &Path) -> Result<(), StoreError> {

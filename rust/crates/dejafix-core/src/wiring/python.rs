@@ -19,13 +19,26 @@ fn python_repr(text: &str) -> String {
     format!("'{}'", text.replace('\\', "\\\\").replace('\'', "\\'"))
 }
 
+fn windows_errno(error: &io::Error) -> Option<(&'static str, i32, &'static str)> {
+    if !cfg!(windows) {
+        return None;
+    }
+    match (error.raw_os_error(), error.kind()) {
+        (_, io::ErrorKind::NotFound) => Some(("FileNotFoundError", 2, "No such file or directory")),
+        (Some(32 | 33), _) | (_, io::ErrorKind::PermissionDenied) => {
+            Some(("PermissionError", 13, "Permission denied"))
+        }
+        _ => None,
+    }
+}
+
 pub(crate) fn python_io_error(error: &io::Error, path: &Path) -> (&'static str, String) {
     let shown = error.to_string();
     let text = shown.split(" (os error").next().unwrap_or(shown.as_str());
     let path = python_repr(&path.to_string_lossy());
-    let message = match error.raw_os_error() {
-        Some(code) => format!("[Errno {code}] {text}: {path}"),
-        None => format!("{text}: {path}"),
-    };
-    (class(error), message)
+    match (windows_errno(error), error.raw_os_error()) {
+        (Some((class, code, text)), _) => (class, format!("[Errno {code}] {text}: {path}")),
+        (None, Some(code)) => (class(error), format!("[Errno {code}] {text}: {path}")),
+        (None, None) => (class(error), format!("{text}: {path}")),
+    }
 }
