@@ -12,10 +12,13 @@ mod scenario;
 mod types;
 
 use std::error::Error;
+use std::fs;
 use std::path::Path;
 
 use dejafix_core::testing::{FIXTURE_SEED, FIXTURE_SIZES, write_project};
-use harness::{console_text, diff, isolated, output, python, repository, run};
+use harness::{
+    choose_python, console_text, diff, isolated, output, python, python_candidates, repository, run,
+};
 use types::{Implementation, Normalizer, Step};
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -157,5 +160,40 @@ fn diff_shows_a_difference_in_line_endings() -> TestResult {
         diff(&base, &changed),
         ["project/.dejafix/config.toml:1: \"recent_days = 30\\n\" != \"recent_days = 30\\r\\n\""]
     );
+    Ok(())
+}
+
+#[cfg(unix)]
+#[test]
+fn the_harness_finds_the_main_checkout_s_virtualenv_from_a_worktree() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let main = fs::canonicalize(dir.path())?.join("main");
+    let worktree = main.with_file_name("worktree");
+    fs::create_dir_all(main.join(".venv/bin"))?;
+    let fake = main.join(".venv/bin/python");
+    fs::write(&fake, "#!/bin/sh\nexit 0\n")?;
+    let git = |args: &[&str]| -> TestResult {
+        let status = std::process::Command::new("git")
+            .args(["-c", "user.email=t@example.invalid", "-c", "user.name=t"])
+            .args(args)
+            .current_dir(&main)
+            .status()?;
+        assert!(status.success(), "git {args:?}");
+        Ok(())
+    };
+    git(&["init", "-q"])?;
+    git(&["commit", "-q", "--allow-empty", "-m", "init"])?;
+    git(&["worktree", "add", "-q", "../worktree"])?;
+    assert_eq!(python_candidates(None, &worktree).first(), Some(&fake));
+    assert_eq!(choose_python(None, &worktree, |_| true)?, fake);
+    assert_eq!(
+        python_candidates(Some("/opt/py".into()), &worktree),
+        [std::path::PathBuf::from("/opt/py")]
+    );
+    let error = choose_python(None, &worktree, |_| false)
+        .err()
+        .ok_or("no error")?;
+    assert!(error.contains("set DEJAFIX_PYTHON to one"), "{error}");
+    assert!(error.contains(&fake.display().to_string()), "{error}");
     Ok(())
 }

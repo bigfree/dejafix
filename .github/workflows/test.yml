@@ -7,6 +7,12 @@ on:
         required: false
         type: string
   workflow_dispatch:
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: test-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -17,7 +23,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, ubuntu-latest, windows-latest]
+        os: ${{ github.event_name == 'pull_request' && fromJSON('["ubuntu-latest"]') || fromJSON('["macos-latest", "ubuntu-latest", "windows-latest"]') }}
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -43,3 +49,36 @@ jobs:
         env:
           DEJAFIX_PYTHON: ${{ steps.python.outputs.python-path }}
         run: cargo nextest run --workspace --all-features --no-fail-fast
+      - name: Self-test the glibc check on the built djf
+        if: runner.os == 'Linux'
+        run: |
+          bash .github/scripts/check-glibc.sh 99.0 rust/target/debug/djf
+          if bash .github/scripts/check-glibc.sh 2.0 rust/target/debug/djf; then
+            echo "check-glibc accepted a floor of 2.0" >&2
+            exit 1
+          fi
+  install-dist:
+    name: install-dist (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ github.event_name == 'pull_request' && fromJSON('["ubuntu-latest"]') || fromJSON('["macos-latest", "ubuntu-latest", "windows-latest"]') }}
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - name: Install dist the way the release does
+        run: |
+          case "$RUNNER_OS-$RUNNER_ARCH" in
+            Linux-X64) triple=x86_64-unknown-linux-gnu ;;
+            Linux-ARM64) triple=aarch64-unknown-linux-gnu ;;
+            macOS-ARM64) triple=aarch64-apple-darwin ;;
+            macOS-X64) triple=x86_64-apple-darwin ;;
+            Windows-X64) triple=x86_64-pc-windows-msvc ;;
+            *) echo "no triple for $RUNNER_OS-$RUNNER_ARCH" >&2; exit 1 ;;
+          esac
+          bash .github/scripts/install-dist.sh "$triple"
