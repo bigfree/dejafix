@@ -1,10 +1,11 @@
 use crate::core::text::{is_python_space, python_lines, python_strip};
 
-const GITIGNORE_ENTRIES: [&str; 4] = [
+const GITIGNORE_ENTRIES: [&str; 5] = [
     ".dejafix/events.jsonl",
     ".dejafix/watch.pid",
     ".dejafix/watch.log",
     ".dejafix/structure.json",
+    ".djf-*",
 ];
 const IDEAS_HEADING: &str = "## Ideas\n";
 

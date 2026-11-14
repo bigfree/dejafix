@@ -2,7 +2,7 @@ use std::fs;
 use std::path::Path;
 
 use super::types::{FsResolver, StoreError};
-use crate::core::path::{PathContext, PathResolver};
+use crate::core::path::{PathContext, PathResolver, is_network_path};
 
 impl PathResolver for FsResolver {
     fn resolve(&self, path: &str) -> Option<String> {
@@ -22,10 +22,6 @@ impl PathResolver for FsResolver {
         let tail = absolute.strip_prefix(ancestor).ok()?;
         Some(posix(&existing.join(tail)))
     }
-}
-
-pub(super) fn is_network_path(path: &str) -> bool {
-    matches!(path.as_bytes(), [b'/' | b'\\', b'/' | b'\\', ..])
 }
 
 pub fn path_context(root: &Path) -> Result<PathContext, StoreError> {

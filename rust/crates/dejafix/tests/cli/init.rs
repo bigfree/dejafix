@@ -497,3 +497,17 @@ fn init_output_is_utf8_with_its_real_characters() -> TestResult {
     assert_eq!(output.stderr.len(), 0);
     Ok(())
 }
+
+#[test]
+fn init_ignores_atomic_write_temporaries_once() -> TestResult {
+    let repo = Repo::bare()?;
+    repo.djf(&["init", "--no-mcp-config"]).assert().success();
+    repo.djf(&["init", "--no-mcp-config"]).assert().success();
+    let text = repo.read(".gitignore")?;
+    assert_eq!(
+        text.lines().filter(|line| *line == ".djf-*").count(),
+        1,
+        "{text}"
+    );
+    Ok(())
+}

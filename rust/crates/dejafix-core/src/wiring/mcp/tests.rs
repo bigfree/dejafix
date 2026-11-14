@@ -672,3 +672,87 @@ fn precheck_sees_a_new_commit_at_once_through_the_memo() {
         "the fourth commit must not wait for the memo to expire"
     );
 }
+
+#[cfg(unix)]
+#[test]
+fn a_memory_folder_linked_out_of_the_project_is_refused_over_mcp() {
+    let world = World::new();
+    let outside = world.project("outside");
+    let root = world.base.join("alpha");
+    fs::create_dir_all(&root).unwrap();
+    std::os::unix::fs::symlink(outside.join(".dejafix"), root.join(".dejafix")).unwrap();
+    let state = world.state(Some(&root), &world.base);
+    let reply = call(&state, note("x"), None);
+    assert!(reply.error, "{}", reply.text);
+    assert!(
+        reply
+            .text
+            .contains("points outside the project; refusing to use it"),
+        "{}",
+        reply.text
+    );
+    assert_eq!(events(&outside), "");
+    assert!(call(&state, ToolCall::GetScore, None).error);
+}
+
+#[cfg(unix)]
+#[test]
+fn memory_files_linked_out_of_the_project_read_as_missing() {
+    use std::os::unix::fs::symlink;
+    let world = World::new();
+    let root = world.project("alpha");
+    let secret = world.base.join("secret.txt");
+    fs::write(&secret, "SECRET\n").unwrap();
+    for name in [
+        "AI_INSTRUCTIONS.md",
+        "summary.md",
+        "PROJECT_MAP.md",
+        "plan.md",
+    ] {
+        symlink(&secret, root.join(".dejafix").join(name)).unwrap();
+    }
+    symlink(&secret, root.join(".dejafix/issues/0001-leak.md")).unwrap();
+    let state = world.state(Some(&root), &world.base);
+    for (tool, expected) in [
+        (
+            ToolCall::GetInstructions,
+            "No instructions found. Run `djf init` first.",
+        ),
+        (
+            ToolCall::GetSummary,
+            "No summary found. Run `djf init` first.",
+        ),
+        (ToolCall::GetProjectMap, "No project map found."),
+        (ToolCall::GetPlan, "No plan found."),
+        (ToolCall::GetIssue("1".into()), "No issue found with ID 1."),
+    ] {
+        assert_eq!(text(&state, tool, None), expected);
+    }
+    assert!(!text(&state, ToolCall::StartSession, None).contains("SECRET"));
+    fs::remove_file(root.join(".dejafix/summary.md")).unwrap();
+    fs::write(root.join(".dejafix/real.md"), "# Inside\n").unwrap();
+    symlink(
+        root.join(".dejafix/real.md"),
+        root.join(".dejafix/summary.md"),
+    )
+    .unwrap();
+    assert_eq!(text(&state, ToolCall::GetSummary, None), "# Inside\n");
+}
+
+#[test]
+fn precheck_files_accepts_at_most_two_hundred_paths() {
+    let world = World::new();
+    let root = world.project("alpha");
+    let paths = |count: usize| {
+        (0..count)
+            .map(|index| format!("f{index}.py"))
+            .collect::<Vec<_>>()
+    };
+    let nowhere = world.state(None, &world.base);
+    assert_eq!(
+        text(&nowhere, ToolCall::PrecheckFiles(paths(201)), None),
+        "precheck_files accepts at most 200 paths; got 201."
+    );
+    let state = world.state(Some(&root), &world.base);
+    assert!(!text(&state, ToolCall::PrecheckFiles(paths(200)), None).contains("at most 200"));
+}

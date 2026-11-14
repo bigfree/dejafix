@@ -32,10 +32,10 @@ pub fn precheck(
     request: &PrecheckRequest,
     ids: &mut impl Ids,
 ) -> Result<PrecheckOutcome, WiringError> {
-    let dir = cwd.join(MEMORY_DIR);
-    if !dir.exists() {
+    if !cwd.join(MEMORY_DIR).exists() {
         return Ok(PrecheckOutcome::NoProject);
     }
+    let dir = MemoryDir::at(cwd)?.dir;
     let now = settings.clock.now;
     if request.unsnooze {
         return Ok(PrecheckOutcome::Unsnoozed(remove_snooze(&dir)));

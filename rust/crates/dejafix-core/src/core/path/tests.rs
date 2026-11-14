@@ -5,7 +5,8 @@ use proptest::prelude::*;
 use crate::testing::NoResolve;
 
 use super::{
-    PathContext, PathResolver, is_memory_path, location_file, location_to_file, project_relative,
+    PathContext, PathResolver, is_memory_path, is_network_path, location_file, location_to_file,
+    project_relative,
 };
 
 fn context() -> PathContext {
@@ -254,5 +255,19 @@ proptest! {
     fn project_relative_is_idempotent(path in "[a-zA-Z0-9_./\\\\:]{0,30}") {
         let once = relative(&path);
         prop_assert_eq!(relative(&once), once);
+    }
+}
+
+#[test]
+fn unc_spellings_are_network_paths() {
+    for path in [
+        "//server/share/a.py",
+        "\\\\server\\share\\a.py",
+        "/\\server/a",
+    ] {
+        assert!(is_network_path(path), "{path}");
+    }
+    for path in ["/server/a.py", "C:/x", "C:\\x", "rel/a.py", ""] {
+        assert!(!is_network_path(path), "{path}");
     }
 }

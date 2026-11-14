@@ -7,7 +7,7 @@ use dejafix_core::{
 
 use super::USER_ERROR;
 use super::args::ProjectAction;
-use super::output::{FAIL, OK, RUNNING, WARN, secho};
+use super::output::{FAIL, OK, RUNNING, WARN, printable, printable_text, secho};
 use super::types::{Outcome, Style};
 use crate::config::Config;
 
@@ -36,7 +36,7 @@ fn listing(project: &ListedProject, active: Option<&str>) -> String {
     format!(
         " {mark} {}{alias}{tags}\n     {}{missing}",
         record.id,
-        record.path.display()
+        printable(&record.path)
     )
 }
 
@@ -67,14 +67,14 @@ fn print_reply(reply: RegistryReply, out: &mut impl Write, color: bool) -> io::R
         RegistryReply::Activated(None) => ok(out, "Active project cleared".to_owned()),
         RegistryReply::Activated(Some(record)) => {
             ok(out, format!("Active project: {}", record.name()))?;
-            writeln!(out, "  {}", record.path.display())
+            writeln!(out, "  {}", printable(&record.path))
         }
         RegistryReply::Removed(record) => {
             ok(out, format!("Removed {} from the registry", record.name()))?;
             writeln!(
                 out,
                 "  {} and its .dejafix/ are untouched.",
-                record.path.display()
+                printable(&record.path)
             )
         }
         RegistryReply::Aliased(record) => ok(
@@ -108,7 +108,7 @@ fn print_registered(record: &ProjectRecord, out: &mut impl Write, color: bool) -
         Style::Green,
         color,
     )?;
-    writeln!(out, "  {}", record.path.display())?;
+    writeln!(out, "  {}", printable(&record.path))?;
     writeln!(
         out,
         "  Use it from any folder:  djf project use {}",
@@ -124,7 +124,12 @@ fn finish(
     match result {
         Ok(printed) => printed.map(|()| Outcome::Done),
         Err(WiringError::Registry(error)) => {
-            secho(out, &format!("{FAIL} {error}"), Style::Red, color)?;
+            secho(
+                out,
+                &format!("{FAIL} {}", printable_text(&error.to_string())),
+                Style::Red,
+                color,
+            )?;
             Ok(Outcome::Exit(USER_ERROR))
         }
         Err(error) => Ok(Outcome::Failed(error)),

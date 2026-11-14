@@ -1,5 +1,7 @@
+use std::borrow::Cow;
 use std::fmt::Write as _;
 use std::io::{self, Write};
+use std::path::Path;
 
 use dejafix_core::WiringError;
 
@@ -23,6 +25,33 @@ impl Style {
             Self::GreenBold => "\x1b[32m\x1b[1m",
         }
     }
+}
+
+pub fn printable(path: &Path) -> String {
+    let text = path.display().to_string();
+    match printable_text(&text) {
+        Cow::Borrowed(_) => text,
+        Cow::Owned(escaped) => escaped,
+    }
+}
+
+pub fn printable_text(text: &str) -> Cow<'_, str> {
+    if !text.chars().any(char::is_control) {
+        return Cow::Borrowed(text);
+    }
+    let mut escaped = String::with_capacity(text.len() + 8);
+    for character in text.chars() {
+        match u32::from(character) {
+            code @ (0..=0x1f | 0x7f) => {
+                let _ = write!(escaped, "\\x{code:02x}");
+            }
+            code @ 0x80..=0x9f => {
+                let _ = write!(escaped, "\\u{{{code:02x}}}");
+            }
+            _ => escaped.push(character),
+        }
+    }
+    Cow::Owned(escaped)
 }
 
 pub fn secho(out: &mut impl Write, text: &str, style: Style, color: bool) -> io::Result<()> {

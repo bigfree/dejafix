@@ -109,3 +109,26 @@ fn a_root_with_quotes_stays_valid_json_and_toml() {
     assert!(text.contains(r#""args": ["--root", "/work/x\"],\"command\":\"sh"]"#));
     assert!(text.contains(r#"args = ["--root", "/work/x\"],\"command\":\"sh"]"#));
 }
+
+#[test]
+fn printable_escapes_c0_del_and_c1_only() {
+    use std::path::Path;
+    assert_eq!(super::output::printable(Path::new("/a/b c/ü")), "/a/b c/ü");
+    assert_eq!(
+        super::output::printable(Path::new("/a/x\u{1b}]52;c;aGk=\u{7}y")),
+        "/a/x\\x1b]52;c;aGk=\\x07y"
+    );
+    assert_eq!(super::output::printable(Path::new("/a/\u{7f}")), "/a/\\x7f");
+    assert_eq!(
+        super::output::printable(Path::new("/a/\u{9b}31m")),
+        "/a/\\u{9b}31m"
+    );
+}
+
+#[test]
+fn printable_text_escapes_error_messages_too() {
+    assert_eq!(
+        super::output::printable_text("cannot write /a/x\u{1b}]52;c;aGk=\u{7}y"),
+        "cannot write /a/x\\x1b]52;c;aGk=\\x07y"
+    );
+}

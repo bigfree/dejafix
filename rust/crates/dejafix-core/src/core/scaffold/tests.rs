@@ -183,11 +183,19 @@ fn initial_files_name_the_project() {
 }
 
 #[test]
-fn gitignore_entries_are_added_once_like_python() {
+fn gitignore_entries_are_added_once() {
     let first = gitignore_with("", &[]).unwrap();
     assert_eq!(
         first,
-        ".dejafix/events.jsonl\n.dejafix/watch.pid\n.dejafix/watch.log\n.dejafix/structure.json\n"
+        ".dejafix/events.jsonl\n.dejafix/watch.pid\n.dejafix/watch.log\n.dejafix/structure.json\n.djf-*\n"
+    );
+    assert_eq!(
+        gitignore_with(
+            ".dejafix/events.jsonl\n.dejafix/watch.pid\n.dejafix/watch.log\n.dejafix/structure.json\n",
+            &[]
+        )
+        .unwrap(),
+        ".dejafix/events.jsonl\n.dejafix/watch.pid\n.dejafix/watch.log\n.dejafix/structure.json\n\n.djf-*\n"
     );
     assert!(!first.contains("plan.md"));
     assert_eq!(gitignore_with(&first, &[]), None);
@@ -207,12 +215,10 @@ fn gitignore_entries_are_added_once_like_python() {
         gitignore_with(&first, &[".dejafix/AI_INSTRUCTIONS.md.bak"]).unwrap(),
         format!("{first}\n.dejafix/AI_INSTRUCTIONS.md.bak\n")
     );
+    let separated = ".dejafix/events.jsonl\u{2028}.dejafix/watch.pid\u{2028}.dejafix/watch.log\u{2028}.dejafix/structure.json";
     assert_eq!(
-        gitignore_with(
-            ".dejafix/events.jsonl\u{2028}.dejafix/watch.pid\u{2028}.dejafix/watch.log\u{2028}.dejafix/structure.json",
-            &[]
-        ),
-        None
+        gitignore_with(separated, &[]).unwrap(),
+        format!("{separated}\n.djf-*\n")
     );
 }
 

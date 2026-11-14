@@ -12,6 +12,7 @@ mod store;
 mod types;
 mod write;
 
+pub(crate) use events::checked_events_path;
 pub use events::{events_path, lock_events, read_events_file, read_events_unlocked};
 pub(crate) use global::read_json_text;
 pub(crate) use legacy::{
@@ -33,7 +34,8 @@ pub use seen::{forget_session, report_is_new, seen_root};
 pub use stack::detect_stack;
 pub(crate) use store::{MEMORY_DIR, points_outside};
 pub use store::{
-    find_memory_dir, issues_dir, project_name, read_optional_text, read_text, read_text_within,
+    find_memory_dir, issues_dir, project_name, read_optional_text, read_text_inside,
+    read_text_within,
 };
 pub(crate) use types::LockedLog;
 pub use types::{FsResolver, GlobalStore, MemoryDir, RegistryFiles, StoreError};

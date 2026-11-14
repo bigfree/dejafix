@@ -313,10 +313,20 @@ fn a_secret_in_a_commit_message_is_redacted() -> TestResult {
     repo.djf(&["_auto-capture", "commit"])
         .assert()
         .success()
+        .stdout("[dejafix] Auto-captured: Fix: fix: rotate [REDACTED:openai_key]\n")
         .stderr("dejafix: redacted 2 secret(s) before write (openai_key)\n");
     let text = repo.read(".dejafix/events.jsonl")?;
     assert!(!text.contains(&secret));
     assert!(text.contains("Fix: fix: rotate [REDACTED:openai_key]"));
+    commit(
+        &repo,
+        &format!("feat: merge {secret}"),
+        &[("src/b.py", "b\n")],
+    )?;
+    repo.djf(&["_auto-capture", "merge"])
+        .assert()
+        .success()
+        .stdout("[dejafix] Auto-captured merge: feat: merge [REDACTED:openai_key]\n");
     Ok(())
 }
 

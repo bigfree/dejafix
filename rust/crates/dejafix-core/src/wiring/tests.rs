@@ -960,3 +960,32 @@ fn doctor_never_reads_an_events_file_that_is_not_a_regular_file() {
     .unwrap();
     assert_eq!(report.corrupt.len(), 0);
 }
+
+#[cfg(unix)]
+#[test]
+fn summary_regeneration_never_copies_an_outside_map_or_summary() {
+    let dir = tempfile::tempdir().unwrap();
+    let home = tempfile::tempdir().unwrap();
+    let outside = tempfile::tempdir().unwrap();
+    empty_project(dir.path());
+    let leak = outside.path().join("map.md");
+    fs::write(&leak, "# Map\n\n## Project purpose\n\nLEAKED-PURPOSE\n").unwrap();
+    std::os::unix::fs::symlink(&leak, dir.path().join(".dejafix/PROJECT_MAP.md")).unwrap();
+    std::os::unix::fs::symlink(&leak, dir.path().join(".dejafix/summary.md")).unwrap();
+    let project = Project::open(dir.path(), settings(home.path())).unwrap();
+    record(
+        &project,
+        Command::Log {
+            text: "review".into(),
+            location: None,
+        },
+        &mut SeqIds::default(),
+    )
+    .unwrap();
+    let summary = read(dir.path().join(".dejafix/summary.md"));
+    assert!(!summary.contains("LEAKED-PURPOSE"), "{summary}");
+    assert_eq!(
+        read(&leak),
+        "# Map\n\n## Project purpose\n\nLEAKED-PURPOSE\n"
+    );
+}

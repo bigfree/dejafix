@@ -99,7 +99,7 @@ fn fail(err: &mut impl Write, error: &WiringError) -> ExitCode {
     match error {
         WiringError::Validation(_)
         | WiringError::Registry(_)
-        | WiringError::Store(StoreError::NotFound { .. }) => {
+        | WiringError::Store(StoreError::NotFound { .. } | StoreError::OutsideProject { .. }) => {
             report(err, &format!("Error: {error}"), USER_ERROR)
         }
         WiringError::Store(store) => {

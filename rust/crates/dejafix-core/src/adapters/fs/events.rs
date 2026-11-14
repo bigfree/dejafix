@@ -2,6 +2,7 @@ use std::fs::{self, File, OpenOptions};
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 
+use super::store::points_outside;
 use super::types::{LockedLog, StoreError};
 
 const EVENTS_FILE: &str = "events.jsonl";
@@ -11,8 +12,17 @@ pub fn events_path(mem_dir: &Path) -> PathBuf {
     mem_dir.join(EVENTS_FILE)
 }
 
-pub fn read_events_unlocked(mem_dir: &Path) -> Result<Vec<u8>, StoreError> {
+pub(crate) fn checked_events_path(mem_dir: &Path) -> Result<PathBuf, StoreError> {
     let path = events_path(mem_dir);
+    let root = mem_dir.parent().unwrap_or(mem_dir);
+    if points_outside(&path, root) {
+        return Err(StoreError::OutsideProject { path });
+    }
+    Ok(path)
+}
+
+pub fn read_events_unlocked(mem_dir: &Path) -> Result<Vec<u8>, StoreError> {
+    let path = checked_events_path(mem_dir)?;
     let read = |source| StoreError::Read {
         path: path.clone(),
         source,
@@ -27,7 +37,7 @@ pub fn read_events_unlocked(mem_dir: &Path) -> Result<Vec<u8>, StoreError> {
 }
 
 pub fn read_events_file(mem_dir: &Path) -> Result<Vec<u8>, StoreError> {
-    let path = events_path(mem_dir);
+    let path = checked_events_path(mem_dir)?;
     let read = |source| StoreError::Read {
         path: path.clone(),
         source,
@@ -49,7 +59,7 @@ pub fn read_events_file(mem_dir: &Path) -> Result<Vec<u8>, StoreError> {
 }
 
 pub fn lock_events(mem_dir: &Path) -> Result<(LockedLog, Vec<u8>), StoreError> {
-    let path = mem_dir.join(EVENTS_FILE);
+    let path = checked_events_path(mem_dir)?;
     let mut file = OpenOptions::new()
         .read(true)
         .append(true)

@@ -1,7 +1,9 @@
 use std::path::{Path, PathBuf};
 
 use super::types::{Probe, Resolution, ResolveError, Source};
+use crate::core::path::is_network_path;
 use crate::core::registry::{ProjectRecord, Registry};
+use crate::core::text::python_strip;
 
 impl Source {
     #[must_use]
@@ -117,6 +119,16 @@ pub fn resolve(
     roots: &[PathBuf],
     probe: &impl Probe,
 ) -> Result<Resolution, ResolveError> {
+    if let Some(explicit) = explicit.filter(|explicit| is_network_path(python_strip(explicit))) {
+        if let Some(pinned) = pinned.filter(|pinned| *pinned.as_os_str() == *python_strip(explicit))
+        {
+            return pinned_to(registry, None, pinned, probe);
+        }
+        return Err(ResolveError::Unknown {
+            explicit: explicit.to_owned(),
+            known: registry.known_names(),
+        });
+    }
     if let Some(pinned) = pinned {
         return pinned_to(registry, explicit, pinned, probe);
     }

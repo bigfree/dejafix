@@ -128,3 +128,8 @@ fn is_source_suffix(suffix: &str) -> bool {
     };
     !lowered.is_empty() && SOURCE_SUFFIXES.binary_search(&lowered.as_ref()).is_ok()
 }
+
+#[must_use]
+pub fn is_network_path(path: &str) -> bool {
+    matches!(path.as_bytes(), [b'/' | b'\\', b'/' | b'\\', ..])
+}

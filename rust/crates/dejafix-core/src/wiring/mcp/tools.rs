@@ -7,7 +7,7 @@ use super::types::{
     FsProbe, GitMemo, LogCache, McpSettings, McpState, MemoGit, ToolCall, ToolError, ToolReply,
 };
 use crate::adapters::fs::{
-    FsResolver, GlobalStore, MEMORY_DIR, events_path, read_text, resolve_path,
+    FsResolver, GlobalStore, MEMORY_DIR, checked_events_path, read_text_within, resolve_path,
 };
 use crate::adapters::git::{GitHistory, status_files};
 use crate::core::context::{ContextInput, generate_context};
@@ -26,6 +26,8 @@ use crate::wiring::registry::load_registry;
 use crate::wiring::types::Settings;
 
 const CONTEXT_RECENT_DAYS: i64 = 30;
+
+const MAX_PRECHECK_PATHS: usize = 200;
 
 impl McpState {
     #[must_use]
@@ -116,6 +118,12 @@ impl McpState {
             ToolCall::ListProjects => return self.list_projects(clock),
             ToolCall::GetGlobalGotchas(library) => return self.gotchas(library.as_deref()),
             ToolCall::Write(write) => return self.write(write, project, clock, ids),
+            ToolCall::PrecheckFiles(paths) if paths.len() > MAX_PRECHECK_PATHS => {
+                return Ok(format!(
+                    "precheck_files accepts at most {MAX_PRECHECK_PATHS} paths; got {}.",
+                    paths.len()
+                ));
+            }
             _ => {}
         }
         let target = self.resolution(project, clock)?;
@@ -218,11 +226,7 @@ pub(super) fn memory_path(root: &Path, name: &str) -> PathBuf {
 }
 
 pub(super) fn memory_text(root: &Path, name: &str) -> Result<Option<String>, ToolError> {
-    let path = memory_path(root, name);
-    if !path.exists() {
-        return Ok(None);
-    }
-    Ok(Some(read_text(&path)?))
+    Ok(read_text_within(&memory_path(root, name), root)?)
 }
 
 fn stripped(root: &Path, name: &str) -> Result<String, ToolError> {
@@ -264,13 +268,13 @@ fn issue_text(root: &Path, requested: &str) -> Result<String, ToolError> {
         .collect();
     found.sort();
     match found.first() {
-        Some(path) => Ok(read_text(path)?),
+        Some(path) => Ok(read_text_within(path, root)?.unwrap_or_else(missing)),
         None => Ok(missing()),
     }
 }
 
 fn score(root: &Path) -> Result<String, ToolError> {
-    let path = events_path(&root.join(MEMORY_DIR));
+    let path = checked_events_path(&root.join(MEMORY_DIR))?;
     let text = fs::read(&path)
         .map_err(|error| io_error(&path, &error))
         .and_then(|bytes| {

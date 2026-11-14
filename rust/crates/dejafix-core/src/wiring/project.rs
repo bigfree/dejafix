@@ -7,8 +7,8 @@ use jiff::tz::TimeZone;
 
 use super::types::{Project, Settings, WiringError};
 use crate::adapters::fs::{
-    MEMORY_DIR, MemoryDir, StoreError, find_memory_dir, issues_dir, path_context, project_name,
-    read_optional_text, write_text, write_text_if_changed,
+    MemoryDir, StoreError, find_memory_dir, issues_dir, path_context, project_name,
+    read_text_within, write_text, write_text_if_changed,
 };
 use crate::core::log::EventLog;
 use crate::core::summary::{
@@ -31,10 +31,7 @@ impl Project {
     }
 
     pub fn at(root: &Path, settings: Settings) -> Result<Self, WiringError> {
-        let memory = MemoryDir {
-            root: root.to_path_buf(),
-            dir: root.join(MEMORY_DIR),
-        };
+        let memory = MemoryDir::at(root)?;
         let context = path_context(root)?;
         Ok(Self {
             memory,
@@ -58,11 +55,12 @@ pub(super) fn regenerate_locked(
     project: &Project,
     log: &EventLog<'_>,
 ) -> Result<PathBuf, WiringError> {
-    let map = read_optional_text(&project.memory.dir.join(PROJECT_MAP_FILE))
+    let root = &project.memory.root;
+    let map = read_text_within(&project.memory.dir.join(PROJECT_MAP_FILE), root)
         .ok()
         .flatten();
     let path = project.summary_path();
-    let existing = read_optional_text(&path).ok().flatten();
+    let existing = read_text_within(&path, root).ok().flatten();
     let purpose = map
         .as_deref()
         .and_then(extract_purpose_from_map)

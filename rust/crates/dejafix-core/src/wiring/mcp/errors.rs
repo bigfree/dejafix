@@ -26,7 +26,9 @@ impl From<StoreError> for ToolError {
             | StoreError::Write { path, source }
             | StoreError::Lock { path, source }
             | StoreError::Root { path, source } => io_error(path, source),
-            StoreError::NotFound { .. } => Self::Dejafix(error.to_string()),
+            StoreError::NotFound { .. } | StoreError::OutsideProject { .. } => {
+                Self::Dejafix(error.to_string())
+            }
         }
     }
 }
