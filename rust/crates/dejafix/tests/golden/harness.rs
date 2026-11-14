@@ -167,6 +167,7 @@ pub fn run_actions(
     snapshot(&project, "project", &mut files)?;
     snapshot(&home, "home", &mut files)?;
     snapshot_git_hooks(implementation, &project, &mut files)?;
+    crate::normalize::approved_departures(&mut files);
     let python_version = python_version(&repository)?;
     let mut normalizer = Normalizer::new(
         &[

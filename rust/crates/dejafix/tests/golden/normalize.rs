@@ -109,3 +109,16 @@ fn minute(since: &str) -> String {
     let time = since.get(11..16).unwrap_or("");
     format!("{date} {time}")
 }
+
+pub fn approved_departures(files: &mut std::collections::BTreeMap<String, String>) {
+    for (path, text) in files.iter_mut() {
+        if !path.ends_with("/.gitignore") {
+            continue;
+        }
+        let kept: String = text
+            .split_inclusive('\n')
+            .filter(|line| line.trim_end_matches(['\r', '\n']) != ".djf-*")
+            .collect();
+        kept.trim_end_matches(['\r', '\n']).clone_into(text);
+    }
+}
