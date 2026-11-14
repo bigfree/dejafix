@@ -694,3 +694,47 @@ fn a_memory_folder_linked_out_of_the_project_is_refused_over_mcp() {
     assert_eq!(events(&outside), "");
     assert!(call(&state, ToolCall::GetScore, None).error);
 }
+
+#[cfg(unix)]
+#[test]
+fn memory_files_linked_out_of_the_project_read_as_missing() {
+    use std::os::unix::fs::symlink;
+    let world = World::new();
+    let root = world.project("alpha");
+    let secret = world.base.join("secret.txt");
+    fs::write(&secret, "SECRET\n").unwrap();
+    for name in [
+        "AI_INSTRUCTIONS.md",
+        "summary.md",
+        "PROJECT_MAP.md",
+        "plan.md",
+    ] {
+        symlink(&secret, root.join(".dejafix").join(name)).unwrap();
+    }
+    symlink(&secret, root.join(".dejafix/issues/0001-leak.md")).unwrap();
+    let state = world.state(Some(&root), &world.base);
+    for (tool, expected) in [
+        (
+            ToolCall::GetInstructions,
+            "No instructions found. Run `djf init` first.",
+        ),
+        (
+            ToolCall::GetSummary,
+            "No summary found. Run `djf init` first.",
+        ),
+        (ToolCall::GetProjectMap, "No project map found."),
+        (ToolCall::GetPlan, "No plan found."),
+        (ToolCall::GetIssue("1".into()), "No issue found with ID 1."),
+    ] {
+        assert_eq!(text(&state, tool, None), expected);
+    }
+    assert!(!text(&state, ToolCall::StartSession, None).contains("SECRET"));
+    fs::remove_file(root.join(".dejafix/summary.md")).unwrap();
+    fs::write(root.join(".dejafix/real.md"), "# Inside\n").unwrap();
+    symlink(
+        root.join(".dejafix/real.md"),
+        root.join(".dejafix/summary.md"),
+    )
+    .unwrap();
+    assert_eq!(text(&state, ToolCall::GetSummary, None), "# Inside\n");
+}

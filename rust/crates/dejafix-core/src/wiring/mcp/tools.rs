@@ -7,7 +7,7 @@ use super::types::{
     FsProbe, GitMemo, LogCache, McpSettings, McpState, MemoGit, ToolCall, ToolError, ToolReply,
 };
 use crate::adapters::fs::{
-    FsResolver, GlobalStore, MEMORY_DIR, StoreError, events_path, points_outside, read_text,
+    FsResolver, GlobalStore, MEMORY_DIR, StoreError, events_path, points_outside, read_text_within,
     resolve_path,
 };
 use crate::adapters::git::{GitHistory, status_files};
@@ -219,11 +219,7 @@ pub(super) fn memory_path(root: &Path, name: &str) -> PathBuf {
 }
 
 pub(super) fn memory_text(root: &Path, name: &str) -> Result<Option<String>, ToolError> {
-    let path = memory_path(root, name);
-    if !path.exists() {
-        return Ok(None);
-    }
-    Ok(Some(read_text(&path)?))
+    Ok(read_text_within(&memory_path(root, name), root)?)
 }
 
 fn stripped(root: &Path, name: &str) -> Result<String, ToolError> {
@@ -265,7 +261,7 @@ fn issue_text(root: &Path, requested: &str) -> Result<String, ToolError> {
         .collect();
     found.sort();
     match found.first() {
-        Some(path) => Ok(read_text(path)?),
+        Some(path) => Ok(read_text_within(path, root)?.unwrap_or_else(missing)),
         None => Ok(missing()),
     }
 }
