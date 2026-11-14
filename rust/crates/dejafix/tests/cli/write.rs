@@ -38,6 +38,35 @@ fn log_attempt_and_fix_write_events() -> TestResult {
 }
 
 #[test]
+fn a_note_in_another_language_exits_one_and_is_not_stored() -> TestResult {
+    let repo = Repo::new()?;
+    repo.djf(&["note", "zmazať cache"]).assert().code(1).stderr(
+        "Error: Memory is stored in English: too many letters outside ASCII. Rewrite the text in English and call the tool again.\n",
+    );
+    let output = repo.djf(&["log", "キャッシュを削除する"]).assert().code(1);
+    assert!(
+        String::from_utf8(output.get_output().stderr.clone())?
+            .contains("Memory is stored in English: it contains letters outside the Latin script.")
+    );
+    assert_eq!(repo.events()?.len(), 0);
+    Ok(())
+}
+
+#[test]
+fn a_doubtful_note_is_stored_and_warns_on_stderr() -> TestResult {
+    let repo = Repo::new()?;
+    repo.djf(&[
+        "note",
+        "smazat cache pri startu aplikace nebo restartu serveru",
+    ])
+    .assert()
+    .success()
+    .stderr("This does not look like English; if it is not, rewrite it in English.\n");
+    assert_eq!(repo.events()?.len(), 1);
+    Ok(())
+}
+
+#[test]
 fn fix_issue_closes_target_without_clearing_newer_active_issue() -> TestResult {
     let repo = Repo::new()?;
     repo.djf(&["log", "first"]).assert().success();

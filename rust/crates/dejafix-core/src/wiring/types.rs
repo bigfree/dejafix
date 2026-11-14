@@ -28,6 +28,7 @@ pub struct Recorded {
     pub events: Vec<String>,
     pub outcome: WriteOutcome,
     pub notices: Vec<String>,
+    pub hints: Vec<String>,
     pub incomplete: Option<WiringError>,
 }
 

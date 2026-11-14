@@ -208,6 +208,27 @@ fn a_real_commit_records_the_event_and_is_never_blocked() -> TestResult {
 }
 
 #[test]
+fn auto_capture_records_a_commit_message_in_another_language() -> TestResult {
+    let repo = Repo::new()?;
+    commit(
+        &repo,
+        "fix: oprava přihlášení uživatele",
+        &[("src/login.py", "print('login')\n")],
+    )?;
+    repo.djf(&["_auto-capture", "commit"])
+        .assert()
+        .success()
+        .stdout("[dejafix] Auto-captured: Fix: fix: oprava přihlášení uživatele\n");
+    let events = repo.events()?;
+    assert_eq!(events.len(), 1);
+    assert_eq!(
+        events.first().ok_or("no event")?["git_message"],
+        "fix: oprava přihlášení uživatele"
+    );
+    Ok(())
+}
+
+#[test]
 fn auto_capture_classifies_deduplicates_and_respects_the_switch() -> TestResult {
     let repo = Repo::new()?;
     commit(

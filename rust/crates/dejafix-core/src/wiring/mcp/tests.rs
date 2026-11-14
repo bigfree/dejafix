@@ -96,6 +96,43 @@ fn events(root: &Path) -> String {
 }
 
 #[test]
+fn a_note_in_another_language_is_refused_and_a_doubtful_one_is_recorded_with_a_notice() {
+    let world = World::new();
+    let root = world.project("alpha");
+    let state = world.state(Some(&root), &world.base);
+    let refused = call(&state, note("zmazať cache pri štarte"), None);
+    assert!(refused.error);
+    assert_eq!(
+        refused.text,
+        "dejafix tool error: DejafixError: Memory is stored in English: too many letters outside ASCII. Rewrite the text in English and call the tool again."
+    );
+    assert!(!events(&root).contains("zmazať"));
+    let doubtful = text(
+        &state,
+        note("smazat cache pri startu aplikace nebo restartu serveru"),
+        None,
+    );
+    assert!(doubtful.starts_with("Recorded note "));
+    assert!(
+        doubtful
+            .ends_with("\nThis does not look like English; if it is not, rewrite it in English.")
+    );
+    assert!(events(&root).contains("smazat cache"));
+}
+
+#[test]
+fn a_redaction_notice_stays_out_of_the_reply_as_in_python() {
+    let world = World::new();
+    let root = world.project("alpha");
+    let state = world.state(Some(&root), &world.base);
+    let token = format!("the deploy token is {}{}", "ghp_", "a".repeat(36));
+    let reply = text(&state, note(&token), None);
+    assert!(reply.starts_with("Recorded note "));
+    assert!(!reply.contains('\n'), "{reply}");
+    assert!(!events(&root).contains("ghp_aaaa"));
+}
+
+#[test]
 fn a_pinned_server_writes_and_names_the_project() {
     let world = World::new();
     let root = world.project("alpha");

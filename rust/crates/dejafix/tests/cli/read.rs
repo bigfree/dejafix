@@ -120,11 +120,10 @@ fn a_subdirectory_finds_the_project_but_the_global_store_is_never_a_project() ->
 #[test]
 fn output_is_utf8_without_replacement_characters() -> TestResult {
     let repo = Repo::new()?;
-    repo.djf(&["note", "žluťoučký kůň — gotcha"])
-        .assert()
-        .success();
+    let note = "Mikó — the cache is cleared on startup when the configuration loader runs";
+    repo.djf(&["note", note]).assert().success();
     let out = repo.stdout(&["show"])?;
-    assert!(out.contains("žluťoučký kůň — gotcha") && !out.contains('\u{fffd}'));
+    assert!(out.contains(note) && !out.contains('\u{fffd}'));
     Ok(())
 }
 

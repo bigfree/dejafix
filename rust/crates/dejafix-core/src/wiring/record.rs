@@ -13,7 +13,7 @@ use crate::core::log::EventLog;
 use crate::core::time::iso_micros;
 use crate::core::write::{
     Command, Ids, MarkerChange, MarkerState, ValidationError, WriteContext, checks_marker,
-    marker_state, plan_command,
+    language_notice, marker_state, plan_command,
 };
 
 pub fn record(
@@ -39,6 +39,10 @@ pub(crate) fn record_with(
         &FsResolver,
     );
     let command = command(&log)?;
+    let hints: Vec<String> = language_notice(&command)?
+        .map(str::to_owned)
+        .into_iter()
+        .collect();
     let marker = if checks_marker(&command) {
         let marker = read_marker(dir);
         if marker_state(&log, marker.as_deref()) == MarkerState::Stale {
@@ -74,6 +78,7 @@ pub(crate) fn record_with(
         events,
         outcome: plan.outcome,
         notices: plan.notices,
+        hints,
         incomplete,
     })
 }
