@@ -28,6 +28,8 @@ use crate::wiring::types::Settings;
 
 const CONTEXT_RECENT_DAYS: i64 = 30;
 
+const MAX_PRECHECK_PATHS: usize = 200;
+
 impl McpState {
     #[must_use]
     pub fn new(mut settings: McpSettings) -> Self {
@@ -117,6 +119,12 @@ impl McpState {
             ToolCall::ListProjects => return self.list_projects(clock),
             ToolCall::GetGlobalGotchas(library) => return self.gotchas(library.as_deref()),
             ToolCall::Write(write) => return self.write(write, project, clock, ids),
+            ToolCall::PrecheckFiles(paths) if paths.len() > MAX_PRECHECK_PATHS => {
+                return Ok(format!(
+                    "precheck_files accepts at most {MAX_PRECHECK_PATHS} paths; got {}.",
+                    paths.len()
+                ));
+            }
             _ => {}
         }
         let target = self.resolution(project, clock)?;

@@ -738,3 +738,21 @@ fn memory_files_linked_out_of_the_project_read_as_missing() {
     .unwrap();
     assert_eq!(text(&state, ToolCall::GetSummary, None), "# Inside\n");
 }
+
+#[test]
+fn precheck_files_accepts_at_most_two_hundred_paths() {
+    let world = World::new();
+    let root = world.project("alpha");
+    let paths = |count: usize| {
+        (0..count)
+            .map(|index| format!("f{index}.py"))
+            .collect::<Vec<_>>()
+    };
+    let nowhere = world.state(None, &world.base);
+    assert_eq!(
+        text(&nowhere, ToolCall::PrecheckFiles(paths(201)), None),
+        "precheck_files accepts at most 200 paths; got 201."
+    );
+    let state = world.state(Some(&root), &world.base);
+    assert!(!text(&state, ToolCall::PrecheckFiles(paths(200)), None).contains("at most 200"));
+}
