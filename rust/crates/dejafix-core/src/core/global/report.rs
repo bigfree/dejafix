@@ -4,6 +4,7 @@ use std::fmt::Write;
 use serde_json::{Map, Value, json};
 
 use super::inherit::is_truthy;
+use super::record::is_upgraded;
 use super::types::{Entry, GlobalOutcome, Palette, Stack, Usage};
 use crate::core::json::{python_str, write_python_json_indented};
 
@@ -111,6 +112,10 @@ fn status(
         libraries.len(),
         projects.len(),
     );
+    let not_upgraded = gotchas.iter().filter(|entry| !is_upgraded(entry)).count();
+    if not_upgraded > 0 {
+        let _ = writeln!(out, "    Not upgraded:        {bold}{not_upgraded}{reset}");
+    }
     let joined = |set: &BTreeSet<String>| {
         set.iter()
             .map(String::as_str)
@@ -210,15 +215,25 @@ fn list_text(
             gotchas.len()
         );
         for entry in gotchas {
+            let upgraded = is_upgraded(entry);
             let _ = writeln!(
                 out,
-                "  {yellow}{}{reset}  [{bold}{}{reset}] {}",
+                "  {yellow}{}{reset}{}  [{bold}{}{reset}] {}",
                 text_of(entry, "id", "?"),
+                if upgraded { "" } else { " (not upgraded)" },
                 text_of(entry, "library", "unknown"),
                 text_of(entry, "gotcha", "")
             );
             let mut parts = Vec::new();
-            if let Some(version) = truthy_text(entry, "version_range") {
+            if upgraded {
+                let keywords = items(entry, "keywords").join(", ");
+                if !keywords.is_empty() {
+                    parts.push(format!("keywords: {keywords}"));
+                }
+            }
+            let version =
+                truthy_text(entry, "versions").or_else(|| truthy_text(entry, "version_range"));
+            if let Some(version) = version {
                 parts.push(format!("version: {version}"));
             }
             if let Some(source) = truthy_text(entry, "source_project") {

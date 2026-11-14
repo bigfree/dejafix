@@ -54,6 +54,13 @@ pub struct LockedLog {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub enum GotchaWrite {
+    Keep,
+    Append(Vec<String>),
+    Replace(Vec<String>),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GlobalStore {
     pub dir: PathBuf,
 }

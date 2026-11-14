@@ -1,6 +1,7 @@
 mod inherit;
 mod promote;
 mod prune;
+mod record;
 mod report;
 mod types;
 
@@ -11,8 +12,11 @@ pub use promote::{
     promotion, similar,
 };
 pub use prune::is_prunable;
+pub use record::{is_upgraded, line, parse_store};
 pub use report::{filtered, global_report};
-pub use types::{Entry, GlobalAction, GlobalOutcome, Relevant, Stack, Usage};
+pub use types::{
+    Entry, GlobalAction, GlobalOutcome, GotchaV2, Libraries, Relevant, Stack, StoredGotcha, Usage,
+};
 
 #[cfg(test)]
 mod tests;

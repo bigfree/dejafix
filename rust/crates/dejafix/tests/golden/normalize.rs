@@ -6,6 +6,8 @@ use regex::{Captures, Regex};
 use crate::types::{Implementation, Normalizer};
 
 const AUTO_CAPTURED: &str = "[dejafix] Auto-captured";
+const NOT_UPGRADED: &str = " (not upgraded)";
+const NOT_UPGRADED_COUNT: &str = "    Not upgraded:";
 
 const ID: &str = r"(?P<id>evt_[0-9a-f]{20}|(?:pat|got)_[0-9a-f]{12})";
 const DJF_BIN: &str = r#"(?P<djf>(?m:^DJF_BIN="[^"$`\n]*"$))"#;
@@ -125,8 +127,21 @@ pub fn approved_departures(files: &mut std::collections::BTreeMap<String, String
     }
 }
 
+fn without_upgrade_marks(text: String) -> String {
+    if !text.contains(NOT_UPGRADED) && !text.contains(NOT_UPGRADED_COUNT) {
+        return text;
+    }
+    text.split_inclusive('\n')
+        .filter(|line| !line.starts_with(NOT_UPGRADED_COUNT))
+        .map(|line| line.replacen(NOT_UPGRADED, "", 1))
+        .collect()
+}
+
 pub fn approved_stdout(implementation: Implementation, text: String) -> String {
-    if !matches!(implementation, Implementation::Python) || !text.contains(AUTO_CAPTURED) {
+    if matches!(implementation, Implementation::Rust) {
+        return without_upgrade_marks(text);
+    }
+    if !text.contains(AUTO_CAPTURED) {
         return text;
     }
     text.split_inclusive('\n')

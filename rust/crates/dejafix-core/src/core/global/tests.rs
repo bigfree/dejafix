@@ -609,3 +609,104 @@ mod prune {
         ));
     }
 }
+
+mod version_two {
+    use serde_json::{Value, json};
+
+    use super::super::{Entry, GotchaV2, Libraries, StoredGotcha, is_upgraded, line, parse_store};
+
+    const SPEC_EXAMPLE: &str = r#"{"v": 2, "id": "got_6448df8c9d45", "library": "bullmq", "keywords": ["bun adapter", "reconnect", "duplicate", "raw client url"], "versions": ">=6.2.0 <6.3", "gotcha": "bullmq 6.2.0's Bun adapter rebuilds the raw client from this.raw.url at three sites", "source_project": "home-log", "discovered": "2026-08-27", "reviewed": "2026-11-14"}"#;
+
+    fn entry(text: &str) -> Entry {
+        serde_json::from_str::<Value>(text)
+            .unwrap()
+            .as_object()
+            .cloned()
+            .unwrap()
+    }
+
+    #[test]
+    fn the_spec_example_round_trips_in_field_order() {
+        let StoredGotcha::V2(record) = StoredGotcha::from_entry(entry(SPEC_EXAMPLE)) else {
+            panic!("not read as version 2");
+        };
+        assert_eq!(record.library, "bullmq");
+        assert_eq!(record.keywords.len(), 4);
+        assert_eq!(record.versions.as_deref(), Some(">=6.2.0 <6.3"));
+        assert_eq!(line(&record), SPEC_EXAMPLE);
+    }
+
+    #[test]
+    fn a_line_without_v_reads_as_version_one() {
+        let old = entry(
+            r#"{"id": "got_1", "library": "react", "gotcha": "effects run twice", "tags": []}"#,
+        );
+        assert!(!is_upgraded(&old));
+        let stored = StoredGotcha::from_entry(old);
+        assert!(!stored.is_upgraded());
+        assert_eq!(stored.id(), "got_1");
+        assert_eq!(stored.library(), "react");
+        assert_eq!(stored.text(), "effects run twice");
+        let broken = entry(
+            r#"{"v": 2, "id": "got_2", "library": "react", "keywords": "one", "gotcha": "x"}"#,
+        );
+        assert!(matches!(
+            StoredGotcha::from_entry(broken),
+            StoredGotcha::V1(_)
+        ));
+        let empty = StoredGotcha::from_entry(Entry::new());
+        assert_eq!((empty.id(), empty.library(), empty.text()), ("", "", ""));
+    }
+
+    #[test]
+    fn unknown_fields_of_a_version_two_line_are_kept() {
+        let with_extra = entry(
+            r#"{"v": 2, "id": "got_3", "library": "zod", "keywords": ["a", "b"], "versions": null, "gotcha": "text", "note": {"by": "hand"}}"#,
+        );
+        let records: [StoredGotcha; 1] = parse_store(vec![with_extra]).try_into().unwrap();
+        let [StoredGotcha::V2(record)] = records else {
+            panic!("not read as version 2");
+        };
+        assert_eq!(record.extra.get("note"), Some(&json!({"by": "hand"})));
+        assert_eq!(
+            line(&record),
+            r#"{"v": 2, "id": "got_3", "library": "zod", "keywords": ["a", "b"], "versions": null, "gotcha": "text", "note": {"by": "hand"}}"#
+        );
+        let minimal = GotchaV2 {
+            id: "got_4".into(),
+            library: "nx".into(),
+            gotcha: "g".into(),
+            ..GotchaV2::default()
+        };
+        assert_eq!(
+            line(&minimal),
+            r#"{"v": 2, "id": "got_4", "library": "nx", "keywords": [], "versions": null, "gotcha": "g"}"#
+        );
+    }
+
+    #[test]
+    fn aliases_resolve_to_the_canonical_library() {
+        let mut libraries =
+            Libraries::from_value(&json!({"next": ["nextjs", "Next.js"], "nx": ["@nx/js"]}))
+                .unwrap();
+        assert_eq!(libraries.canonical("nextjs"), "next");
+        assert_eq!(libraries.canonical(" NEXT.JS "), "next");
+        assert_eq!(libraries.canonical("@nx/js"), "nx");
+        assert_eq!(libraries.canonical("Prisma"), "prisma");
+        assert_eq!(libraries.aliases("next"), ["nextjs", "next.js"]);
+        assert_eq!(libraries.aliases("prisma"), Vec::<String>::new());
+        assert!(libraries.add_library("prisma"));
+        assert!(!libraries.add_library("prisma"));
+        assert!(libraries.add_alias("prisma", "Prisma-Client"));
+        assert!(!libraries.add_alias("prisma", "prisma-client"));
+        assert!(!libraries.add_alias("prisma", "prisma"));
+        assert_eq!(libraries.canonical("prisma-client"), "prisma");
+        assert_eq!(
+            libraries.to_value(),
+            json!({"next": ["nextjs", "next.js"], "nx": ["@nx/js"], "prisma": ["prisma-client"]})
+        );
+        assert!(Libraries::from_value(&json!(["next"])).is_none());
+        assert!(Libraries::from_value(&json!({"next": "nextjs"})).is_none());
+        assert!(Libraries::from_value(&json!({"next": [1]})).is_none());
+    }
+}

@@ -40,14 +40,14 @@ Patterns (3)
 
 Library Gotchas (5)
 ────────────────────────────────────────────────────────────
-  got_000000000001  [sqlalchemy] always close async sessions
+  got_000000000001 (not upgraded)  [sqlalchemy] always close async sessions
     from: other
-  got_000000000002  [fastapi] fastapi deps are cached
+  got_000000000002 (not upgraded)  [fastapi] fastapi deps are cached
     version: >=0.100 · from: other
-  got_000000000003  [gin] unrelated lib thing
-  got_000000000004  [pydantic] pydantic v2 strictness
+  got_000000000003 (not upgraded)  [gin] unrelated lib thing
+  got_000000000004 (not upgraded)  [pydantic] pydantic v2 strictness
     version: 2.x
-  got_000000000005  [sqlalchemy] with text key
+  got_000000000005 (not upgraded)  [sqlalchemy] with text key
 
 ";
 
@@ -63,6 +63,7 @@ const STATUS: &str = "
     Unique tags:         3
     Libraries tracked:   4
     Source projects:     3
+    Not upgraded:        5
 
   Tags: python, rust, web
   Libraries: fastapi, gin, pydantic, sqlalchemy
@@ -148,7 +149,7 @@ fn ids(text: &str) -> String {
 }
 
 #[test]
-fn status_matches_python_and_creates_the_directory() -> TestResult {
+fn status_counts_version_one_records_and_creates_the_directory() -> TestResult {
     let repo = seeded()?;
     let out = run(&repo, &["status"])?;
     assert_eq!(
@@ -167,7 +168,7 @@ fn status_matches_python_and_creates_the_directory() -> TestResult {
 }
 
 #[test]
-fn list_matches_python_and_filters() -> TestResult {
+fn list_marks_version_one_records_and_filters() -> TestResult {
     let repo = seeded()?;
     assert_eq!(run(&repo, &["list"])?, LIST);
     let by_library = run(&repo, &["list", "--library", "sql"])?;
@@ -188,6 +189,26 @@ fn list_matches_python_and_filters() -> TestResult {
         empty,
         "No entries found.\n  Add patterns:  djf global add \"your pattern here\"\n  Add gotchas:   djf global add-gotcha \"gotcha text\" --library <library>\n"
     );
+    Ok(())
+}
+
+#[test]
+fn a_version_two_record_is_listed_without_the_marker() -> TestResult {
+    let repo = Repo::new()?;
+    let dir = global_dir(&repo);
+    fs::create_dir_all(&dir)?;
+    fs::write(
+        dir.join("library_gotchas.jsonl"),
+        concat!(
+            r#"{"v": 2, "id": "got_000000000009", "library": "bullmq", "keywords": ["shutdown", "worker close"], "versions": ">=6.2.0 <6.3", "gotcha": "Worker.close() never resolves against an unreachable Redis", "source_project": "project-a", "discovered": "2026-08-27", "reviewed": "2026-11-14"}"#,
+            "\n"
+        ),
+    )?;
+    let list = run(&repo, &["list"])?;
+    assert!(list.contains(
+        "  got_000000000009  [bullmq] Worker.close() never resolves against an unreachable Redis\n    keywords: shutdown, worker close · version: >=6.2.0 <6.3 · from: project-a\n"
+    ));
+    assert!(!run(&repo, &["status"])?.contains("Not upgraded"));
     Ok(())
 }
 

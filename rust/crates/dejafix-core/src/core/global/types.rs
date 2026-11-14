@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use serde_json::{Map, Value};
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -131,3 +133,25 @@ pub enum GlobalOutcome {
     },
     Unknown(String),
 }
+
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct GotchaV2 {
+    pub id: String,
+    pub library: String,
+    pub keywords: Vec<String>,
+    pub versions: Option<String>,
+    pub gotcha: String,
+    pub source_project: Option<String>,
+    pub discovered: Option<String>,
+    pub reviewed: Option<String>,
+    pub extra: Entry,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum StoredGotcha {
+    V2(GotchaV2),
+    V1(Entry),
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Libraries(pub BTreeMap<String, Vec<String>>);

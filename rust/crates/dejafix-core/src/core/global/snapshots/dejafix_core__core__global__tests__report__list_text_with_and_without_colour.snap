@@ -11,6 +11,6 @@ Patterns (2)
 
 Library Gotchas (2)
 ────────────────────────────────────────────────────────────
-  got_1  [sqlalchemy] close sessions
+  got_1 (not upgraded)  [sqlalchemy] close sessions
     version: >=2 · from: beta
-  got_2  [unknown] no library
+  got_2 (not upgraded)  [unknown] no library

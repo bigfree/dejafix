@@ -14,6 +14,7 @@ expression: "global_report(&outcome, false)"
     Unique tags:         2
     Libraries tracked:   1
     Source projects:     2
+    Not upgraded:        2
 
   Tags: python, web
   Libraries: sqlalchemy

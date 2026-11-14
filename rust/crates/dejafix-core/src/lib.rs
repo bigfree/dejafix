@@ -3,10 +3,10 @@ mod core;
 mod wiring;
 
 pub use crate::adapters::fs::{
-    ClientConfig, ClientPaths, ConfigState, FsResolver, GlobalStore, Identity, MemoryDir,
-    RegistryFiles, StoreError, canonical_path, client_configs, dedupe_paths, default_roots,
-    detect_stack, find_memory_dir, find_projects, identity, manifest_info, path_context,
-    pinned_client_configs, read_events_file, resolve_path, scan_client_configs,
+    ClientConfig, ClientPaths, ConfigState, FsResolver, GlobalStore, GotchaWrite, Identity,
+    MemoryDir, RegistryFiles, StoreError, canonical_path, client_configs, dedupe_paths,
+    default_roots, detect_stack, find_memory_dir, find_projects, identity, manifest_info,
+    path_context, pinned_client_configs, read_events_file, resolve_path, scan_client_configs,
 };
 pub use crate::adapters::fs::{forget_session, report_is_new, seen_root};
 pub use crate::adapters::git::{GitHistory, recent_changes};
@@ -27,9 +27,10 @@ pub use crate::core::event::{
     Outcome, Summary,
 };
 pub use crate::core::global::{
-    Entry, GlobalAction, GlobalOutcome, PROMOTABLE_SEED, Relevant, Stack, Usage, filtered,
-    global_report, gotcha_entry, inherited_block, is_gotcha_signal, is_prunable,
-    promotable_libraries, promotable_set, promotion, relevant_entries, similar,
+    Entry, GlobalAction, GlobalOutcome, GotchaV2, Libraries, PROMOTABLE_SEED, Relevant, Stack,
+    StoredGotcha, Usage, filtered, global_report, gotcha_entry, inherited_block, is_gotcha_signal,
+    is_prunable, is_upgraded, line, parse_store, promotable_libraries, promotable_set, promotion,
+    relevant_entries, similar,
 };
 pub use crate::core::hooks::{
     HOOK_MARKER_END, HOOK_MARKER_START, HOOK_SHEBANG, HookChange, HookKind, Removal,

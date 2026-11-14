@@ -576,8 +576,8 @@ fn no_gotcha_file_is_created_when_nothing_is_promoted() {
 
 #[cfg(unix)]
 #[test]
-fn global_removal_rewrites_in_place_so_a_locked_append_is_never_lost() {
-    use std::os::unix::fs::MetadataExt;
+fn global_removal_replaces_the_file_and_keeps_its_mode() {
+    use std::os::unix::fs::PermissionsExt;
     let home = tempfile::tempdir().unwrap();
     let store = super::GlobalStore::new(home.path());
     store.ensure().unwrap();
@@ -587,14 +587,109 @@ fn global_removal_rewrites_in_place_so_a_locked_append_is_never_lost() {
         "{\"gotcha\": \"a\", \"id\": \"got_a\", \"library\": \"x\"}\n{\"gotcha\": \"b\", \"id\": \"got_b\", \"library\": \"x\"}\n",
     )
     .unwrap();
-    let inode = fs::metadata(&path).unwrap().ino();
+    fs::set_permissions(&path, fs::Permissions::from_mode(0o640)).unwrap();
     assert!(store.remove("got_a").unwrap());
     assert!(!store.remove("got_zzz").unwrap());
-    assert_eq!(fs::metadata(&path).unwrap().ino(), inode);
     assert_eq!(
         fs::read_to_string(&path).unwrap(),
         "{\"gotcha\": \"b\", \"id\": \"got_b\", \"library\": \"x\"}\n"
     );
+    assert_eq!(
+        fs::metadata(&path).unwrap().permissions().mode() & 0o777,
+        0o640
+    );
+    store
+        .replace_gotchas(&["{\"id\": \"got_c\"}".to_owned()])
+        .unwrap();
+    assert_eq!(fs::read_to_string(&path).unwrap(), "{\"id\": \"got_c\"}\n");
+    assert_eq!(
+        fs::metadata(&path).unwrap().permissions().mode() & 0o777,
+        0o640
+    );
+}
+
+#[test]
+fn an_append_waiting_for_the_lock_lands_in_the_replaced_file() {
+    use std::sync::mpsc;
+    use std::time::Duration;
+    let home = tempfile::tempdir().unwrap();
+    let store = super::GlobalStore::new(home.path());
+    store.ensure().unwrap();
+    fs::write(
+        store.path("library_gotchas.jsonl"),
+        "{\"id\": \"got_old\"}\n",
+    )
+    .unwrap();
+    let (started, waiting) = mpsc::channel();
+    let appender = {
+        let store = store.clone();
+        std::thread::spawn(move || {
+            waiting.recv().unwrap();
+            store
+                .edit_gotchas(|existing| {
+                    let ids: Vec<String> = existing
+                        .iter()
+                        .filter_map(|entry| entry.get("id")?.as_str().map(str::to_owned))
+                        .collect();
+                    (
+                        super::GotchaWrite::Append(vec!["{\"id\": \"got_late\"}".to_owned()]),
+                        ids,
+                    )
+                })
+                .unwrap()
+        })
+    };
+    store
+        .edit_gotchas(|_| {
+            started.send(()).unwrap();
+            std::thread::sleep(Duration::from_millis(200));
+            (
+                super::GotchaWrite::Replace(vec!["{\"id\": \"got_new\"}".to_owned()]),
+                (),
+            )
+        })
+        .unwrap();
+    assert_eq!(appender.join().unwrap(), ["got_new"]);
+    assert_eq!(
+        fs::read_to_string(store.path("library_gotchas.jsonl")).unwrap(),
+        nl("{\"id\": \"got_new\"}\n{\"id\": \"got_late\"}\n")
+    );
+}
+
+#[test]
+fn libraries_are_empty_until_saved_and_a_corrupt_file_is_an_error() {
+    let home = tempfile::tempdir().unwrap();
+    let store = super::GlobalStore::new(home.path());
+    assert_eq!(
+        store.libraries().unwrap(),
+        crate::core::global::Libraries::default()
+    );
+    let mut libraries = crate::core::global::Libraries::default();
+    libraries.add_alias("next", "nextjs");
+    store.save_libraries(&libraries).unwrap();
+    assert_eq!(
+        fs::read_to_string(store.path("libraries.json")).unwrap(),
+        nl("{\n  \"next\": [\n    \"nextjs\"\n  ]\n}\n")
+    );
+    assert_eq!(store.libraries().unwrap(), libraries);
+    fs::write(store.path("libraries.json"), "[1]").unwrap();
+    assert!(matches!(
+        store.libraries(),
+        Err(super::StoreError::Read { .. })
+    ));
+}
+
+#[test]
+fn the_version_one_backup_is_written_once() {
+    let home = tempfile::tempdir().unwrap();
+    let store = super::GlobalStore::new(home.path());
+    store.ensure().unwrap();
+    fs::write(store.path("library_gotchas.jsonl"), "first\n").unwrap();
+    let backup = store.backup_v1().unwrap();
+    assert_eq!(backup, store.path("library_gotchas.v1.jsonl"));
+    fs::write(store.path("library_gotchas.jsonl"), "second\n").unwrap();
+    assert_eq!(store.backup_v1().unwrap(), backup);
+    assert_eq!(fs::read_to_string(&backup).unwrap(), "first\n");
 }
 
 mod containment {
