@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.0.0-rc.2
+
+**Second release candidate of the Rust rewrite.** It closes the ways a cloned repository or a prompt-injected MCP call could make dejafix read, write or run something outside the project. It also widens the systems the release runs on.
+
+### Changed
+
+- **A `.dejafix` folder or `events.jsonl` that resolves outside the project is refused.** `djf` exits with `Error: <path> points outside the project; refusing to use it`, and the MCP tools that touch the log answer with the same error. This also refuses a `.dejafix` you linked elsewhere on purpose. Move the folder into the project to keep using it. Links that stay inside the project work as before.
+- **Linux archives need glibc 2.28** instead of 2.35, so they run on RHEL 8, Debian 11 and Ubuntu 20.04.
+- **Wheels for musl.** `pip install --pre dejafix` on Alpine and other musl systems installs the Rust build (`musllinux_1_2`, x86_64 and aarch64) instead of falling back to Python 0.4.x.
+
+### Security
+
+- **Repository config cannot make git run commands.** Every git call runs with `core.fsmonitor` and `log.showSignature` switched off. It also ignores bare repositories that git would only find by walking up from a folder, and treats paths taken from the event log literally rather than as globs.
+- **Memory files that resolve outside the project are not read or copied.** This covers the MCP read tools, `djf show`, `djf instructions`, `djf map` and summary regeneration. A symlinked memory file never hands an outside file to an agent.
+- **Network paths in the MCP `project` argument are refused**, also with leading whitespace. On Windows a UNC path can no longer make the server connect to another host and send the user's credentials.
+- `precheck_files` accepts at most 200 paths.
+- `djf doctor`, `djf project scan` and `djf project list` print control characters in paths and error text escaped, so a folder name cannot drive the terminal.
+- `_auto-capture` prints the redacted summary, never the secret it redacted.
+- `djf init` adds `.djf-*` to `.gitignore`, so a temporary file left by an interrupted write is never committed.
+- The release workflow installs `dist` from an archive checked against a pinned SHA-256, and only `v1` and later tags start a release.
+
 ## 0.4.0 — dejafix
 
 **First release as dejafix, a fork of [projectmem](https://github.com/riponcm/projectmem) 0.3.5.** Everything projectmem wrote is renamed, and `djf migrate` carries an existing install across.
