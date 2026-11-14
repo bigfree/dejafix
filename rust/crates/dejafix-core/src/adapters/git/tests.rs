@@ -644,3 +644,110 @@ fn git_dirs_follow_the_git_dir_git_itself_uses() {
         fs::canonicalize(root.join(".git")).unwrap()
     );
 }
+
+#[cfg(unix)]
+fn marker_script(dir: &Path, name: &str) -> (PathBuf, PathBuf) {
+    use std::os::unix::fs::PermissionsExt;
+    let marker = dir.join(format!("{name}.ran"));
+    let script = dir.join(format!("{name}.sh"));
+    fs::write(
+        &script,
+        format!("#!/bin/sh\ntouch '{}'\nexit 1\n", marker.display()),
+    )
+    .unwrap();
+    fs::set_permissions(&script, fs::Permissions::from_mode(0o755)).unwrap();
+    (script, marker)
+}
+
+#[cfg(unix)]
+#[test]
+fn status_never_runs_the_repository_s_fsmonitor() {
+    let dir = tempfile::tempdir().unwrap();
+    let tools = tempfile::tempdir().unwrap();
+    git(dir.path(), &["init", "-q"]);
+    fs::write(dir.path().join("a.txt"), "a\n").unwrap();
+    git(dir.path(), &["add", "a.txt"]);
+    let (script, marker) = marker_script(tools.path(), "fsmonitor");
+    git(
+        dir.path(),
+        &["config", "core.fsmonitor", &script.to_string_lossy()],
+    );
+    let _ = fs::remove_file(&marker);
+    Command::new("git")
+        .args(["status", "--porcelain"])
+        .current_dir(dir.path())
+        .output()
+        .unwrap();
+    assert!(marker.exists(), "control: plain git status must run the hook");
+    fs::remove_file(&marker).unwrap();
+    let _ = status_files(dir.path());
+    assert!(!marker.exists());
+}
+
+#[cfg(unix)]
+#[test]
+fn history_never_runs_the_repository_s_gpg_program() {
+    let dir = tempfile::tempdir().unwrap();
+    let tools = tempfile::tempdir().unwrap();
+    git(dir.path(), &["init", "-q"]);
+    fs::write(dir.path().join("a.txt"), "a\n").unwrap();
+    git(dir.path(), &["add", "a.txt"]);
+    let tree = Command::new("git")
+        .args(["write-tree"])
+        .current_dir(dir.path())
+        .output()
+        .unwrap();
+    let tree = String::from_utf8(tree.stdout).unwrap();
+    let object = format!(
+        "tree {}\nauthor t <t@example.invalid> 1700000000 +0000\ncommitter t <t@example.invalid> 1700000000 +0000\ngpgsig -----BEGIN PGP SIGNATURE-----\n \n -----END PGP SIGNATURE-----\n\nsigned\n",
+        tree.trim()
+    );
+    let mut child = Command::new("git")
+        .args(["hash-object", "-t", "commit", "-w", "--stdin"])
+        .current_dir(dir.path())
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+    std::io::Write::write_all(&mut child.stdin.take().unwrap(), object.as_bytes()).unwrap();
+    let id = String::from_utf8(child.wait_with_output().unwrap().stdout).unwrap();
+    git(dir.path(), &["update-ref", "HEAD", id.trim()]);
+    let (script, marker) = marker_script(tools.path(), "gpg");
+    git(
+        dir.path(),
+        &["config", "gpg.program", &script.to_string_lossy()],
+    );
+    git(dir.path(), &["config", "log.showSignature", "true"]);
+    let _ = fs::remove_file(&marker);
+    Command::new("git")
+        .args(["log", "--format=%cI", "--", "a.txt"])
+        .current_dir(dir.path())
+        .output()
+        .unwrap();
+    assert!(
+        marker.exists(),
+        "control: plain git log must call gpg.program on a signed commit"
+    );
+    fs::remove_file(&marker).unwrap();
+    let history = super::GitHistory {
+        root: dir.path().to_path_buf(),
+    };
+    let times = crate::core::stale::FileHistory::commit_times(&history, "a.txt", None).unwrap();
+    assert_eq!(times.len(), 1);
+    assert!(!marker.exists());
+}
+
+#[test]
+fn every_git_call_carries_the_hardening() {
+    assert_eq!(
+        super::run::HARDENING,
+        [
+            "-c",
+            "core.fsmonitor=",
+            "-c",
+            "log.showSignature=false",
+            "-c",
+            "safe.bareRepository=explicit",
+        ]
+    );
+}

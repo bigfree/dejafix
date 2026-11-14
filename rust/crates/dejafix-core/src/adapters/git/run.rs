@@ -9,6 +9,14 @@ use super::types::GitFailure;
 const TIMEOUT: Duration = Duration::from_secs(5);
 const FIRST_POLL: Duration = Duration::from_micros(500);
 const LAST_POLL: Duration = Duration::from_millis(5);
+pub(super) const HARDENING: [&str; 6] = [
+    "-c",
+    "core.fsmonitor=",
+    "-c",
+    "log.showSignature=false",
+    "-c",
+    "safe.bareRepository=explicit",
+];
 
 pub(crate) fn git<S: AsRef<OsStr>>(root: &Path, args: &[S]) -> Option<Vec<u8>> {
     git_status(root, args).ok()
@@ -16,6 +24,7 @@ pub(crate) fn git<S: AsRef<OsStr>>(root: &Path, args: &[S]) -> Option<Vec<u8>> {
 
 pub(crate) fn git_status<S: AsRef<OsStr>>(root: &Path, args: &[S]) -> Result<Vec<u8>, GitFailure> {
     let mut child = Command::new("git")
+        .args(HARDENING)
         .args(args)
         .current_dir(root)
         .stdin(Stdio::null())
