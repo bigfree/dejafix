@@ -99,6 +99,37 @@ fn a_failed_attempt_hints_only_when_it_names_a_stack_library() {
 }
 
 #[test]
+fn scoped_package_names_are_named_in_the_hint_but_not_inside_other_names() {
+    assert_eq!(
+        hint(
+            "@nx/js build caches stale output",
+            EventKind::Attempt,
+            Some(Outcome::Failed),
+            &["@nx/js"]
+        ),
+        Some(hint_for("@nx/js"))
+    );
+    assert_eq!(
+        hint(
+            "react-router lost the state",
+            EventKind::Attempt,
+            Some(Outcome::Failed),
+            &["react"]
+        ),
+        None
+    );
+    assert_eq!(
+        hint(
+            "vite.config breaks again",
+            EventKind::Attempt,
+            Some(Outcome::Failed),
+            &["vite"]
+        ),
+        Some(hint_for("vite"))
+    );
+}
+
+#[test]
 fn a_lesson_note_hints_with_the_named_library_or_a_placeholder() {
     assert_eq!(
         hint(

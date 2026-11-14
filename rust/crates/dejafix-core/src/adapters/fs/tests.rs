@@ -774,3 +774,15 @@ fn removing_a_gotcha_keeps_the_version_two_field_order() {
         nl(&format!("{kept}\n{legacy}\n"))
     );
 }
+
+#[test]
+fn an_existing_empty_store_is_kept_when_nothing_is_written() {
+    let home = tempfile::tempdir().unwrap();
+    let store = super::GlobalStore::new(home.path());
+    store.ensure().unwrap();
+    fs::write(store.path("library_gotchas.jsonl"), "").unwrap();
+    store
+        .edit_gotchas(|_| (super::GotchaWrite::Keep, ()))
+        .unwrap();
+    assert!(store.path("library_gotchas.jsonl").exists());
+}

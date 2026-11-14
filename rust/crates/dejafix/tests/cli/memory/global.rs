@@ -322,9 +322,7 @@ fn add_gotcha_writes_a_version_two_record_and_the_library() -> TestResult {
         ],
     )?;
     assert!(
-        ids(&again).starts_with(
-            "Not added: it repeats got_X; change that record with `djf global edit` instead.\n"
-        ),
+        ids(&again).starts_with("Not added: it repeats got_X, which already holds this lesson.\n"),
         "{again}"
     );
     Ok(())

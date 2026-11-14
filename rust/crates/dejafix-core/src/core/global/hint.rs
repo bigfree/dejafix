@@ -1,6 +1,6 @@
 use super::types::GlobalHint;
 use crate::core::event::{EventKind, Outcome};
-use crate::core::text::{contains_word, is_python_space};
+use crate::core::text::is_python_space;
 
 const LESSON_PREFIXES: [&str; 10] = [
     "gotcha:", "lesson:", "warning:", "caution:", "pitfall:", "avoid:", "don't ", "do not ",
@@ -8,6 +8,21 @@ const LESSON_PREFIXES: [&str; 10] = [
 ];
 
 const ANY_LIBRARY: &str = "<library>";
+
+fn is_name_char(character: char) -> bool {
+    character.is_alphanumeric() || matches!(character, '@' | '/' | '_' | '-')
+}
+
+fn names(text: &str, library: &str) -> bool {
+    text.match_indices(library).any(|(at, _)| {
+        let before = text.get(..at).and_then(|head| head.chars().next_back());
+        let after = text
+            .get(at + library.len()..)
+            .and_then(|tail| tail.chars().next());
+        !before.is_some_and(|before| is_name_char(before) || before == '.')
+            && !after.is_some_and(is_name_char)
+    })
+}
 
 #[must_use]
 pub fn hint_candidate(summary: &str, kind: EventKind, outcome: Option<Outcome>) -> GlobalHint {
@@ -39,7 +54,7 @@ pub fn global_hint(summary: &str, candidate: GlobalHint, libraries: &[String]) -
     let named = libraries
         .iter()
         .map(|library| library.to_lowercase())
-        .filter(|library| !library.is_empty() && contains_word(&lowered, library))
+        .filter(|library| !library.is_empty() && names(&lowered, library))
         .max_by_key(String::len);
     let library = match (named, candidate) {
         (Some(library), _) => library,

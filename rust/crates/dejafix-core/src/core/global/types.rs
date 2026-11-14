@@ -227,7 +227,7 @@ pub enum CheckFailure {
     Ticket(String),
     #[error("it names an internal host ({0})")]
     InternalHost(String),
-    #[error("it repeats {0}; change that record with `djf global edit` instead")]
+    #[error("it repeats {0}, which already holds this lesson")]
     Duplicate(String),
 }
 

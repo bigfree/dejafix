@@ -61,11 +61,19 @@ const CHARS_PER_TOKEN: usize = 4;
 impl GlobalIndex {
     #[must_use]
     pub fn build(records: Vec<StoredGotcha>, libraries: Libraries) -> Self {
-        let index = Index::build(GLOBAL_FIELDS, &global_docs(records.iter(), &libraries));
-        let canonical = records
+        let canonical: Vec<Box<str>> = records
             .iter()
             .map(|record| libraries.canonical(record.library()).into_boxed_str())
             .collect();
+        let docs: Vec<GlobalDoc<'_>> = records
+            .iter()
+            .zip(&canonical)
+            .map(|(record, library)| GlobalDoc {
+                record,
+                aliases: libraries.aliases(library),
+            })
+            .collect();
+        let index = Index::build(GLOBAL_FIELDS, &docs);
         Self {
             index,
             records,

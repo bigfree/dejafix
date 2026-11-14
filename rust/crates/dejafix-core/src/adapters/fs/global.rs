@@ -199,15 +199,28 @@ impl GlobalStore {
             source,
         };
         for _ in 0..LOCK_ATTEMPTS {
-            let opened = OpenOptions::new()
-                .read(true)
-                .append(true)
-                .create(create)
-                .open(&path);
-            let mut file = match opened {
+            let mut created = false;
+            let mut file = match OpenOptions::new().read(true).append(true).open(&path) {
                 Ok(file) => file,
                 Err(error) if error.kind() == std::io::ErrorKind::NotFound && !create => {
                     return Ok(None);
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                    match OpenOptions::new()
+                        .read(true)
+                        .append(true)
+                        .create_new(true)
+                        .open(&path)
+                    {
+                        Ok(file) => {
+                            created = true;
+                            file
+                        }
+                        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+                            continue;
+                        }
+                        Err(error) => return Err(write_error(&path)(error)),
+                    }
                 }
                 Err(error) => return Err(read_error(error)),
             };
@@ -220,7 +233,7 @@ impl GlobalStore {
             let entries =
                 parse_entries(&universal_newlines(&text)).ok_or_else(|| invalid_store(&path))?;
             let (write, value) = decide(entries);
-            if create && text.is_empty() && matches!(write, GotchaWrite::Keep) {
+            if created && text.is_empty() && matches!(write, GotchaWrite::Keep) {
                 fs::remove_file(&path).map_err(write_error(&path))?;
                 return Ok(Some(value));
             }

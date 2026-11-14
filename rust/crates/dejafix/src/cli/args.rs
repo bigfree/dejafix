@@ -252,7 +252,10 @@ pub struct GlobalArgs {
 pub struct InitArgs {
     #[arg(long = "no-hooks", help = "Skip git hook installation.")]
     pub no_hooks: bool,
-    #[arg(long = "no-global", help = "Skip global memory inheritance.")]
+    #[arg(
+        long = "no-global",
+        help = "Accepted for compatibility; init no longer copies global memory."
+    )]
     pub no_global: bool,
     #[arg(long = "no-watch", hide = true)]
     pub no_watch: bool,
@@ -282,7 +285,7 @@ pub struct InitArgs {
     pub no_structure: bool,
     #[arg(
         long = "global-tags",
-        help = "Only inherit matching tags (comma-separated)."
+        help = "Accepted for compatibility; init no longer copies global memory."
     )]
     pub global_tags: Option<String>,
 }
