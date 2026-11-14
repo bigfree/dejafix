@@ -5,7 +5,7 @@ use serde_json::{Map, Value, json};
 
 use super::inherit::is_truthy;
 use super::record::is_upgraded;
-use super::types::{Entry, GlobalOutcome, Palette, Stack, Usage};
+use super::types::{AddOutcome, Entry, GlobalOutcome, Palette, Stack, Usage};
 use crate::core::json::{python_str, write_python_json_indented};
 
 const RULE: &str = "─";
@@ -176,7 +176,7 @@ fn list_text(
             );
         }
         out.push_str(
-            "\n  Add patterns:  djf global add \"your pattern here\"\n  Add gotchas:   djf global add-gotcha \"gotcha text\" --library <library>\n",
+            "\n  Add patterns:  djf global add \"your pattern here\"\n  Add gotchas:   djf global add-gotcha \"gotcha text\" --library <library> --keyword <phrase> --keyword <phrase>\n",
         );
         return out;
     }
@@ -324,7 +324,7 @@ fn usage_text(usage: Usage) -> &'static str {
     match usage {
         Usage::Add => "Usage: djf global add \"your pattern here\" [--tag python]\n",
         Usage::AddGotcha => {
-            "Usage: djf global add-gotcha --library sqlalchemy \"gotcha text\" [--tag python]\n"
+            "Usage: djf global add-gotcha \"<text>\" --library <name> --keyword <phrase> --keyword <phrase> [--versions <range>]\nWrite one lesson in English, 30 to 600 characters, without project details; give 2 to 8 keywords.\n"
         }
         Usage::Remove => "Usage: djf global remove <id>\n",
         Usage::Import => "Usage: djf global import <file.json>\n",
@@ -369,8 +369,24 @@ pub fn global_report(outcome: &GlobalOutcome, color: bool) -> String {
         GlobalOutcome::PatternAdded { id, text } => {
             format!("{tag} Pattern added: {id}\n  {text}\n")
         }
-        GlobalOutcome::GotchaAdded { id, library, text } => {
-            format!("{tag} Gotcha added: {id}\n  [{library}] {text}\n")
+        GlobalOutcome::GotchaAdded {
+            id,
+            library,
+            text,
+            warnings,
+        } => {
+            let mut out = format!("{tag} Gotcha added: {id}\n  [{library}] {text}\n");
+            for warning in warnings {
+                let _ = writeln!(out, "  Warning: {warning}");
+            }
+            out
+        }
+        GlobalOutcome::GotchaRejected { failures, warnings } => {
+            let mut out = format!("Not added: {}.\n", failures.join("; "));
+            for warning in warnings {
+                let _ = writeln!(out, "  Warning: {warning}");
+            }
+            out
         }
         GlobalOutcome::Removed(id) => format!("{tag} Removed: {id}\n"),
         GlobalOutcome::NotFound(id) => format!("Entry not found: {id}\n"),
@@ -407,6 +423,27 @@ pub fn global_report(outcome: &GlobalOutcome, color: bool) -> String {
         }
         GlobalOutcome::Unknown(action) => {
             format!("Unknown action: {action}\nAvailable: {AVAILABLE}\n")
+        }
+    }
+}
+
+#[must_use]
+pub fn add_reply(outcome: &AddOutcome) -> String {
+    match outcome {
+        AddOutcome::Added {
+            id,
+            library,
+            warnings,
+        } => {
+            let mut reply = format!("Added global gotcha {id} ({library}).");
+            for warning in warnings {
+                let _ = write!(reply, "\nWarning: {warning}.");
+            }
+            reply
+        }
+        AddOutcome::Rejected(report) => {
+            let failures: Vec<String> = report.failures.iter().map(ToString::to_string).collect();
+            format!("Not added: {}.", failures.join("; "))
         }
     }
 }

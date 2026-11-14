@@ -182,12 +182,12 @@ fn list_marks_version_one_records_and_filters() -> TestResult {
     let none = run(&repo, &["list", "--tag", "zzz", "--library", "qqq"])?;
     assert_eq!(
         none,
-        "No entries found. (filter: tag=zzz, library=qqq)\n  Add patterns:  djf global add \"your pattern here\"\n  Add gotchas:   djf global add-gotcha \"gotcha text\" --library <library>\n"
+        "No entries found. (filter: tag=zzz, library=qqq)\n  Add patterns:  djf global add \"your pattern here\"\n  Add gotchas:   djf global add-gotcha \"gotcha text\" --library <library> --keyword <phrase> --keyword <phrase>\n"
     );
     let empty = run(&Repo::new()?, &["list"])?;
     assert_eq!(
         empty,
-        "No entries found.\n  Add patterns:  djf global add \"your pattern here\"\n  Add gotchas:   djf global add-gotcha \"gotcha text\" --library <library>\n"
+        "No entries found.\n  Add patterns:  djf global add \"your pattern here\"\n  Add gotchas:   djf global add-gotcha \"gotcha text\" --library <library> --keyword <phrase> --keyword <phrase>\n"
     );
     Ok(())
 }
@@ -264,34 +264,108 @@ fn add_writes_a_sorted_key_line_and_prints_its_id() -> TestResult {
     Ok(())
 }
 
+const LESSON: &str =
+    "SQLAlchemy async sessions stay open after a request unless the handler closes them.";
+
+fn refused(repo: &Repo, args: &[&str]) -> Result<String, Box<dyn std::error::Error>> {
+    let mut full = vec!["global"];
+    full.extend_from_slice(args);
+    let assert = repo.djf(&full).assert().code(1);
+    assert_eq!(assert.get_output().stdout, b"");
+    Ok(String::from_utf8(assert.get_output().stderr.clone())?)
+}
+
 #[test]
-fn add_with_a_library_routes_to_add_gotcha() -> TestResult {
+fn add_gotcha_writes_a_version_two_record_and_the_library() -> TestResult {
     let repo = Repo::new()?;
     let out = run(
         &repo,
         &[
             "add",
-            "close sessions",
+            LESSON,
             "--library",
             "SQLAlchemy",
-            "--tag",
-            "web",
+            "--keyword",
+            "async session",
+            "--keyword",
+            "request  cleanup",
+            "--versions",
+            ">=2.0",
         ],
     )?;
     assert_eq!(
         ids(&out),
-        "[global] Gotcha added: got_X\n  [SQLAlchemy] close sessions\n"
+        format!("[global] Gotcha added: got_X\n  [sqlalchemy] {LESSON}\n")
     );
     assert!(!global_dir(&repo).join("patterns.jsonl").exists());
     let line = read(&repo, "library_gotchas.jsonl")?;
-    let shape = Regex::new(
-        r#"^\{"discovered": "[^"]+", "gotcha": "close sessions", "id": "got_[0-9a-f]{12}", "library": "sqlalchemy", "source_project": "repo", "tags": \["web"\], "version_range": null\}\n$"#,
-    )?;
+    let shape = Regex::new(&format!(
+        r#"^\{{"v": 2, "id": "got_[0-9a-f]{{12}}", "library": "sqlalchemy", "keywords": \["async session", "request cleanup"\], "versions": ">=2.0", "gotcha": "{}", "source_project": "repo", "discovered": "\d{{4}}-\d\d-\d\d"\}}\n$"#,
+        regex::escape(LESSON)
+    ))?;
     assert!(shape.is_match(&line), "{line}");
-    let explicit = run(&repo, &["add-gotcha", "expire keys", "--library", "Redis"])?;
     assert_eq!(
-        ids(&explicit),
-        "[global] Gotcha added: got_X\n  [Redis] expire keys\n"
+        read(&repo, "libraries.json")?,
+        "{\n  \"sqlalchemy\": []\n}\n"
+    );
+    let again = refused(
+        &repo,
+        &[
+            "add-gotcha",
+            LESSON,
+            "--library",
+            "sqlalchemy",
+            "--keyword",
+            "a",
+            "--keyword",
+            "b",
+        ],
+    )?;
+    assert!(
+        ids(&again).starts_with(
+            "Not added: it repeats got_X; change that record with `djf global edit` instead.\n"
+        ),
+        "{again}"
+    );
+    Ok(())
+}
+
+#[test]
+fn a_refused_gotcha_lists_every_failure_and_writes_nothing() -> TestResult {
+    let repo = Repo::new()?;
+    let err = refused(
+        &repo,
+        &[
+            "add-gotcha",
+            "See ECHO-3233: the config in apps/heating/ breaks",
+            "--library",
+            "nx",
+            "--keyword",
+            "only one",
+        ],
+    )?;
+    assert_eq!(
+        err,
+        "Not added: give 2 to 8 keywords, not 1; it names a project path (apps/heating/); it names a ticket number (ECHO-3233).\n"
+    );
+    assert!(!global_dir(&repo).join("library_gotchas.jsonl").exists());
+    assert!(!global_dir(&repo).join("libraries.json").exists());
+    let warned = run(
+        &repo,
+        &[
+            "add-gotcha",
+            "Retry of the nx affected command failed because the daemon cached the graph.",
+            "--library",
+            "nx",
+            "--keyword",
+            "daemon",
+            "--keyword",
+            "project graph",
+        ],
+    )?;
+    assert!(
+        warned.ends_with("\n  Warning: it reads like a run status ('retry of')\n"),
+        "{warned}"
     );
     Ok(())
 }
@@ -307,12 +381,18 @@ fn usage_lines_when_arguments_are_missing() -> TestResult {
         run(&repo, &["add", ""])?,
         "Usage: djf global add \"your pattern here\" [--tag python]\n"
     );
-    let gotcha =
-        "Usage: djf global add-gotcha --library sqlalchemy \"gotcha text\" [--tag python]\n";
-    assert_eq!(run(&repo, &["add-gotcha"])?, gotcha);
-    assert_eq!(run(&repo, &["add-gotcha", "only text"])?, gotcha);
-    assert_eq!(run(&repo, &["add-gotcha", "--library", "x"])?, gotcha);
-    assert_eq!(run(&repo, &["add", "--library", "x"])?, gotcha);
+    let gotcha = "Usage: djf global add-gotcha \"<text>\" --library <name> --keyword <phrase> --keyword <phrase> [--versions <range>]\nWrite one lesson in English, 30 to 600 characters, without project details; give 2 to 8 keywords.\n";
+    assert_eq!(refused(&repo, &["add-gotcha"])?, gotcha);
+    assert_eq!(refused(&repo, &["add-gotcha", "only text"])?, gotcha);
+    assert_eq!(refused(&repo, &["add-gotcha", "--library", "x"])?, gotcha);
+    assert_eq!(refused(&repo, &["add", "--library", "x"])?, gotcha);
+    assert_eq!(
+        refused(
+            &repo,
+            &["add-gotcha", "text without keywords", "--library", "x"]
+        )?,
+        gotcha
+    );
     assert_eq!(run(&repo, &["remove"])?, "Usage: djf global remove <id>\n");
     assert_eq!(
         run(&repo, &["import"])?,
@@ -352,7 +432,19 @@ fn add_then_remove_round_trips() -> TestResult {
         format!("[global] Removed: {id}\n")
     );
     assert_eq!(read(&repo, "patterns.jsonl")?, "");
-    let added = run(&repo, &["add-gotcha", "--library", "redis", "ttl"])?;
+    let added = run(
+        &repo,
+        &[
+            "add-gotcha",
+            "--library",
+            "redis",
+            "Redis EXPIRE on a key that already has a TTL replaces the old TTL.",
+            "--keyword",
+            "ttl",
+            "--keyword",
+            "expire",
+        ],
+    )?;
     let id = Regex::new("got_[0-9a-f]{12}")?
         .find(&added)
         .map(|found| found.as_str().to_owned())

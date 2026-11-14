@@ -134,16 +134,25 @@ pub(crate) fn compare(
     actions: &[Action<'_>],
     clean: fn(Run) -> Cleaned,
 ) -> Result<(Run, Vec<String>), Box<dyn Error>> {
+    compare_with_home(fixture, None, actions, clean)
+}
+
+pub(crate) fn compare_with_home(
+    fixture: &Path,
+    home: Option<&Path>,
+    actions: &[Action<'_>],
+    clean: fn(Run) -> Cleaned,
+) -> Result<(Run, Vec<String>), Box<dyn Error>> {
     let python = clean(canonical(run_actions(
         Implementation::Python,
         fixture,
-        None,
+        home,
         actions,
     )?))?;
     let rust = clean(canonical(run_actions(
         Implementation::Rust,
         fixture,
-        None,
+        home,
         actions,
     )?))?;
     let differences = diff(&python, &rust);

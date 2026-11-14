@@ -314,6 +314,8 @@ fn sorted(value: &serde_json::Value) -> serde_json::Value {
     }
 }
 
+const RUST_ONLY_TOOLS: [&str; 2] = ["add_global_gotcha", "global_query"];
+
 fn mcp_transcript(name: &str, response: &serde_json::Value) -> Result<String, Box<dyn Error>> {
     let result = response
         .get("result")
@@ -326,12 +328,24 @@ fn mcp_transcript(name: &str, response: &serde_json::Value) -> Result<String, Bo
                 .and_then(serde_json::Value::as_str)
                 .unwrap_or_default()
         ),
-        "tools/list" => format!(
-            "### tools/list\n{}\n",
-            serde_json::to_string_pretty(&sorted(
-                result.get("tools").unwrap_or(&serde_json::Value::Null)
-            ))?
-        ),
+        "tools/list" => {
+            let tools: Vec<serde_json::Value> = result
+                .get("tools")
+                .and_then(serde_json::Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter(|tool| {
+                    tool.get("name")
+                        .and_then(serde_json::Value::as_str)
+                        .is_none_or(|name| !RUST_ONLY_TOOLS.contains(&name))
+                })
+                .map(sorted)
+                .collect();
+            format!(
+                "### tools/list\n{}\n",
+                serde_json::to_string_pretty(&tools)?
+            )
+        }
         _ => {
             let text = result
                 .pointer("/content/0/text")

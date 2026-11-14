@@ -793,3 +793,59 @@ fn precheck_files_accepts_at_most_two_hundred_paths() {
     let state = world.state(Some(&root), &world.base);
     assert!(!text(&state, ToolCall::PrecheckFiles(paths(200)), None).contains("at most 200"));
 }
+
+fn global_gotcha(library: &str, gotcha: &str, keywords: &[&str]) -> ToolCall {
+    ToolCall::AddGlobalGotcha(crate::core::global::GotchaInput {
+        library: library.to_owned(),
+        keywords: keywords
+            .iter()
+            .map(|keyword| (*keyword).to_owned())
+            .collect(),
+        gotcha: gotcha.to_owned(),
+        versions: None,
+    })
+}
+
+#[test]
+fn add_global_gotcha_checks_writes_and_names_the_source_project() {
+    let world = World::new();
+    let root = world.project("alpha");
+    world.register(&root);
+    let state = world.state(Some(&root), &world.base);
+    let added = text(
+        &state,
+        global_gotcha(
+            "BullMQ",
+            "bullmq Worker.close() never resolves when Redis is unreachable; pass a timeout.",
+            &["shutdown", "worker close"],
+        ),
+        None,
+    );
+    let id = added
+        .strip_prefix("Added global gotcha ")
+        .and_then(|rest| rest.strip_suffix(" (bullmq)."))
+        .unwrap();
+    let store =
+        fs::read_to_string(world.home.join(".dejafix/global/library_gotchas.jsonl")).unwrap();
+    assert!(store.contains(&format!("\"id\": \"{id}\"")));
+    assert!(store.contains("\"source_project\": \"alpha\""));
+    assert!(store.contains("\"discovered\": \"2027-01-15\""), "{store}");
+    let refused = text(&state, global_gotcha("bullmq", "short", &["one"]), None);
+    assert_eq!(
+        refused,
+        "Not added: give 2 to 8 keywords, not 1; the gotcha must be 30 to 600 characters long, not 5."
+    );
+    let warned = text(
+        &state,
+        global_gotcha(
+            "vite",
+            "vite dev server in alpha keeps a stale value after a hot reload of the config file.",
+            &["hot reload", "config"],
+        ),
+        None,
+    );
+    assert!(
+        warned.ends_with("\nWarning: it names the project 'alpha'."),
+        "{warned}"
+    );
+}

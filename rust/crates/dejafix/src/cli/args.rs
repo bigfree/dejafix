@@ -193,6 +193,18 @@ pub struct GlobalArgs {
     #[arg(long, help = "Confidence filter for prune.")]
     pub confidence: Option<String>,
     #[arg(
+        long = "keyword",
+        value_name = "PHRASE",
+        help = "Keyword phrase for add-gotcha (repeat 2 to 8 times)."
+    )]
+    pub keyword: Vec<String>,
+    #[arg(
+        long,
+        value_name = "RANGE",
+        help = "Version range a gotcha applies to."
+    )]
+    pub versions: Option<String>,
+    #[arg(
         short = 'f',
         long = "format",
         default_value = "text",

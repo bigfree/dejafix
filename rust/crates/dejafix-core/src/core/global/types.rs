@@ -63,7 +63,8 @@ pub enum GlobalAction {
     AddGotcha {
         library: Option<String>,
         text: Option<String>,
-        tag: Option<String>,
+        keywords: Vec<String>,
+        versions: Option<String>,
     },
     Remove(Option<String>),
     Export,
@@ -110,6 +111,11 @@ pub enum GlobalOutcome {
         id: String,
         library: String,
         text: String,
+        warnings: Vec<String>,
+    },
+    GotchaRejected {
+        failures: Vec<String>,
+        warnings: Vec<String>,
     },
     Removed(String),
     NotFound(String),
@@ -155,3 +161,68 @@ pub enum StoredGotcha {
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Libraries(pub BTreeMap<String, Vec<String>>);
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct GotchaInput {
+    pub library: String,
+    pub keywords: Vec<String>,
+    pub gotcha: String,
+    pub versions: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum CheckFailure {
+    #[error("the text is not English ({0})")]
+    NotEnglish(String),
+    #[error("the library must be a package name in lower case: letters, digits and @ / . _ -")]
+    Library,
+    #[error("give 2 to 8 keywords, not {0}")]
+    KeywordCount(usize),
+    #[error("a keyword is empty")]
+    EmptyKeyword,
+    #[error("the keyword '{0}' has more than 4 words")]
+    LongKeyword(String),
+    #[error("the gotcha must be 30 to 600 characters long, not {0}")]
+    Length(usize),
+    #[error("it names a project path ({0})")]
+    ProjectPath(String),
+    #[error("it names a ticket number ({0})")]
+    Ticket(String),
+    #[error("it names an internal host ({0})")]
+    InternalHost(String),
+    #[error("it repeats {0}; change that record with `djf global edit` instead")]
+    Duplicate(String),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum CheckWarning {
+    #[error("it does not look like English")]
+    Doubtful,
+    #[error("it names the project '{0}'")]
+    ProjectName(String),
+    #[error("it reads like a run status ('{0}')")]
+    RunStatus(String),
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct CheckReport {
+    pub failures: Vec<CheckFailure>,
+    pub warnings: Vec<CheckWarning>,
+    pub duplicate_of: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct GlobalDoc<'r> {
+    pub record: &'r StoredGotcha,
+    pub aliases: &'r [String],
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AddOutcome {
+    Added {
+        id: String,
+        library: String,
+        warnings: Vec<CheckWarning>,
+    },
+    Rejected(CheckReport),
+}

@@ -3,6 +3,7 @@ use std::path::Path;
 
 use serde_json::Value;
 
+use super::global::add_gotcha;
 use super::init::detect_and_record;
 use super::types::{Project, Settings, WiringError};
 use crate::adapters::fs::{
@@ -10,7 +11,9 @@ use crate::adapters::fs::{
 };
 use crate::adapters::git::GitHistory;
 use crate::core::brief::{BriefInput, render_brief};
-use crate::core::global::{Entry, GlobalAction, GlobalOutcome, Usage, filtered, relevant_entries};
+use crate::core::global::{
+    AddOutcome, Entry, GlobalAction, GlobalOutcome, GotchaInput, Usage, filtered, relevant_entries,
+};
 use crate::core::log::EventLog;
 use crate::core::stale::{STALE_COMMIT_THRESHOLD, find_stale};
 use crate::core::time::iso_micros;
@@ -127,14 +130,41 @@ pub fn global(
         GlobalAction::Add { text, tag } => {
             add_pattern(&store, &project, settings, non_empty(text), tag, ids)
         }
-        GlobalAction::AddGotcha { library, text, tag } => add_gotcha(
-            &store,
-            &project,
-            settings,
-            (non_empty(library), non_empty(text)),
-            tag,
-            ids,
-        ),
+        GlobalAction::AddGotcha {
+            library,
+            text,
+            keywords,
+            versions,
+        } => {
+            let (Some(library), Some(gotcha)) = (non_empty(library), non_empty(text)) else {
+                return Ok(GlobalOutcome::Usage(Usage::AddGotcha));
+            };
+            if keywords.is_empty() {
+                return Ok(GlobalOutcome::Usage(Usage::AddGotcha));
+            }
+            let input = GotchaInput {
+                library,
+                keywords,
+                gotcha: gotcha.clone(),
+                versions,
+            };
+            Ok(match add_gotcha(settings, input, Some(&project), ids)? {
+                AddOutcome::Added {
+                    id,
+                    library,
+                    warnings,
+                } => GlobalOutcome::GotchaAdded {
+                    id,
+                    library,
+                    text: gotcha,
+                    warnings: warnings.iter().map(ToString::to_string).collect(),
+                },
+                AddOutcome::Rejected(report) => GlobalOutcome::GotchaRejected {
+                    failures: report.failures.iter().map(ToString::to_string).collect(),
+                    warnings: report.warnings.iter().map(ToString::to_string).collect(),
+                },
+            })
+        }
         GlobalAction::Remove(id) => {
             let Some(id) = non_empty(id) else {
                 return Ok(GlobalOutcome::Usage(Usage::Remove));
@@ -191,30 +221,6 @@ fn add_pattern(
         ("created", Value::String(iso_micros(&settings.clock))),
     ]))?;
     Ok(GlobalOutcome::PatternAdded { id, text })
-}
-
-fn add_gotcha(
-    store: &GlobalStore,
-    project: &str,
-    settings: &Settings,
-    asked: (Option<String>, Option<String>),
-    tag: Option<String>,
-    ids: &mut impl Ids,
-) -> Result<GlobalOutcome, WiringError> {
-    let (Some(library), Some(text)) = asked else {
-        return Ok(GlobalOutcome::Usage(Usage::AddGotcha));
-    };
-    let id = ids.entry_id("got");
-    store.append_gotcha(&entry_of([
-        ("id", Value::String(id.clone())),
-        ("library", Value::String(library.to_lowercase())),
-        ("gotcha", Value::String(text.clone())),
-        ("tags", tags_of(tag)),
-        ("source_project", Value::String(project.to_owned())),
-        ("version_range", Value::Null),
-        ("discovered", Value::String(iso_micros(&settings.clock))),
-    ]))?;
-    Ok(GlobalOutcome::GotchaAdded { id, library, text })
 }
 
 fn detect(

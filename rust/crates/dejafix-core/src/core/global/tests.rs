@@ -390,7 +390,7 @@ mod report {
         let out = global_report(&list(Some("zzz"), None, false), false);
         assert_eq!(
             out,
-            "No entries found. (filter: tag=zzz, library=None)\n  Add patterns:  djf global add \"your pattern here\"\n  Add gotchas:   djf global add-gotcha \"gotcha text\" --library <library>\n"
+            "No entries found. (filter: tag=zzz, library=None)\n  Add patterns:  djf global add \"your pattern here\"\n  Add gotchas:   djf global add-gotcha \"gotcha text\" --library <library> --keyword <phrase> --keyword <phrase>\n"
         );
         let bare = global_report(&list(Some("zzz"), Some("nothing"), false), false);
         assert!(bare.starts_with("No entries found. (filter: tag=zzz, library=nothing)\n"));
@@ -412,8 +412,18 @@ mod report {
                     id: "got_1".into(),
                     library: "SQL".into(),
                     text: "t".into(),
+                    warnings: vec!["it names the project 'alpha'".into()],
                 },
-                format!("{green} Gotcha added: got_1\n  [SQL] t\n"),
+                format!(
+                    "{green} Gotcha added: got_1\n  [SQL] t\n  Warning: it names the project 'alpha'\n"
+                ),
+            ),
+            (
+                GlobalOutcome::GotchaRejected {
+                    failures: vec!["a".into(), "b".into()],
+                    warnings: vec!["c".into()],
+                },
+                "Not added: a; b.\n  Warning: c\n".to_owned(),
             ),
             (
                 GlobalOutcome::Removed("x".into()),
@@ -474,7 +484,7 @@ mod report {
         );
         assert_eq!(
             usage(Usage::AddGotcha),
-            "Usage: djf global add-gotcha --library sqlalchemy \"gotcha text\" [--tag python]\n"
+            "Usage: djf global add-gotcha \"<text>\" --library <name> --keyword <phrase> --keyword <phrase> [--versions <range>]\nWrite one lesson in English, 30 to 600 characters, without project details; give 2 to 8 keywords.\n"
         );
         assert_eq!(usage(Usage::Remove), "Usage: djf global remove <id>\n");
         assert_eq!(
@@ -708,5 +718,312 @@ mod version_two {
         assert!(Libraries::from_value(&json!(["next"])).is_none());
         assert!(Libraries::from_value(&json!({"next": "nextjs"})).is_none());
         assert!(Libraries::from_value(&json!({"next": [1]})).is_none());
+    }
+}
+
+mod checks {
+    use serde_json::json;
+
+    use super::super::{
+        CheckFailure, CheckWarning, GotchaInput, Libraries, StoredGotcha, check_gotcha,
+        normalize_input,
+    };
+
+    const GOOD: &str =
+        "bullmq 6.2 Worker.close() never resolves when Redis is unreachable; pass a timeout.";
+
+    fn input(library: &str, gotcha: &str, keywords: &[&str]) -> GotchaInput {
+        GotchaInput {
+            library: library.to_owned(),
+            keywords: keywords
+                .iter()
+                .map(|keyword| (*keyword).to_owned())
+                .collect(),
+            gotcha: gotcha.to_owned(),
+            versions: None,
+        }
+    }
+
+    fn report(gotcha: &str) -> (Vec<CheckFailure>, Vec<CheckWarning>) {
+        let report = check_gotcha(
+            &input("bullmq", gotcha, &["shutdown", "worker close"]),
+            &Libraries::default(),
+            &["home-log", "cra-portal"],
+            &[],
+            None,
+        );
+        (report.failures, report.warnings)
+    }
+
+    fn failures(gotcha: &str) -> Vec<CheckFailure> {
+        report(gotcha).0
+    }
+
+    fn padded(text: &str) -> String {
+        format!("{text} and this sentence makes the lesson long enough to pass.")
+    }
+
+    #[test]
+    fn a_clean_record_passes() {
+        assert_eq!(report(GOOD), (Vec::new(), Vec::new()));
+    }
+
+    #[test]
+    fn library_keyword_and_length_rules() {
+        let check = |library: &str, gotcha: &str, keywords: &[&str]| {
+            check_gotcha(
+                &input(library, gotcha, keywords),
+                &Libraries::default(),
+                &[],
+                &[],
+                None,
+            )
+            .failures
+        };
+        assert_eq!(check("", GOOD, &["a", "b"]), [CheckFailure::Library]);
+        assert_eq!(check("Bull MQ", GOOD, &["a", "b"]), [CheckFailure::Library]);
+        assert_eq!(
+            check("@nx/js", GOOD, &["a", "b"]),
+            Vec::<CheckFailure>::new()
+        );
+        assert_eq!(
+            check("next.js_x-1", GOOD, &["a", "b"]),
+            Vec::<CheckFailure>::new()
+        );
+        assert_eq!(check("zod", GOOD, &["a"]), [CheckFailure::KeywordCount(1)]);
+        assert_eq!(
+            check("zod", GOOD, &["a", "b", "c", "d", "e", "f", "g", "h", "i"]),
+            [CheckFailure::KeywordCount(9)]
+        );
+        assert_eq!(check("zod", GOOD, &["a", ""]), [CheckFailure::EmptyKeyword]);
+        assert_eq!(
+            check("zod", GOOD, &["a", "one two three four five"]),
+            [CheckFailure::LongKeyword("one two three four five".into())]
+        );
+        assert_eq!(
+            check("zod", GOOD, &["a", "one two three four"]),
+            Vec::<CheckFailure>::new()
+        );
+        assert_eq!(
+            check("zod", "too short to be a lesson", &["a", "b"]),
+            [CheckFailure::Length(24)]
+        );
+        assert_eq!(
+            check("zod", &"a lesson ".repeat(70), &["a", "b"]),
+            [CheckFailure::Length(630)]
+        );
+    }
+
+    #[test]
+    fn other_languages_are_refused_and_terse_text_warned() {
+        assert_eq!(
+            failures("bullmq Worker.close() sa nikdy neukončí, keď Redis nie je dostupný."),
+            [CheckFailure::NotEnglish(
+                "too many letters outside ASCII".into()
+            )]
+        );
+        let (_, warnings) =
+            report("worker close redis unreachable timeout hang forever restart pod again");
+        assert_eq!(warnings, [CheckWarning::Doubtful]);
+        let keywords = check_gotcha(
+            &input("bullmq", GOOD, &["zatvorenie", "Работник"]),
+            &Libraries::default(),
+            &[],
+            &[],
+            None,
+        );
+        assert_eq!(keywords.failures.len(), 1);
+    }
+
+    #[test]
+    fn project_paths_are_refused_but_library_paths_pass() {
+        assert_eq!(
+            failures(&padded("A note citing `apps/heating/` and its config")),
+            [CheckFailure::ProjectPath("apps/heating/".into())]
+        );
+        for path in [
+            "/Users/someone/repo/file.ts",
+            "/home/ci/build",
+            "~/.config/tool",
+            "C:\\work\\repo",
+            "libs/shared/util.ts",
+            "packages/api/src",
+            "tools/scripts/run.sh",
+        ] {
+            assert!(
+                matches!(
+                    failures(&padded(&format!("It reads {path} first"))).as_slice(),
+                    [CheckFailure::ProjectPath(_)]
+                ),
+                "{path}"
+            );
+        }
+        for path in [
+            "node_modules/excalibur/build/dist/*.d.ts",
+            "drizzle/meta/*.json",
+            "src/apps/x",
+            "@nx/js",
+        ] {
+            assert_eq!(
+                failures(&padded(&format!("It reads {path} first"))),
+                [],
+                "{path}"
+            );
+        }
+    }
+
+    #[test]
+    fn ticket_numbers_are_refused_with_the_standard_exceptions() {
+        assert_eq!(
+            failures(&padded("Fixed in ECHO-3233 after the upgrade")),
+            [CheckFailure::Ticket("ECHO-3233".into())]
+        );
+        assert_eq!(
+            failures(&padded("See issue #1234 upstream for details")),
+            [CheckFailure::Ticket("#1234".into())]
+        );
+        for fine in [
+            "UTF-8 input",
+            "ISO-8601 dates",
+            "SHA-256 hashes",
+            "RFC-9110 says",
+            "CVE-2024-1234",
+            "TLS-13 only",
+            "IEEE-754 floats",
+            "ECMA-262 spec",
+            "#12 is short",
+            "AB-12 too short",
+            "ECHO-1 too short",
+            "ECHOs-123 mixed",
+            "xECHO-123 glued",
+        ] {
+            assert_eq!(failures(&padded(fine)), [], "{fine}");
+        }
+    }
+
+    #[test]
+    fn internal_hosts_and_private_addresses_are_refused() {
+        for host in [
+            "api.int",
+            "db.local",
+            "svc.internal",
+            "nas.lan",
+            "git.corp",
+            "router.home",
+            "10.1.2.3",
+            "172.16.0.9",
+            "172.31.255.255",
+            "192.168.1.10",
+        ] {
+            assert_eq!(
+                failures(&padded(&format!("It calls {host}:8080 at start"))),
+                [CheckFailure::InternalHost(host.into())],
+                "{host}"
+            );
+        }
+        for fine in [
+            "example.com",
+            "localhost",
+            "app.localhost",
+            "172.32.0.1",
+            "8.8.8.8",
+            "1.2.3",
+            "256.1.1.1",
+            "v1.2.3.4.5",
+        ] {
+            assert_eq!(
+                failures(&padded(&format!("It calls {fine} at start"))),
+                [],
+                "{fine}"
+            );
+        }
+    }
+
+    #[test]
+    fn project_names_and_run_statuses_only_warn() {
+        let (failures, warnings) = report(&padded("Retry of test docker-image-base failed"));
+        assert_eq!(failures, []);
+        assert_eq!(warnings, [CheckWarning::RunStatus("retry of".into())]);
+        let (_, warnings) = report(&padded("Seen in home-log while deploying"));
+        assert_eq!(warnings, [CheckWarning::ProjectName("home-log".into())]);
+        for status in [
+            "not pushed yet",
+            "awaiting review",
+            "was reverted",
+            "Task 7 is done",
+            "in round 2",
+        ] {
+            assert_eq!(report(&padded(status)).1.len(), 1, "{status}");
+        }
+        assert_eq!(report(&padded("the task scheduler restarts")).1, []);
+    }
+
+    #[test]
+    fn a_reworded_duplicate_of_the_same_library_is_refused() {
+        let existing = [
+            StoredGotcha::from_entry(
+                json!({"v": 2, "id": "got_aaaaaaaaaaaa", "library": "bullmq", "keywords": ["shutdown", "worker close"], "versions": null, "gotcha": GOOD})
+                    .as_object()
+                    .cloned()
+                    .unwrap(),
+            ),
+            StoredGotcha::from_entry(
+                json!({"id": "got_bbbbbbbbbbbb", "library": "redis", "gotcha": GOOD})
+                    .as_object()
+                    .cloned()
+                    .unwrap(),
+            ),
+        ];
+        let reordered = input(
+            "bullmq",
+            "When Redis is unreachable, bullmq 6.2 Worker.close() never resolves: pass a timeout.",
+            &["worker close", "shutdown"],
+        );
+        let report = check_gotcha(&reordered, &Libraries::default(), &[], &existing, None);
+        assert_eq!(report.duplicate_of.as_deref(), Some("got_aaaaaaaaaaaa"));
+        assert_eq!(
+            report.failures,
+            [CheckFailure::Duplicate("got_aaaaaaaaaaaa".into())]
+        );
+        let replacing = check_gotcha(
+            &reordered,
+            &Libraries::default(),
+            &[],
+            &existing,
+            Some("got_aaaaaaaaaaaa"),
+        );
+        assert_eq!(replacing.failures, []);
+        let other = input(
+            "bullmq",
+            "bullmq repeatable jobs keep their old cron pattern after a deploy; remove them first.",
+            &["repeatable jobs", "cron"],
+        );
+        assert_eq!(
+            check_gotcha(&other, &Libraries::default(), &[], &existing, None).failures,
+            []
+        );
+    }
+
+    #[test]
+    fn input_is_normalised_before_checking() {
+        let libraries = Libraries::from_value(&json!({"next": ["nextjs"]})).unwrap();
+        let normalised = normalize_input(
+            GotchaInput {
+                library: " NextJS ".into(),
+                keywords: vec!["  app   router ".into()],
+                gotcha: "  text  ".into(),
+                versions: Some("  ".into()),
+            },
+            &libraries,
+        );
+        assert_eq!(
+            normalised,
+            GotchaInput {
+                library: "next".into(),
+                keywords: vec!["app router".into()],
+                gotcha: "text".into(),
+                versions: None,
+            }
+        );
     }
 }

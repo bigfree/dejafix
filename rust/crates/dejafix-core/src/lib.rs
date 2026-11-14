@@ -27,10 +27,11 @@ pub use crate::core::event::{
     Outcome, Summary,
 };
 pub use crate::core::global::{
-    Entry, GlobalAction, GlobalOutcome, GotchaV2, Libraries, PROMOTABLE_SEED, Relevant, Stack,
-    StoredGotcha, Usage, filtered, global_report, gotcha_entry, inherited_block, is_gotcha_signal,
-    is_prunable, is_upgraded, line, parse_store, promotable_libraries, promotable_set, promotion,
-    relevant_entries, similar,
+    AddOutcome, CheckFailure, CheckReport, CheckWarning, Entry, GLOBAL_FIELDS, GlobalAction,
+    GlobalDoc, GlobalOutcome, GotchaInput, GotchaV2, Libraries, PROMOTABLE_SEED, Relevant, Stack,
+    StoredGotcha, Usage, add_reply, check_gotcha, filtered, global_report, gotcha_entry,
+    inherited_block, is_gotcha_signal, is_prunable, is_upgraded, line, normalize_input,
+    parse_store, promotable_libraries, promotable_set, promotion, relevant_entries, similar,
 };
 pub use crate::core::hooks::{
     HOOK_MARKER_END, HOOK_MARKER_START, HOOK_SHEBANG, HookChange, HookKind, Removal,
@@ -103,9 +104,9 @@ pub use crate::wiring::{
     FoundProject, HooksAction, HooksOutcome, HooksReport, Inherited, InitHooks, InitOptions,
     InitReport, ListedProject, MemoryFile, PrecheckOutcome, PrecheckRequest, Project, Recorded,
     RegistryOp, RegistryReply, ScanReport, SearchOutput, Settings, UpgradeNotice, WiringError,
-    add_plan_idea, auto_capture, brief, doctor, edit_hook, global, hooks_action, init_project,
-    other_projects, precheck, read_memory_file, record, regenerate, register_project, registry_op,
-    scan_projects, search_project, show, upgrade_notice,
+    add_gotcha, add_plan_idea, auto_capture, brief, doctor, edit_hook, global, hooks_action,
+    init_project, other_projects, precheck, read_memory_file, record, regenerate, register_project,
+    registry_op, scan_projects, search_project, show, upgrade_notice,
 };
 pub use crate::wiring::{CachedLog, McpSettings, McpState, ToolCall, ToolReply, WriteCall};
 pub use crate::wiring::{

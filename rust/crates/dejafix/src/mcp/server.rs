@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use dejafix_core::{McpState, OsIds, Outcome, ToolCall, ToolReply, WriteCall};
+use dejafix_core::{GotchaInput, McpState, OsIds, Outcome, ToolCall, ToolReply, WriteCall};
 use rmcp::ErrorData;
 use rmcp::handler::server::ServerHandler;
 use rmcp::model::{
@@ -14,7 +14,7 @@ use serde_json::{Value, json};
 use super::schema::instructions;
 use super::types::{
     ArgumentError, AttemptArgs, ContextArgs, DecisionArgs, DejafixServer, FileArgs, FilesArgs,
-    FixArgs, GotchaArgs, IssueArgs, ProjectArgs, SearchArgs, WriteArgs,
+    FixArgs, GlobalGotchaArgs, GotchaArgs, IssueArgs, ProjectArgs, SearchArgs, WriteArgs,
 };
 
 const SERVER_NAME: &str = "dejafix";
@@ -82,6 +82,20 @@ fn tool_call(name: &str, arguments: &Value) -> Result<ToolCall, ArgumentError> {
             }
         }
         "get_global_gotchas" => ToolCall::GetGlobalGotchas(parse::<GotchaArgs>(arguments)?.library),
+        "add_global_gotcha" => {
+            let GlobalGotchaArgs {
+                library,
+                keywords,
+                gotcha,
+                versions,
+            } = parse(arguments)?;
+            ToolCall::AddGlobalGotcha(GotchaInput {
+                library,
+                keywords,
+                gotcha,
+                versions,
+            })
+        }
         "log_issue" => {
             let (summary, location) = write(arguments)?;
             ToolCall::Write(WriteCall::LogIssue { summary, location })

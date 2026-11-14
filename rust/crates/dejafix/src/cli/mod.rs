@@ -138,7 +138,7 @@ fn dispatch(
         }
         Commands::Precheck(args) => return hooks::run_precheck(args, config, settings, out, err),
         Commands::Brief => return memory::run_brief(config, settings, out),
-        Commands::Global(args) => return memory::run_global(args, config, settings, out),
+        Commands::Global(args) => return memory::run_global(args, config, settings, out, err),
         Commands::Project { action } => return project::run(action, config, settings, out),
         Commands::Doctor {
             fix,

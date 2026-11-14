@@ -55,6 +55,15 @@ pub(super) struct GotchaArgs {
 }
 
 #[derive(Debug, Deserialize)]
+pub(super) struct GlobalGotchaArgs {
+    pub(super) library: String,
+    pub(super) keywords: Vec<String>,
+    pub(super) gotcha: String,
+    #[serde(default)]
+    pub(super) versions: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
 pub(super) struct WriteArgs {
     pub(super) summary: String,
     #[serde(default)]

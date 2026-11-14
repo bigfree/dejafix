@@ -12,6 +12,7 @@ use crate::adapters::fs::{
 use crate::adapters::git::{GitHistory, status_files};
 use crate::core::context::{ContextInput, generate_context};
 use crate::core::event::IssueId;
+use crate::core::global::{GotchaInput, add_reply};
 use crate::core::registry::Registry;
 use crate::core::reply::{current_reply, gotchas_reply, precheck_report, projects_reply};
 use crate::core::resolve::{Probe, Resolution, resolve};
@@ -21,6 +22,7 @@ use crate::core::session::session_start;
 use crate::core::text::{is_python_word, python_strip};
 use crate::core::time::Clock;
 use crate::core::write::Ids;
+use crate::wiring::global::add_gotcha;
 use crate::wiring::hooks::analyze_files;
 use crate::wiring::registry::load_registry;
 use crate::wiring::types::Settings;
@@ -117,6 +119,7 @@ impl McpState {
         match call {
             ToolCall::ListProjects => return self.list_projects(clock),
             ToolCall::GetGlobalGotchas(library) => return self.gotchas(library.as_deref()),
+            ToolCall::AddGlobalGotcha(input) => return self.add_global(input, project, clock, ids),
             ToolCall::Write(write) => return self.write(write, project, clock, ids),
             ToolCall::PrecheckFiles(paths) if paths.len() > MAX_PRECHECK_PATHS => {
                 return Ok(format!(
@@ -164,9 +167,10 @@ impl McpState {
                 ))
             }
             ToolCall::CurrentProject => Ok(current_reply(&target)),
-            ToolCall::ListProjects | ToolCall::GetGlobalGotchas(_) | ToolCall::Write(_) => {
-                Ok(String::new())
-            }
+            ToolCall::ListProjects
+            | ToolCall::GetGlobalGotchas(_)
+            | ToolCall::AddGlobalGotcha(_)
+            | ToolCall::Write(_) => Ok(String::new()),
         }
     }
 
@@ -206,6 +210,21 @@ impl McpState {
             ))
         })?;
         Ok(gotchas_reply(&gotchas, library))
+    }
+
+    fn add_global(
+        &self,
+        input: GotchaInput,
+        project: Option<&str>,
+        clock: &Clock,
+        ids: &mut impl Ids,
+    ) -> Result<String, ToolError> {
+        let source = self
+            .resolution(project, clock)
+            .ok()
+            .map(|target| target.name);
+        let outcome = add_gotcha(&self.project_settings(clock), input, source.as_deref(), ids)?;
+        Ok(add_reply(&outcome))
     }
 
     fn list_projects(&self, clock: &Clock) -> Result<String, ToolError> {

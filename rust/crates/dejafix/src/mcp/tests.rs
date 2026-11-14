@@ -13,7 +13,7 @@ use super::instructions;
 use super::lax::{lax_boolean, lax_integer};
 use super::schema::tools;
 
-const NAMES: [&str; 19] = [
+const NAMES: [&str; 20] = [
     "start_session",
     "get_instructions",
     "get_summary",
@@ -31,9 +31,12 @@ const NAMES: [&str; 19] = [
     "record_fix",
     "add_decision",
     "add_note",
+    "add_global_gotcha",
     "list_projects",
     "current_project",
 ];
+
+const NEW_TOOLS: [&str; 2] = ["add_global_gotcha", "global_query"];
 
 fn table() -> Vec<Tool> {
     tools().unwrap().to_vec()
@@ -114,7 +117,7 @@ fn names_shown(args: &[String]) -> Vec<String> {
 }
 
 #[test]
-fn the_table_lists_the_nineteen_tools_in_python_s_order() {
+fn the_table_lists_python_s_tools_in_order_and_the_new_ones() {
     let names: Vec<String> = table().iter().map(|tool| tool.name.to_string()).collect();
     assert_eq!(names, NAMES);
 }
@@ -233,7 +236,7 @@ async fn a_client_sees_the_instructions_tools_and_replies() {
         Some(instructions(false).as_str())
     );
     let listed = client.list_all_tools().await.unwrap();
-    assert_eq!(listed.len(), 19);
+    assert_eq!(listed.len(), NAMES.len());
     let noted = client
         .call_tool(
             CallToolRequestParams::new("add_note")
@@ -397,4 +400,20 @@ async fn initialize_reports_the_crate_version_and_only_tools() {
         Some(vec!["tools".to_owned()])
     );
     client.cancel().await.unwrap();
+}
+
+#[test]
+fn the_new_global_tools_stay_within_their_size_budget() {
+    let table: Vec<serde_json::Value> = serde_json::from_str(include_str!("tools.json")).unwrap();
+    let size: usize = table
+        .iter()
+        .filter(|tool| {
+            tool.get("name")
+                .and_then(serde_json::Value::as_str)
+                .is_some_and(|name| NEW_TOOLS.contains(&name))
+        })
+        .map(|tool| serde_json::to_string(tool).unwrap().chars().count())
+        .sum();
+    assert!(size > 0);
+    assert!(size <= 1_600, "{size} characters");
 }

@@ -4,7 +4,7 @@ use std::path::Path;
 
 use serde_json::{Value, json};
 
-use crate::m3::{assert_same, clock, compare, djf, precheck_fixture};
+use crate::m3::{assert_same, clock, compare, compare_with_home, djf, precheck_fixture};
 use crate::types::{Action, McpSession};
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -255,14 +255,6 @@ fn global_matches_python() -> TestResult {
             "--tag",
             "javascript",
         ]),
-        djf(&[
-            "global",
-            "add",
-            "effects run twice in strict mode",
-            "--library",
-            "React",
-        ]),
-        djf(&["global", "add-gotcha", "no library given"]),
         djf(&["global", "status"]),
         djf(&["global", "list", "--tag", "javascript"]),
         djf(&["global", "list", "--library", "react", "-f", "json"]),
@@ -280,7 +272,13 @@ fn global_matches_python() -> TestResult {
         djf(&["global", "import", "missing.json"]),
         djf(&["global", "frobnicate"]),
     ];
-    let (_, differences) = compare(fixture.path(), &actions, clock)?;
+    let home = tempfile::tempdir()?;
+    fs::create_dir_all(home.path().join(".dejafix/global"))?;
+    fs::write(
+        home.path().join(".dejafix/global/library_gotchas.jsonl"),
+        "{\"discovered\": \"2026-01-01T00:00:00Z\", \"gotcha\": \"effects run twice in strict mode\", \"id\": \"got_0123456789ab\", \"library\": \"react\", \"source_project\": \"web\", \"tags\": [], \"version_range\": null}\n",
+    )?;
+    let (_, differences) = compare_with_home(fixture.path(), Some(home.path()), &actions, clock)?;
     assert_same("global", &differences);
     Ok(())
 }

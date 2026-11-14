@@ -846,6 +846,50 @@
     }
   },
   {
+    "name": "add_global_gotcha",
+    "description": "Store a lesson that holds beyond this project in global memory. Write it in English, without project paths, ticket numbers, hosts or project names; a refusal lists every problem. Call global_query first so you do not add a duplicate.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "library": {
+          "type": "string",
+          "description": "Package name as published, e.g. 'bullmq' or '@nx/js'."
+        },
+        "keywords": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "2 to 8 English phrases of at most 4 words that a later search would use."
+        },
+        "gotcha": {
+          "type": "string",
+          "description": "The lesson, 30 to 600 characters."
+        },
+        "versions": {
+          "type": "string",
+          "description": "Optional version range it applies to, e.g. '>=6.2 <6.3'."
+        }
+      },
+      "required": [
+        "library",
+        "keywords",
+        "gotcha"
+      ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "result": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "result"
+      ]
+    }
+  },
+  {
     "description": "List the projects this server can reach, and which one is active.\n\nCall this when a tool answers \"No project selected\", or when you need the\nexact name to pass as `project`. Read-only; touches no project memory.",
     "inputSchema": {
       "properties": {},

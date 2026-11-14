@@ -7,6 +7,7 @@ use jiff::tz::TimeZone;
 
 use crate::adapters::git::{GitDirs, RepoState};
 use crate::core::event::Outcome;
+use crate::core::global::GotchaInput;
 use crate::core::log::EventLog;
 use crate::core::path::PathContext;
 
@@ -90,6 +91,7 @@ pub enum ToolCall {
         focus: Option<String>,
     },
     GetGlobalGotchas(Option<String>),
+    AddGlobalGotcha(GotchaInput),
     Write(WriteCall),
     ListProjects,
     CurrentProject,
