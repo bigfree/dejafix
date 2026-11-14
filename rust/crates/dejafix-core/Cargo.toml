@@ -38,6 +38,11 @@ name = "summary"
 harness = false
 required-features = ["testing"]
 
+[[bench]]
+name = "rank"
+harness = false
+required-features = ["testing"]
+
 [[example]]
 name = "gen-fixtures"
 required-features = ["testing"]

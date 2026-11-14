@@ -1,6 +1,87 @@
 use std::borrow::Cow;
 
-use super::{Analyzer, STOP_WORDS, stem};
+use proptest::prelude::*;
+
+use super::{Analyzer, Document, FieldSpec, Index, RankParams, STOP_WORDS, Scored, stem};
+
+struct Doc {
+    id: &'static str,
+    fields: Vec<Vec<&'static str>>,
+}
+
+impl Document for Doc {
+    fn id(&self) -> &str {
+        self.id
+    }
+
+    fn texts<'d>(&'d self, field: usize, visit: &mut dyn FnMut(&'d str)) {
+        for text in self.fields.get(field).into_iter().flatten() {
+            visit(text);
+        }
+    }
+}
+
+const TITLE_FIRST: &[FieldSpec] = &[
+    FieldSpec {
+        name: "title",
+        weight: 2.0,
+    },
+    FieldSpec {
+        name: "body",
+        weight: 1.0,
+    },
+];
+
+const BODY_FIRST: &[FieldSpec] = &[
+    FieldSpec {
+        name: "title",
+        weight: 1.0,
+    },
+    FieldSpec {
+        name: "body",
+        weight: 3.0,
+    },
+];
+
+const BODY_HEAVY: &[FieldSpec] = &[
+    FieldSpec {
+        name: "title",
+        weight: 1.0,
+    },
+    FieldSpec {
+        name: "body",
+        weight: 4.0,
+    },
+];
+
+const ALL: RankParams = RankParams {
+    min_coverage: 0.0,
+    min_ratio: 0.0,
+    ..RankParams::DEFAULT
+};
+
+fn doc(id: &'static str, title: &'static str, body: &'static str) -> Doc {
+    Doc {
+        id,
+        fields: vec![vec![title], vec![body]],
+    }
+}
+
+fn corpus() -> Vec<Doc> {
+    vec![
+        doc("c", "worker sigterm", "worker close timeout"),
+        doc("a", "redis timeout", "worker"),
+        doc("b", "queue", "redis redis worker"),
+    ]
+}
+
+fn ranked(index: &Index, query: &str, params: &RankParams) -> Vec<(u32, String)> {
+    index
+        .rank(query, params)
+        .iter()
+        .map(|scored| (scored.doc, format!("{:.4}", scored.score)))
+        .collect()
+}
 
 const VOCABULARY: &str = include_str!("../../../tests/data/snowball-english/voc.txt");
 const STEMS: &str = include_str!("../../../tests/data/snowball-english/output.txt");
@@ -144,4 +225,151 @@ fn lower_case_tokens_borrow_from_the_text() {
 #[test]
 fn stop_words_are_sorted_for_binary_search() {
     assert!(STOP_WORDS.windows(2).all(|pair| pair[0] < pair[1]));
+}
+
+#[test]
+fn bm25f_scores_match_the_hand_computed_values() {
+    let index = Index::build(TITLE_FIRST, &corpus());
+    assert_eq!(
+        ranked(&index, "worker timeout", &ALL),
+        [
+            (1, "0.7861".to_owned()),
+            (0, "0.6209".to_owned()),
+            (2, "0.1196".to_owned())
+        ]
+    );
+    assert_eq!(
+        ranked(&index, "redis", &ALL),
+        [(1, "0.6118".to_owned()), (2, "0.5982".to_owned())]
+    );
+}
+
+#[test]
+fn field_weights_change_the_order() {
+    let body_first = Index::build(BODY_FIRST, &corpus());
+    assert_eq!(
+        ranked(&body_first, "worker timeout", &ALL),
+        [
+            (0, "0.9121".to_owned()),
+            (1, "0.6736".to_owned()),
+            (2, "0.1977".to_owned())
+        ]
+    );
+    let body_heavy = Index::build(BODY_HEAVY, &corpus());
+    assert_eq!(
+        ranked(&body_heavy, "redis", &ALL),
+        [(2, "0.8747".to_owned()), (1, "0.4345".to_owned())]
+    );
+}
+
+#[test]
+fn coverage_and_ratio_cut_irrelevant_documents() {
+    let index = Index::build(TITLE_FIRST, &corpus());
+    let docs = |query: &str, params: &RankParams| -> Vec<u32> {
+        index
+            .rank(query, params)
+            .iter()
+            .map(|scored| scored.doc)
+            .collect()
+    };
+    assert_eq!(docs("worker timeout", &RankParams::DEFAULT), [1, 0]);
+    let coverage_only = RankParams {
+        min_ratio: 0.0,
+        ..RankParams::DEFAULT
+    };
+    assert_eq!(docs("worker timeout", &coverage_only), [1, 0, 2]);
+    assert_eq!(docs("sigterm queue close", &coverage_only), [0]);
+    let strict = RankParams {
+        min_coverage: 1.0,
+        ..ALL
+    };
+    assert_eq!(docs("worker timeout", &strict), [1, 0]);
+    let limited = RankParams { limit: 1, ..ALL };
+    assert_eq!(docs("worker timeout", &limited), [1]);
+}
+
+#[test]
+fn unknown_query_terms_count_against_coverage() {
+    let index = Index::build(TITLE_FIRST, &corpus());
+    let found = index.rank("queue nonexistent", &RankParams::DEFAULT);
+    assert_eq!(found.len(), 1);
+    assert!(
+        found
+            .iter()
+            .all(|scored| (scored.coverage - 0.5).abs() < f64::EPSILON)
+    );
+    assert_eq!(
+        index.rank("nonexistent words", &RankParams::DEFAULT),
+        Vec::<Scored>::new()
+    );
+}
+
+#[test]
+fn ties_are_ordered_by_id() {
+    let docs = vec![
+        doc("got_b", "redis", "timeout"),
+        doc("got_c", "redis", "timeout"),
+        doc("got_a", "redis", "timeout"),
+    ];
+    let index = Index::build(TITLE_FIRST, &docs);
+    let order: Vec<u32> = index
+        .rank("redis", &RankParams::DEFAULT)
+        .iter()
+        .map(|scored| scored.doc)
+        .collect();
+    assert_eq!(order, [2, 0, 1]);
+}
+
+#[test]
+fn an_empty_query_or_corpus_returns_nothing() {
+    let index = Index::build(TITLE_FIRST, &corpus());
+    assert_eq!(index.rank("", &ALL), Vec::<Scored>::new());
+    assert_eq!(index.rank("the and of", &ALL), Vec::<Scored>::new());
+    let empty = Index::build(TITLE_FIRST, &Vec::<Doc>::new());
+    assert!(empty.is_empty());
+    assert_eq!(empty.rank("worker", &ALL), Vec::<Scored>::new());
+}
+
+#[test]
+fn covered_terms_count_every_field() {
+    let index = Index::build(TITLE_FIRST, &corpus());
+    let query = index.query_terms("worker sigterm queue redis missing");
+    assert_eq!(query.distinct, 5);
+    assert_eq!(query.ids.len(), 4);
+    assert_eq!(index.terms_covered(0, &query.ids), 2);
+    assert_eq!(index.terms_covered(1, &query.ids), 2);
+    assert_eq!(index.terms_covered(2, &query.ids), 3);
+}
+
+const NOUNS: [&str; 8] = [
+    "apple", "berry", "cherry", "grape", "lemon", "mango", "peach", "plum",
+];
+const OTHERS: [&str; 4] = ["xenon", "zebra", "quartz", "violin"];
+
+fn field_words() -> impl Strategy<Value = Vec<&'static str>> {
+    proptest::collection::vec(proptest::sample::select(&NOUNS[..]), 3)
+}
+
+proptest! {
+    #[test]
+    fn an_unrelated_document_never_changes_a_one_term_result(
+        fields in proptest::collection::vec((field_words(), field_words()), 2..12),
+        unrelated in proptest::collection::vec(proptest::sample::select(&OTHERS[..]), 6),
+        term in proptest::sample::select(&NOUNS[..]),
+    ) {
+        const IDS: [&str; 12] = ["d00", "d01", "d02", "d03", "d04", "d05", "d06", "d07", "d08", "d09", "d10", "d11"];
+        let mut docs: Vec<Doc> = fields
+            .into_iter()
+            .zip(IDS)
+            .map(|((title, body), id)| Doc { id, fields: vec![title, body] })
+            .collect();
+        let before = Index::build(TITLE_FIRST, &docs).rank(term, &RankParams::DEFAULT);
+        docs.push(Doc {
+            id: "d99",
+            fields: vec![unrelated[..3].to_vec(), unrelated[3..].to_vec()],
+        });
+        let after = Index::build(TITLE_FIRST, &docs).rank(term, &RankParams::DEFAULT);
+        let order = |found: &[Scored]| found.iter().map(|scored| scored.doc).collect::<Vec<_>>();
+        prop_assert_eq!(order(&before), order(&after));
+    }
 }

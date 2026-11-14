@@ -24,7 +24,7 @@ fixtures dir="target/fixtures":
     cargo run -p dejafix-core --features testing --example gen-fixtures -- {{dir}}
 
 bench:
-    cargo bench -p dejafix-core --features testing --bench load --bench summary
+    cargo bench -p dejafix-core --features testing --bench load --bench summary --bench rank
     cargo bench -p dejafix --bench hooks --bench mcp
 
 smoke:
