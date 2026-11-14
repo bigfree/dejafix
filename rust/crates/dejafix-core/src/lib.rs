@@ -27,11 +27,12 @@ pub use crate::core::event::{
     Outcome, Summary,
 };
 pub use crate::core::global::{
-    AddOutcome, CheckFailure, CheckReport, CheckWarning, Entry, GLOBAL_FIELDS, GlobalAction,
-    GlobalDoc, GlobalOutcome, GotchaInput, GotchaV2, Libraries, PROMOTABLE_SEED, Relevant, Stack,
-    StoredGotcha, Usage, add_reply, check_gotcha, filtered, global_report, gotcha_entry,
-    inherited_block, is_gotcha_signal, is_prunable, is_upgraded, line, normalize_input,
-    parse_store, promotable_libraries, promotable_set, promotion, relevant_entries, similar,
+    AddOutcome, CheckFailure, CheckReport, CheckWarning, DEFAULT_BUDGET, Entry, GLOBAL_FIELDS,
+    GlobalAction, GlobalDoc, GlobalIndex, GlobalOutcome, GotchaInput, GotchaV2, Libraries,
+    PROMOTABLE_SEED, Relevant, Stack, StoredGotcha, Usage, add_reply, check_gotcha, filtered,
+    global_reply, global_report, gotcha_entry, inherited_block, is_gotcha_signal, is_prunable,
+    is_upgraded, line, normalize_input, parse_store, promotable_libraries, promotable_set,
+    promotion, relevant_entries, similar,
 };
 pub use crate::core::hooks::{
     HOOK_MARKER_END, HOOK_MARKER_START, HOOK_SHEBANG, HookChange, HookKind, Removal,
@@ -65,7 +66,7 @@ pub use crate::core::registry::{
     list_payload, load as load_registry, meta_payload, normalize_path, same_path, slugify,
     unique_id,
 };
-pub use crate::core::reply::{current_reply, gotchas_reply, precheck_report, projects_reply};
+pub use crate::core::reply::{current_reply, precheck_report, projects_reply};
 pub use crate::core::resolve::{Probe, Resolution, ResolveError, Source, resolve};
 pub use crate::core::scaffold::{
     BRIDGE_END, BRIDGE_START, BridgeChange, INITIAL_CONFIG, INSTRUCTIONS_BACKUP_FILE,

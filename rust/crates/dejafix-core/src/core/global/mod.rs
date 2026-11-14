@@ -15,12 +15,13 @@ pub use promote::{
     promotion, similar,
 };
 pub use prune::is_prunable;
-pub use query::GLOBAL_FIELDS;
+pub use query::{DEFAULT_BUDGET, GLOBAL_FIELDS, global_reply};
 pub use record::{is_upgraded, line, parse_store};
 pub use report::{add_reply, filtered, global_report};
 pub use types::{
     AddOutcome, CheckFailure, CheckReport, CheckWarning, Entry, GlobalAction, GlobalDoc,
-    GlobalOutcome, GotchaInput, GotchaV2, Libraries, Relevant, Stack, StoredGotcha, Usage,
+    GlobalIndex, GlobalOutcome, GotchaInput, GotchaV2, Libraries, Relevant, Stack, StoredGotcha,
+    Usage,
 };
 
 #[cfg(test)]

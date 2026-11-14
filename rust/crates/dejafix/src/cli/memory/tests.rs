@@ -14,6 +14,7 @@ fn args(action: &str, text: Option<&str>, library: Option<&str>) -> GlobalArgs {
         format: "text".to_owned(),
         keyword: Vec::new(),
         versions: None,
+        budget: 2_000,
     }
 }
 

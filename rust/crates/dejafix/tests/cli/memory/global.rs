@@ -107,7 +107,7 @@ const DETECT_JSON: &str = r#"{
 }
 "#;
 
-const UNKNOWN: &str = "Unknown action: frob\nAvailable: status, list, add, add-gotcha, remove, export, import, prune, detect\n";
+const UNKNOWN: &str = "Unknown action: frob\nAvailable: status, list, add, add-gotcha, query, remove, export, import, prune, detect\n";
 
 fn global_dir(repo: &Repo) -> PathBuf {
     repo.registry().join("global")
@@ -682,5 +682,46 @@ fn colour_is_not_written_to_a_pipe() -> TestResult {
     ] {
         assert!(!run(&repo, args)?.contains('\u{1b}'));
     }
+    Ok(())
+}
+
+#[test]
+fn query_ranks_global_gotchas_and_checks_the_budget() -> TestResult {
+    let repo = Repo::new()?;
+    run(
+        &repo,
+        &[
+            "add-gotcha",
+            LESSON,
+            "--library",
+            "sqlalchemy",
+            "--keyword",
+            "async session",
+            "--keyword",
+            "request cleanup",
+        ],
+    )?;
+    let found = run(&repo, &["query", "sessions left open after a request"])?;
+    assert!(
+        ids(&found).starts_with(
+            "Global gotchas for \"sessions left open after a request\" (1 of 1 shown):\n- got_X · sqlalchemy · from repo\n"
+        ),
+        "{found}"
+    );
+    assert_eq!(
+        run(&repo, &["query", "kubernetes ingress"])?,
+        "No global gotcha matches this query.\nLibraries with records: sqlalchemy (1).\n"
+    );
+    let listed = run(
+        &repo,
+        &["query", "--library", "sqlalchemy", "--budget", "500"],
+    )?;
+    assert!(
+        listed.starts_with("Global gotchas of sqlalchemy (1 of 1 shown):"),
+        "{listed}"
+    );
+    repo.djf(&["global", "query", "x", "--budget", "100"])
+        .assert()
+        .code(2);
     Ok(())
 }

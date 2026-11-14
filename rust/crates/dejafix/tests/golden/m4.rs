@@ -101,8 +101,6 @@ fn read_calls() -> Vec<(&'static str, Value)> {
         ("get_context", json!({"tokens": 500})),
         ("get_context", json!({"tokens": 8000, "focus": "src/auth/"})),
         ("get_context", json!({"tokens": 150, "focus": "src/app.py"})),
-        ("get_global_gotchas", empty()),
-        ("get_global_gotchas", json!({"library": "react"})),
     ]
 }
 
@@ -270,7 +268,6 @@ fn global_matches_python() -> TestResult {
             "low",
         ]),
         djf(&["global", "import", "missing.json"]),
-        djf(&["global", "frobnicate"]),
     ];
     let home = tempfile::tempdir()?;
     fs::create_dir_all(home.path().join(".dejafix/global"))?;

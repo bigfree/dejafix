@@ -34,6 +34,16 @@ impl Index {
 
     #[must_use]
     pub fn rank_terms(&self, query: &QueryTerms, params: &RankParams) -> Vec<Scored> {
+        self.rank_where(query, params, |_| true)
+    }
+
+    #[must_use]
+    pub fn rank_where(
+        &self,
+        query: &QueryTerms,
+        params: &RankParams,
+        keep: impl Fn(u32) -> bool,
+    ) -> Vec<Scored> {
         if query.distinct == 0 || self.is_empty() || query.ids.is_empty() {
             return Vec::new();
         }
@@ -75,7 +85,7 @@ impl Index {
             .iter()
             .zip(&scores)
             .enumerate()
-            .filter(|(_, (hits, _))| **hits > 0)
+            .filter(|(doc, (hits, _))| **hits > 0 && keep(u32::try_from(*doc).unwrap_or(u32::MAX)))
             .map(|(doc, (hits, score))| Scored {
                 doc: u32::try_from(doc).unwrap_or(u32::MAX),
                 score: *score,

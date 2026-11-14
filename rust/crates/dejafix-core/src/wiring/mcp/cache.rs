@@ -3,14 +3,24 @@ use std::path::Path;
 use std::sync::{Arc, MutexGuard, PoisonError};
 
 use super::errors::io_error;
-use super::types::{CacheEntry, CachedLog, LogCache, McpState, ToolError};
+use super::types::{CacheEntry, CachedLog, FileStamp, GlobalEntry, LogCache, McpState, ToolError};
+use crate::adapters::fs::GlobalStore;
 use crate::adapters::fs::{
     FsResolver, MEMORY_DIR, events_path, path_context, posix, read_events_file,
 };
+use crate::core::global::{GlobalIndex, parse_store};
 use crate::core::log::EventLog;
 use crate::core::time::Clock;
 
 const CACHED_PROJECTS: usize = 16;
+const GOTCHAS_FILE: &str = "library_gotchas.jsonl";
+const LIBRARIES_FILE: &str = "libraries.json";
+
+fn stamp(path: &Path) -> FileStamp {
+    fs::metadata(path)
+        .ok()
+        .map(|metadata| (metadata.len(), metadata.modified().ok()))
+}
 
 impl LogCache {
     fn fresh(
@@ -79,6 +89,33 @@ impl McpState {
             },
         );
         Ok(cached)
+    }
+
+    pub(super) fn global_index(&self) -> Result<Arc<GlobalIndex>, ToolError> {
+        let store = GlobalStore::new(&self.settings.dejafix_home);
+        let gotchas_path = store.path(GOTCHAS_FILE);
+        let gotchas = stamp(&gotchas_path);
+        let libraries = stamp(&store.path(LIBRARIES_FILE));
+        let mut cached = self.global.lock().unwrap_or_else(PoisonError::into_inner);
+        if let Some(entry) = cached.as_ref()
+            && entry.gotchas == gotchas
+            && entry.libraries == libraries
+        {
+            return Ok(Arc::clone(&entry.index));
+        }
+        let records = store.gotchas().ok_or_else(|| {
+            ToolError::Json(format!(
+                "{} holds a line that is not a JSON object",
+                gotchas_path.display()
+            ))
+        })?;
+        let index = Arc::new(GlobalIndex::build(parse_store(records), store.libraries()?));
+        *cached = Some(GlobalEntry {
+            gotchas,
+            libraries,
+            index: Arc::clone(&index),
+        });
+        Ok(index)
     }
 
     #[must_use]

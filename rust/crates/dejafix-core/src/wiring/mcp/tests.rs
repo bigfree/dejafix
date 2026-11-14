@@ -330,7 +330,10 @@ fn read_tools_answer_on_a_bare_project() {
         (ToolCall::GetPlan, "No plan found."),
         (ToolCall::GetIssue("1".into()), "No issue found with ID 1."),
         (ToolCall::GetIssue("*".into()), "No issue found with ID *."),
-        (ToolCall::GetGlobalGotchas(None), "No global gotchas found."),
+        (
+            ToolCall::GetGlobalGotchas(None),
+            "Global memory is empty. Add a lesson with add_global_gotcha.",
+        ),
         (
             ToolCall::SearchEvents {
                 query: "x".into(),
@@ -847,5 +850,70 @@ fn add_global_gotcha_checks_writes_and_names_the_source_project() {
     assert!(
         warned.ends_with("\nWarning: it names the project 'alpha'."),
         "{warned}"
+    );
+}
+
+#[test]
+fn the_global_index_is_reused_until_the_store_or_the_aliases_change() {
+    let world = World::new();
+    let root = world.project("alpha");
+    let state = world.state(Some(&root), &world.base);
+    let empty = state.global_index().unwrap();
+    assert!(Arc::ptr_eq(&empty, &state.global_index().unwrap()));
+    text(
+        &state,
+        global_gotcha(
+            "bullmq",
+            "bullmq Worker.close() never resolves when Redis is unreachable; pass a timeout.",
+            &["shutdown", "worker close"],
+        ),
+        None,
+    );
+    let first = state.global_index().unwrap();
+    assert!(!Arc::ptr_eq(&empty, &first));
+    assert_eq!(first.len(), 1);
+    assert!(Arc::ptr_eq(&first, &state.global_index().unwrap()));
+    fs::write(
+        world.home.join(".dejafix/global/libraries.json"),
+        "{\"bullmq\": [\"bull-mq\"]}\n",
+    )
+    .unwrap();
+    let aliased = state.global_index().unwrap();
+    assert!(!Arc::ptr_eq(&first, &aliased));
+    let reply = text(
+        &state,
+        ToolCall::GlobalQuery {
+            query: "worker shutdown".to_owned(),
+            library: Some("bull-mq".to_owned()),
+            budget: 2_000,
+        },
+        None,
+    );
+    assert!(
+        reply.starts_with("Global gotchas for \"worker shutdown\" in bull-mq (1 of 1 shown):"),
+        "{reply}"
+    );
+    let listed = text(
+        &state,
+        ToolCall::GetGlobalGotchas(Some("bullmq".to_owned())),
+        None,
+    );
+    assert!(
+        listed.starts_with("Global gotchas of bullmq (1 of 1 shown):"),
+        "{listed}"
+    );
+    fs::write(
+        world.home.join(".dejafix/global/library_gotchas.jsonl"),
+        "[1]\n",
+    )
+    .unwrap();
+    let broken = call(&state, ToolCall::GetGlobalGotchas(None), None);
+    assert!(broken.error);
+    assert!(
+        broken
+            .text
+            .contains("holds a line that is not a JSON object"),
+        "{}",
+        broken.text
     );
 }

@@ -13,7 +13,7 @@ use super::instructions;
 use super::lax::{lax_boolean, lax_integer};
 use super::schema::tools;
 
-const NAMES: [&str; 20] = [
+const NAMES: [&str; 21] = [
     "start_session",
     "get_instructions",
     "get_summary",
@@ -26,6 +26,7 @@ const NAMES: [&str; 20] = [
     "get_score",
     "get_context",
     "get_global_gotchas",
+    "global_query",
     "log_issue",
     "record_attempt",
     "record_fix",

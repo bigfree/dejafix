@@ -7,14 +7,14 @@ use super::types::{
     FsProbe, GitMemo, LogCache, McpSettings, McpState, MemoGit, ToolCall, ToolError, ToolReply,
 };
 use crate::adapters::fs::{
-    FsResolver, GlobalStore, MEMORY_DIR, checked_events_path, read_text_within, resolve_path,
+    FsResolver, MEMORY_DIR, checked_events_path, read_text_within, resolve_path,
 };
 use crate::adapters::git::{GitHistory, status_files};
 use crate::core::context::{ContextInput, generate_context};
 use crate::core::event::IssueId;
-use crate::core::global::{GotchaInput, add_reply};
+use crate::core::global::{DEFAULT_BUDGET, GotchaInput, add_reply, global_reply};
 use crate::core::registry::Registry;
-use crate::core::reply::{current_reply, gotchas_reply, precheck_report, projects_reply};
+use crate::core::reply::{current_reply, precheck_report, projects_reply};
 use crate::core::resolve::{Probe, Resolution, resolve};
 use crate::core::score::{calculate_score, raw_events, score_event, score_reply};
 use crate::core::search::search_reply;
@@ -48,6 +48,7 @@ impl McpState {
             settings,
             cache: Mutex::new(LogCache::default()),
             git: Mutex::new(GitMemo::default()),
+            global: Mutex::new(None),
         }
     }
 
@@ -118,7 +119,26 @@ impl McpState {
     ) -> Result<String, ToolError> {
         match call {
             ToolCall::ListProjects => return self.list_projects(clock),
-            ToolCall::GetGlobalGotchas(library) => return self.gotchas(library.as_deref()),
+            ToolCall::GetGlobalGotchas(library) => {
+                return Ok(global_reply(
+                    self.global_index()?.as_ref(),
+                    "",
+                    library.as_deref(),
+                    DEFAULT_BUDGET,
+                ));
+            }
+            ToolCall::GlobalQuery {
+                query,
+                library,
+                budget,
+            } => {
+                return Ok(global_reply(
+                    self.global_index()?.as_ref(),
+                    &query,
+                    library.as_deref(),
+                    budget,
+                ));
+            }
             ToolCall::AddGlobalGotcha(input) => return self.add_global(input, project, clock, ids),
             ToolCall::Write(write) => return self.write(write, project, clock, ids),
             ToolCall::PrecheckFiles(paths) if paths.len() > MAX_PRECHECK_PATHS => {
@@ -169,6 +189,7 @@ impl McpState {
             ToolCall::CurrentProject => Ok(current_reply(&target)),
             ToolCall::ListProjects
             | ToolCall::GetGlobalGotchas(_)
+            | ToolCall::GlobalQuery { .. }
             | ToolCall::AddGlobalGotcha(_)
             | ToolCall::Write(_) => Ok(String::new()),
         }
@@ -198,18 +219,6 @@ impl McpState {
             &cached.context,
             &FsResolver,
         ))
-    }
-
-    fn gotchas(&self, library: Option<&str>) -> Result<String, ToolError> {
-        let store = GlobalStore::new(&self.settings.dejafix_home);
-        store.ensure()?;
-        let gotchas = store.gotchas().ok_or_else(|| {
-            ToolError::Json(format!(
-                "{} holds a line that is not a JSON object",
-                store.path("library_gotchas.jsonl").display()
-            ))
-        })?;
-        Ok(gotchas_reply(&gotchas, library))
     }
 
     fn add_global(

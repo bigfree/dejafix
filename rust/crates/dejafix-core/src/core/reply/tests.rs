@@ -1,9 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use serde_json::json;
-
-use super::{current_reply, gotchas_reply, precheck_report, projects_reply};
-use crate::core::global::Entry;
+use super::{current_reply, precheck_report, projects_reply};
 use crate::core::path::PathContext;
 use crate::core::precheck::{Severity, Warning, WarningKind};
 use crate::core::registry::Registry;
@@ -63,50 +60,6 @@ fn precheck_names_a_memory_file_instead_of_clearing_it() {
         precheck_report(&paths, &[], &context(), &NoResolve),
         ".dejafix/summary.md: this is a dejafix memory file. It is regenerated from the event log, so do not edit it; record the change with add_note / add_decision / log_issue / record_fix instead."
     );
-}
-
-fn entries(values: &[serde_json::Value]) -> Vec<Entry> {
-    values
-        .iter()
-        .filter_map(|value| value.as_object().cloned())
-        .collect()
-}
-
-#[test]
-fn gotchas_are_filtered_by_a_library_substring() {
-    let gotchas = entries(&[
-        json!({"library": "react-router", "gotcha": "loaders run twice", "source_project": "web"}),
-        json!({"library": "bcrypt", "gotcha": "truncates at 72 bytes", "source_project": ""}),
-        json!({"gotcha": "no library", "source_project": null}),
-        json!({"library": null, "gotcha": 5}),
-    ]);
-    assert_eq!(
-        gotchas_reply(&gotchas, Some("React")),
-        "Global gotchas (1):\n  [react-router] loaders run twice (from web)"
-    );
-    assert_eq!(
-        gotchas_reply(&gotchas, None),
-        "Global gotchas (4):\n  [react-router] loaders run twice (from web)\n  [bcrypt] truncates at 72 bytes\n  [unknown] no library\n  [None] 5"
-    );
-    assert_eq!(
-        gotchas_reply(&gotchas, Some("vue")),
-        "No global gotchas found for vue."
-    );
-    assert_eq!(gotchas_reply(&[], Some("")), "No global gotchas found.");
-}
-
-#[test]
-fn only_fifteen_gotchas_are_shown_but_all_are_counted() {
-    let gotchas: Vec<Entry> = (0..20)
-        .filter_map(|index| {
-            json!({"library": "x", "gotcha": format!("g{index}")})
-                .as_object()
-                .cloned()
-        })
-        .collect();
-    let reply = gotchas_reply(&gotchas, None);
-    assert!(reply.starts_with("Global gotchas (20):"));
-    assert_eq!(reply.lines().count(), 16);
 }
 
 fn registry(active: Option<&str>) -> Registry {

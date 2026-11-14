@@ -18,6 +18,7 @@ pub fn action_of(args: GlobalArgs) -> GlobalAction {
         format,
         keyword,
         versions,
+        budget,
     } = args;
     let json = format == "json";
     let action = match action.as_str() {
@@ -39,6 +40,11 @@ pub fn action_of(args: GlobalArgs) -> GlobalAction {
             text,
             keywords: keyword,
             versions,
+        },
+        "query" => GlobalAction::Query {
+            text,
+            library,
+            budget,
         },
         "remove" => GlobalAction::Remove(text),
         "export" => GlobalAction::Export,

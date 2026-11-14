@@ -515,6 +515,44 @@
     }
   },
   {
+    "name": "global_query",
+    "description": "Search lessons from all projects (global memory), ranked by relevance. Call it before using a library and after an unexpected failure.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "What you are about to do or the failure you saw, in English."
+        },
+        "library": {
+          "type": "string",
+          "description": "Only records of this library or its aliases."
+        },
+        "budget": {
+          "type": "integer",
+          "minimum": 500,
+          "maximum": 8000,
+          "default": 2000,
+          "description": "Reply size in tokens."
+        }
+      },
+      "required": [
+        "query"
+      ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "result": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "result"
+      ]
+    }
+  },
+  {
     "description": "Open a new issue. Returns the issue ID.\n\nMANDATORY: call this IMMEDIATELY when you encounter a bug, regression,\nor unexpected behavior — BEFORE writing fix code. Logging up-front\nmeans the issue survives interruptions and session boundaries.\n\nSide effects: appends an `issue` event to .dejafix/events.jsonl,\ncreates an issue file in .dejafix/issues/, updates summary.md,\nand marks this issue as the active one for subsequent\nrecord_attempt calls.",
     "inputSchema": {
       "properties": {

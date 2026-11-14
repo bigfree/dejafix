@@ -14,7 +14,8 @@ const DETECT_RULE_WIDTH: usize = 50;
 const STATUS_BAR_WIDTH: usize = 48;
 const SHOWN_LIBRARIES: usize = 15;
 const META_SEPARATOR: &str = " · ";
-const AVAILABLE: &str = "status, list, add, add-gotcha, remove, export, import, prune, detect";
+const AVAILABLE: &str =
+    "status, list, add, add-gotcha, query, remove, export, import, prune, detect";
 
 fn items(entry: &Entry, key: &str) -> Vec<String> {
     match entry.get(key) {
@@ -388,6 +389,7 @@ pub fn global_report(outcome: &GlobalOutcome, color: bool) -> String {
             }
             out
         }
+        GlobalOutcome::Reply(text) => format!("{text}\n"),
         GlobalOutcome::Removed(id) => format!("{tag} Removed: {id}\n"),
         GlobalOutcome::NotFound(id) => format!("Entry not found: {id}\n"),
         GlobalOutcome::Exported(value) => json_text(value),

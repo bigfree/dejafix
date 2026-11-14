@@ -493,7 +493,7 @@ mod report {
         );
         assert_eq!(
             global_report(&GlobalOutcome::Unknown("frob".into()), true),
-            "Unknown action: frob\nAvailable: status, list, add, add-gotcha, remove, export, import, prune, detect\n"
+            "Unknown action: frob\nAvailable: status, list, add, add-gotcha, query, remove, export, import, prune, detect\n"
         );
     }
 
@@ -1025,5 +1025,97 @@ mod checks {
                 versions: None,
             }
         );
+    }
+}
+
+mod query {
+    use serde_json::{Value, json};
+
+    use super::super::{GlobalIndex, Libraries, StoredGotcha, global_reply, parse_store};
+
+    fn store() -> GlobalIndex {
+        let lines = [
+            json!({"v": 2, "id": "got_33f8cfe2c2d5", "library": "bullmq", "keywords": ["shutdown", "worker close", "sigterm"], "versions": ">=6.2.0 <6.3", "gotcha": "bullmq 6.2.0 Worker.close() never resolves against an unreachable Redis, so the process never exits on SIGTERM; pass a timeout.", "source_project": "home-log", "discovered": "2026-08-27", "reviewed": "2026-11-14"}),
+            json!({"v": 2, "id": "got_000000000002", "library": "bullmq", "keywords": ["repeatable jobs", "cron"], "versions": null, "gotcha": "bullmq repeatable jobs keep their old cron pattern after a deploy until they are removed.", "source_project": "project-b", "discovered": "2026-09-01"}),
+            json!({"v": 2, "id": "got_000000000003", "library": "next", "keywords": ["app router", "fetch cache"], "versions": "15", "gotcha": "next 15 app router caches fetch results by default in production; pass cache: 'no-store'."}),
+            json!({"id": "got_000000000004", "library": "nextjs", "gotcha": "next dev server ignores the custom server file when started with turbo.", "source_project": "web"}),
+        ];
+        let entries = lines.iter().filter_map(Value::as_object).cloned().collect();
+        let libraries = Libraries::from_value(&json!({"next": ["nextjs", "next.js"]})).unwrap();
+        GlobalIndex::build(parse_store(entries), libraries)
+    }
+
+    #[test]
+    fn a_query_replies_in_the_spec_format() {
+        insta::assert_snapshot!(global_reply(
+            &store(),
+            "worker never exits on sigterm",
+            None,
+            2_000
+        ));
+    }
+
+    #[test]
+    fn the_budget_cuts_but_keeps_the_first_record() {
+        let reply = global_reply(&store(), "", None, 1);
+        assert!(
+            reply.starts_with(
+                "Global gotchas (1 of 4 shown):\n- got_000000000002 · bullmq · from project-b\n"
+            ),
+            "{reply}"
+        );
+        assert_eq!(reply.lines().count(), 3);
+        let all = global_reply(&store(), "", None, 8_000);
+        assert!(all.starts_with("Global gotchas (4 of 4 shown):"));
+    }
+
+    #[test]
+    fn the_library_filter_resolves_aliases() {
+        let reply = global_reply(&store(), "", Some("Next.js"), 2_000);
+        assert_eq!(
+            reply,
+            "Global gotchas of Next.js (2 of 2 shown):\n- got_000000000003 · next 15\n  next 15 app router caches fetch results by default in production; pass cache: 'no-store'.\n- got_000000000004 · nextjs · from web, not upgraded\n  next dev server ignores the custom server file when started with turbo."
+        );
+        let query = global_reply(&store(), "dev server turbo", Some("next"), 2_000);
+        assert!(query.starts_with("Global gotchas for \"dev server turbo\" in next (1 of 1 shown):\n- got_000000000004"), "{query}");
+    }
+
+    #[test]
+    fn a_library_named_in_the_query_scores_but_does_not_filter() {
+        let reply = global_reply(&store(), "bullmq cron deploy", None, 2_000);
+        assert!(reply.contains("- got_000000000002 · bullmq"), "{reply}");
+        assert!(
+            reply.starts_with("Global gotchas for \"bullmq cron deploy\" (1 of 1 shown)"),
+            "{reply}"
+        );
+    }
+
+    #[test]
+    fn no_match_names_the_libraries_with_counts() {
+        assert_eq!(
+            global_reply(&store(), "kubernetes ingress certificate", None, 2_000),
+            "No global gotcha matches this query.\nLibraries with records: bullmq (2), next (2)."
+        );
+        assert_eq!(
+            global_reply(&store(), "", Some("prisma"), 2_000),
+            "No global gotcha matches this query.\nLibraries with records: bullmq (2), next (2)."
+        );
+        assert_eq!(
+            global_reply(&GlobalIndex::default(), "anything", None, 2_000),
+            "Global memory is empty. Add a lesson with add_global_gotcha."
+        );
+    }
+
+    #[test]
+    fn version_one_records_are_found_by_their_text() {
+        let reply = global_reply(&store(), "custom server file", None, 2_000);
+        assert!(
+            reply.contains("- got_000000000004 · nextjs · from web, not upgraded"),
+            "{reply}"
+        );
+        assert!(matches!(
+            parse_store(vec![json!({"id": "x"}).as_object().cloned().unwrap()]).first(),
+            Some(StoredGotcha::V1(_))
+        ));
     }
 }

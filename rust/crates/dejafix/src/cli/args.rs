@@ -174,7 +174,7 @@ pub enum Commands {
 pub struct GlobalArgs {
     #[arg(
         default_value = "status",
-        help = "Action: status, list, add, add-gotcha, remove, export, import, prune, detect."
+        help = "Action: status, list, add, add-gotcha, query, remove, export, import, prune, detect."
     )]
     pub action: String,
     #[arg(help = "Pattern text, gotcha text, entry ID, or import file path.")]
@@ -204,6 +204,13 @@ pub struct GlobalArgs {
         help = "Version range a gotcha applies to."
     )]
     pub versions: Option<String>,
+    #[arg(
+        long,
+        default_value_t = 2_000,
+        value_parser = clap::value_parser!(u32).range(500..=8_000),
+        help = "Reply size of query in tokens (500 to 8000)."
+    )]
+    pub budget: u32,
     #[arg(
         short = 'f',
         long = "format",

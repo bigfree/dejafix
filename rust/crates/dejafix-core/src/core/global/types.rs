@@ -2,6 +2,8 @@ use std::collections::BTreeMap;
 
 use serde_json::{Map, Value};
 
+use crate::core::rank::Index;
+
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Stack {
     pub tags: Vec<String>,
@@ -66,6 +68,11 @@ pub enum GlobalAction {
         keywords: Vec<String>,
         versions: Option<String>,
     },
+    Query {
+        text: Option<String>,
+        library: Option<String>,
+        budget: u32,
+    },
     Remove(Option<String>),
     Export,
     Import(Option<String>),
@@ -117,6 +124,7 @@ pub enum GlobalOutcome {
         failures: Vec<String>,
         warnings: Vec<String>,
     },
+    Reply(String),
     Removed(String),
     NotFound(String),
     Exported(Value),
@@ -225,4 +233,12 @@ pub enum AddOutcome {
         warnings: Vec<CheckWarning>,
     },
     Rejected(CheckReport),
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct GlobalIndex {
+    pub(super) index: Index,
+    pub(super) records: Vec<StoredGotcha>,
+    pub(super) canonical: Vec<Box<str>>,
+    pub(super) libraries: Libraries,
 }
