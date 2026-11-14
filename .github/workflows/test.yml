@@ -49,6 +49,14 @@ jobs:
         env:
           DEJAFIX_PYTHON: ${{ steps.python.outputs.python-path }}
         run: cargo nextest run --workspace --all-features --no-fail-fast
+      - name: Self-test the glibc check on the built djf
+        if: runner.os == 'Linux'
+        run: |
+          bash .github/scripts/check-glibc.sh 99.0 rust/target/debug/djf
+          if bash .github/scripts/check-glibc.sh 2.0 rust/target/debug/djf; then
+            echo "check-glibc accepted a floor of 2.0" >&2
+            exit 1
+          fi
   install-dist:
     name: install-dist (${{ matrix.os }})
     strategy:

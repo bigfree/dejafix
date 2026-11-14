@@ -25,7 +25,11 @@
 #   SHA-256, instead of piping dist's installer into a shell;
 # * the workflow starts only on tags `v[1-9]*`, so a Python v0.x tag never
 #   starts a release;
-# * `build-wheels` builds the maturin wheels, `host` waits for them;
+# * the Linux gnu builds run in manylinux_2_28 containers (dist-workspace.toml),
+#   dist is installed for the container's musl host there, and
+#   `build-local-artifacts` fails if a binary needs glibc newer than 2.28;
+# * `build-wheels` builds the maturin wheels (manylinux and musllinux_1_2),
+#   `host` waits for them;
 # * `publish-pypi` uploads them through PyPI trusted publishing. It must stay a
 #   job of this file: PyPI does not support trusted publishing from a reusable
 #   workflow;
@@ -124,14 +128,25 @@ jobs:
         include:
           - target: aarch64-apple-darwin
             runner: macos-15
+            manylinux: auto
           - target: x86_64-apple-darwin
             runner: macos-15-intel
+            manylinux: auto
           - target: x86_64-unknown-linux-gnu
             runner: ubuntu-22.04
+            manylinux: auto
           - target: aarch64-unknown-linux-gnu
             runner: ubuntu-22.04-arm
+            manylinux: auto
+          - target: x86_64-unknown-linux-musl
+            runner: ubuntu-22.04
+            manylinux: musllinux_1_2
+          - target: aarch64-unknown-linux-musl
+            runner: ubuntu-22.04
+            manylinux: musllinux_1_2
           - target: x86_64-pc-windows-msvc
             runner: windows-2022
+            manylinux: auto
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
@@ -143,7 +158,7 @@ jobs:
           maturin-version: "1.16.0"
           working-directory: rust
           target: ${{ matrix.target }}
-          manylinux: auto
+          manylinux: ${{ matrix.manylinux }}
           args: --locked --out wheels --manifest-path crates/dejafix/Cargo.toml
       - name: Upload the wheel
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
@@ -196,7 +211,7 @@ jobs:
       - name: Install dist
         shell: bash
         env:
-          HOST: ${{ matrix.host }}
+          HOST: ${{ matrix.container && matrix.container.host || matrix.host }}
         run: bash .github/scripts/install-dist.sh "$HOST"
       # Get the dist-manifest
       - name: Fetch local artifacts
@@ -215,6 +230,17 @@ jobs:
           # Actually do builds and make zips and whatnot
           dist build ${TAG_FLAG:+"$TAG_FLAG"} --print=linkage --output-format=json ${{ matrix.dist_args }} > dist-manifest.json
           echo "dist ran successfully"
+      - name: Check the glibc floor of the Linux gnu binaries
+        if: ${{ contains(join(matrix.targets, ' '), 'linux-gnu') }}
+        shell: bash
+        run: |
+          shopt -s nullglob
+          binaries=(rust/target/*-unknown-linux-gnu/dist/{djf,dejafix,djf-mcp,djf-edit-hook})
+          if [ "${#binaries[@]}" -ne 4 ]; then
+            echo "expected 4 Linux gnu binaries, found ${#binaries[@]}" >&2
+            exit 1
+          fi
+          bash .github/scripts/check-glibc.sh 2.28 "${binaries[@]}"
       - id: cargo-dist
         name: Post-build
         # We force bash here just because github makes it really hard to get values up
