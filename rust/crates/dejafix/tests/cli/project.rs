@@ -201,3 +201,22 @@ fn no_notice_on_a_first_ever_run() -> TestResult {
     assert!(!again.contains("upgraded to"));
     Ok(())
 }
+
+#[cfg(unix)]
+#[test]
+fn scan_list_and_doctor_escape_control_characters_in_paths() -> TestResult {
+    let repo = Repo::bare()?;
+    let code = repo.home.with_file_name("code");
+    let evil = code.join("x\u{1b}]52;c;aGk=\u{7}y");
+    fs::create_dir_all(evil.join(".dejafix"))?;
+    fs::write(evil.join(".dejafix/config.toml"), "")?;
+    let code_text = code.to_string_lossy().into_owned();
+    let doctor = repo.stdout(&["doctor", "--path", &code_text])?;
+    let scan = repo.stdout(&["project", "scan", &code_text])?;
+    let list = repo.stdout(&["project", "list"])?;
+    for output in [&doctor, &scan, &list] {
+        assert!(!output.contains('\u{1b}'), "{output}");
+        assert!(output.contains("x\\x1b]52;c;aGk=\\x07y"), "{output}");
+    }
+    Ok(())
+}

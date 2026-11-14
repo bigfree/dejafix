@@ -8,7 +8,7 @@ use dejafix_core::{
 
 use super::types::DoctorRun;
 use crate::cli::USER_ERROR;
-use crate::cli::output::{FAIL, OK, WARN, secho};
+use crate::cli::output::{FAIL, OK, WARN, printable, printable_text, secho};
 use crate::cli::types::{Outcome, Style};
 use crate::config::Config;
 
@@ -49,7 +49,7 @@ fn write_missing(
         color,
     )?;
     for project in report.missing.iter().take(LISTED) {
-        writeln!(out, "      {}", project.display())?;
+        writeln!(out, "      {}", printable(project))?;
     }
     if report.missing.len() > LISTED {
         writeln!(out, "      … and {} more", report.missing.len() - LISTED)?;
@@ -58,7 +58,11 @@ fn write_missing(
         for (project, error) in &report.register_failures {
             secho(
                 out,
-                &format!("      {FAIL} {}: {error}", project.display()),
+                &format!(
+                    "      {FAIL} {}: {}",
+                    printable(project),
+                    printable_text(error)
+                ),
                 Style::Red,
                 color,
             )?;
@@ -104,11 +108,16 @@ fn write_stale(
         color,
     )?;
     for record in &report.stale {
-        writeln!(out, "      {}  {}", record.name(), record.path.display())?;
+        writeln!(out, "      {}  {}", record.name(), printable(&record.path))?;
     }
     if fix {
         match &report.prune_failure {
-            Some(error) => secho(out, &format!("  {FAIL} {error}"), Style::Red, color)?,
+            Some(error) => secho(
+                out,
+                &format!("  {FAIL} {}", printable_text(error)),
+                Style::Red,
+                color,
+            )?,
             None => secho(
                 out,
                 &format!(
@@ -134,7 +143,7 @@ fn write_configs(report: &DoctorReport, out: &mut impl Write, color: bool) -> io
             color,
         )?;
         for config in &report.unreadable {
-            writeln!(out, "      {}  {}", config.client, config.path.display())?;
+            writeln!(out, "      {}  {}", config.client, printable(&config.path))?;
         }
         writeln!(
             out,
@@ -157,7 +166,7 @@ fn write_configs(report: &DoctorReport, out: &mut impl Write, color: bool) -> io
         color,
     )?;
     for config in &report.pinned {
-        writeln!(out, "      {}  {}", config.client, config.path.display())?;
+        writeln!(out, "      {}  {}", config.client, printable(&config.path))?;
     }
     writeln!(
         out,
@@ -194,7 +203,7 @@ fn write_corrupt(report: &DoctorReport, out: &mut impl Write, color: bool) -> io
             &format!(
                 "\n  {WARN} {} line(s) of {} could not be read",
                 log.lines.len(),
-                log.path.display()
+                printable(&log.path)
             ),
             Style::Yellow,
             color,
@@ -341,7 +350,7 @@ fn write_scan(
     color: bool,
 ) -> io::Result<()> {
     for root in roots {
-        writeln!(out, "Scanning {} (depth {depth_limit})…", root.display())?;
+        writeln!(out, "Scanning {} (depth {depth_limit})…", printable(root))?;
     }
     if found.is_empty() {
         return writeln!(out, "No projects with memory found here.");
@@ -352,7 +361,7 @@ fn write_scan(
         } else {
             ("+ ", "")
         };
-        writeln!(out, "  {mark}{}{note}", project.path.display())?;
+        writeln!(out, "  {mark}{}{note}", printable(&project.path))?;
     }
     let fresh = found.iter().filter(|project| !project.known).count();
     if fresh == 0 {
@@ -372,7 +381,7 @@ fn write_scan(
     for (project, error) in failures {
         secho(
             out,
-            &format!("  {FAIL} {}: {error}", project.display()),
+            &format!("  {FAIL} {}: {}", printable(project), printable_text(error)),
             Style::Red,
             color,
         )?;
@@ -413,7 +422,7 @@ pub fn scan(
         Ok(ScanReport::NotADirectory(root)) => {
             secho(
                 out,
-                &format!("{FAIL} {} is not a directory.", root.display()),
+                &format!("{FAIL} {} is not a directory.", printable(&root)),
                 Style::Red,
                 color,
             )?;
