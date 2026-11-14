@@ -102,8 +102,8 @@ mod store {
     use std::thread;
 
     use super::super::{
-        GlobalStore, StoreError, clear_marker, find_memory_dir, lock_events, read_marker,
-        write_marker, write_text_if_changed,
+        GlobalStore, GotchaWrite, StoreError, clear_marker, find_memory_dir, lock_events,
+        read_marker, write_marker, write_text_if_changed,
     };
     use crate::adapters::fs::write::write_atomic;
 
@@ -248,57 +248,29 @@ mod store {
     }
 
     #[test]
-    fn the_promotable_cache_grows_only_with_new_libraries() {
-        let dir = tempfile::tempdir().unwrap();
-        let store = GlobalStore::new(dir.path());
-        let cache = dir.path().join("global/.promotable.json");
-        store
-            .record_promotable(&["React".into(), String::new()])
-            .unwrap();
-        assert!(!cache.exists());
-        store.record_promotable(&["zod".into()]).unwrap();
-        let text = fs::read_to_string(&cache).unwrap();
-        assert!(text.starts_with(&super::nl("{\n  \"libraries\": [\n    \"alembic\",")));
-        assert!(text.contains("\"zod\"") && !text.ends_with('\n'));
-        assert_eq!(store.promotable().unwrap().len(), 28);
-        fs::write(&cache, "{broken").unwrap();
-        assert_eq!(store.promotable(), Some(Vec::new()));
-        fs::write(&cache, "[1]").unwrap();
-        assert_eq!(store.promotable(), None);
-    }
-
-    #[test]
-    fn gotchas_are_appended_once_as_sorted_json_lines() {
+    fn gotchas_are_appended_under_the_lock_and_a_corrupt_store_is_an_error() {
         let dir = tempfile::tempdir().unwrap();
         let store = GlobalStore::new(dir.path());
         assert_eq!(store.gotchas(), Some(Vec::new()));
-        let entry = serde_json::json!({"library": "react", "id": "got_1"})
-            .as_object()
-            .cloned()
+        let line = "{\"id\": \"got_1\", \"library\": \"react\"}".to_owned();
+        let seen = store
+            .edit_gotchas(|existing| (GotchaWrite::Append(vec![line.clone()]), existing.len()))
             .unwrap();
-        assert!(
-            store
-                .append_gotcha_if_new(|existing| {
-                    assert_eq!(existing.len(), 0);
-                    Some(entry.clone())
-                })
-                .unwrap()
-        );
-        assert!(
-            !store
-                .append_gotcha_if_new(|existing| {
-                    assert_eq!(existing.len(), 1);
-                    None
-                })
-                .unwrap()
-        );
+        assert_eq!(seen, 0);
+        let seen = store
+            .edit_gotchas(|existing| (GotchaWrite::Keep, existing.len()))
+            .unwrap();
+        assert_eq!(seen, 1);
         assert_eq!(
             fs::read_to_string(dir.path().join("global/library_gotchas.jsonl")).unwrap(),
             super::nl("{\"id\": \"got_1\", \"library\": \"react\"}\n")
         );
         fs::write(dir.path().join("global/library_gotchas.jsonl"), "[1]\n").unwrap();
         assert_eq!(store.gotchas(), None);
-        assert!(!store.append_gotcha_if_new(|_| Some(entry.clone())).unwrap());
+        assert!(matches!(
+            store.edit_gotchas(|_| (GotchaWrite::Keep, ())),
+            Err(StoreError::Read { .. })
+        ));
     }
 }
 
@@ -559,18 +531,20 @@ fn main_folders_skip_dependencies_and_dot_folders() {
 }
 
 #[test]
-fn no_gotcha_file_is_created_when_nothing_is_promoted() {
+fn no_gotcha_file_is_created_when_nothing_is_written() {
     let home = tempfile::tempdir().unwrap();
     let store = super::GlobalStore::new(home.path());
-    assert!(!store.append_gotcha_if_new(|_| None).unwrap());
+    store
+        .edit_gotchas(|_| (super::GotchaWrite::Keep, ()))
+        .unwrap();
     assert!(!store.dir.join("library_gotchas.jsonl").exists());
-    let mut entry = serde_json::Map::new();
-    entry.insert("library".to_owned(), serde_json::json!("react"));
-    assert!(
-        store
-            .append_gotcha_if_new(|existing| existing.is_empty().then_some(entry))
-            .unwrap()
-    );
+    assert!(!store.dir.join(".promotable.json").exists());
+    store
+        .edit_gotchas(|existing| {
+            assert_eq!(existing, Vec::<crate::core::global::Entry>::new());
+            (super::GotchaWrite::Append(vec!["{}".to_owned()]), ())
+        })
+        .unwrap();
     assert!(store.dir.join("library_gotchas.jsonl").exists());
 }
 

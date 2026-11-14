@@ -71,19 +71,11 @@ pub enum BridgeOutcome {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Inherited {
-    pub tags: Vec<String>,
-    pub gotchas: usize,
-    pub patterns: usize,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InitReport {
     pub mem_dir: PathBuf,
     pub refreshed_instructions: bool,
     pub bridges: Vec<(&'static str, BridgeOutcome)>,
     pub project_map: Option<String>,
-    pub inherited: Option<Inherited>,
     pub hooks: Option<InitHooks>,
 }
 
@@ -174,4 +166,11 @@ pub enum ScanReport {
         found: Vec<FoundProject>,
         failures: Vec<(PathBuf, String)>,
     },
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(super) struct GotchaChanges {
+    pub(super) library: Option<String>,
+    pub(super) keywords: Vec<String>,
+    pub(super) versions: Option<String>,
 }

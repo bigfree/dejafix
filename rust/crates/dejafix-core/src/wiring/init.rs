@@ -5,19 +5,18 @@ use std::path::{Path, PathBuf};
 use super::hooks::install;
 use super::registry::{load_registry, now_text};
 use super::types::InitHooks;
-use super::types::{BridgeOutcome, Inherited, InitOptions, InitReport, Settings, WiringError};
+use super::types::{BridgeOutcome, InitOptions, InitReport, Settings, WiringError};
 use crate::adapters::fs::{
-    GlobalStore, MemoryDir, RegistryFiles, StoreError, detect_stack, manifest_info, project_name,
+    MemoryDir, RegistryFiles, StoreError, detect_stack, manifest_info, project_name,
     read_optional_text, read_text_within, resolve_path, write_text,
 };
 use crate::adapters::git::hooks_dir;
-use crate::core::global::{Stack, inherited_block, promotable_libraries, relevant_entries};
+use crate::core::global::Stack;
 use crate::core::registry::{RegisterResult, Registry, same_path, slugify};
 use crate::core::scaffold::{
     BridgeChange, INITIAL_CONFIG, INSTRUCTIONS_BACKUP_FILE, INSTRUCTIONS_VERSION, ai_instructions,
-    apply_bridge, extract_global_block, gitignore_with, initial_plan, initial_project_map,
-    initial_summary, instructions_version, project_map_from_stack, splice_global_block,
-    stack_summary_suffix,
+    apply_bridge, gitignore_with, initial_plan, initial_project_map, initial_summary,
+    instructions_version, project_map_from_stack, stack_summary_suffix,
 };
 
 pub(super) const MEMORY_DIR: &str = ".dejafix";
@@ -25,7 +24,6 @@ const INSTRUCTIONS_FILE: &str = "AI_INSTRUCTIONS.md";
 const PROJECT_MAP_FILE: &str = "PROJECT_MAP.md";
 const MAP_PLACEHOLDER: &str = "Status: not created yet";
 pub(super) const RULE_FILES: [&str; 2] = ["CLAUDE.md", "AGENTS.md"];
-const INHERITED_TAGS: usize = 5;
 
 fn write_failed(path: &Path) -> impl Fn(io::Error) -> StoreError + '_ {
     move |source| StoreError::Write {
@@ -106,11 +104,7 @@ pub(super) fn refresh_instructions(root: &Path) -> Result<bool, StoreError> {
         return Ok(false);
     }
     write_text(&memory.join(INSTRUCTIONS_BACKUP_FILE), &current)?;
-    let fresh = match extract_global_block(&current) {
-        Some(block) => splice_global_block(ai_instructions(), &block),
-        None => ai_instructions().to_owned(),
-    };
-    write_text(&path, &fresh)?;
+    write_text(&path, ai_instructions())?;
     ensure_gitignore(root, &[&format!("{MEMORY_DIR}/{INSTRUCTIONS_BACKUP_FILE}")])?;
     Ok(true)
 }
@@ -148,22 +142,11 @@ pub(super) fn write_bridges(
     Ok(written)
 }
 
-pub(super) fn detect_and_record(root: &Path, settings: &Settings) -> Stack {
-    let stack = detect_stack(root);
-    let _ =
-        GlobalStore::new(&settings.dejafix_home).record_promotable(&promotable_libraries(&stack));
-    stack
+fn cached<'s>(stack: &'s mut Option<Stack>, root: &Path) -> &'s Stack {
+    stack.get_or_insert_with(|| detect_stack(root))
 }
 
-fn cached<'s>(stack: &'s mut Option<Stack>, root: &Path, settings: &Settings) -> &'s Stack {
-    stack.get_or_insert_with(|| detect_and_record(root, settings))
-}
-
-fn populate_map(
-    root: &Path,
-    settings: &Settings,
-    stack: &mut Option<Stack>,
-) -> Result<Option<String>, StoreError> {
+fn populate_map(root: &Path, stack: &mut Option<Stack>) -> Result<Option<String>, StoreError> {
     let path = root.join(MEMORY_DIR).join(PROJECT_MAP_FILE);
     let Some(current) = read_optional_text(&path)? else {
         return Ok(None);
@@ -171,48 +154,12 @@ fn populate_map(
     if !current.contains(MAP_PLACEHOLDER) {
         return Ok(None);
     }
-    let stack = cached(stack, root, settings);
+    let stack = cached(stack, root);
     let Some(map) = project_map_from_stack(&project_name(root), stack, &manifest_info(root)) else {
         return Ok(None);
     };
     write_text(&path, &map)?;
     Ok(Some(stack_summary_suffix(stack)))
-}
-
-fn inherit(
-    root: &Path,
-    settings: &Settings,
-    global_tags: Option<&str>,
-    stack: &mut Option<Stack>,
-) -> Result<Option<Inherited>, StoreError> {
-    let store = GlobalStore::new(&settings.dejafix_home);
-    if !store.has_entries() {
-        return Ok(None);
-    }
-    let stack = cached(stack, root, settings);
-    if stack.tags.is_empty() && stack.libraries.is_empty() {
-        return Ok(None);
-    }
-    let filter: Option<Vec<String>> = global_tags.filter(|tags| !tags.is_empty()).map(|tags| {
-        tags.split(',')
-            .map(|tag| crate::core::text::python_strip(tag).to_owned())
-            .collect()
-    });
-    let patterns = store.patterns().unwrap_or_default();
-    let gotchas = store.gotchas().unwrap_or_default();
-    let relevant = relevant_entries(stack, filter.as_deref(), &patterns, &gotchas);
-    let Some(block) = inherited_block(&relevant) else {
-        return Ok(None);
-    };
-    let path = root.join(MEMORY_DIR).join(INSTRUCTIONS_FILE);
-    if let Some(content) = read_text_within(&path, root)? {
-        write_text(&path, &splice_global_block(&content, &block))?;
-    }
-    Ok(Some(Inherited {
-        tags: stack.tags.iter().take(INHERITED_TAGS).cloned().collect(),
-        gotchas: relevant.gotchas.len(),
-        patterns: relevant.patterns.len(),
-    }))
 }
 
 pub fn init_project(
@@ -230,7 +177,7 @@ pub fn init_project(
     };
     let mut stack = None;
     let project_map = if options.stack_detect {
-        populate_map(root, settings, &mut stack)?
+        populate_map(root, &mut stack)?
     } else {
         None
     };
@@ -245,17 +192,11 @@ pub fn init_project(
             })
         }
     };
-    let inherited = if options.global {
-        inherit(root, settings, options.global_tags.as_deref(), &mut stack)?
-    } else {
-        None
-    };
     Ok(InitReport {
         mem_dir,
         refreshed_instructions,
         bridges,
         project_map,
-        inherited,
         hooks,
     })
 }

@@ -11,7 +11,6 @@ pub const OK: &str = "✓";
 pub const FAIL: &str = "✗";
 pub const WARN: &str = "⚠";
 pub const RUNNING: &str = "●";
-pub const ARROW: &str = "→";
 pub const RULE_DOUBLE: &str = "═";
 
 impl Style {

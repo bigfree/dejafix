@@ -17,6 +17,7 @@ fn args(action: &str, text: Option<&str>, library: Option<&str>) -> GlobalArgs {
         budget: 2_000,
         export_file: None,
         apply_file: None,
+        alias: Vec::new(),
     }
 }
 

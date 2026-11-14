@@ -21,6 +21,7 @@ pub fn action_of(args: GlobalArgs) -> GlobalAction {
         budget,
         export_file,
         apply_file,
+        alias,
     } = args;
     let json = format == "json";
     let action = match action.as_str() {
@@ -48,6 +49,13 @@ pub fn action_of(args: GlobalArgs) -> GlobalAction {
             library,
             budget,
         },
+        "edit" => GlobalAction::Edit {
+            id: text,
+            library,
+            keywords: keyword,
+            versions,
+            aliases: alias,
+        },
         "upgrade" => GlobalAction::Upgrade {
             export: export_file,
             apply: apply_file,
@@ -73,7 +81,8 @@ pub fn run(
 ) -> io::Result<Outcome> {
     match global(&config.cwd, settings, action_of(args), &mut OsIds) {
         Ok(
-            outcome @ (GlobalOutcome::Usage(Usage::AddGotcha | Usage::Upgrade)
+            outcome @ (GlobalOutcome::Usage(Usage::AddGotcha | Usage::Edit | Usage::Upgrade)
+            | GlobalOutcome::EditRefused(_)
             | GlobalOutcome::GotchaRejected { .. }
             | GlobalOutcome::UpgradeExists(_)
             | GlobalOutcome::UpgradeMissing(_)

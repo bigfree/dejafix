@@ -28,11 +28,10 @@ pub use crate::core::event::{
 };
 pub use crate::core::global::{
     AddOutcome, CheckFailure, CheckReport, CheckWarning, DEFAULT_BUDGET, Draft, DraftError, Entry,
-    GLOBAL_FIELDS, GlobalAction, GlobalDoc, GlobalIndex, GlobalOutcome, GotchaInput, GotchaV2,
-    Libraries, PROMOTABLE_SEED, Relevant, Stack, StoredGotcha, UpgradeOutcome, Usage, add_reply,
-    check_gotcha, filtered, global_reply, global_report, gotcha_entry, inherited_block,
-    is_gotcha_signal, is_prunable, is_upgraded, line, normalize_input, parse_store,
-    promotable_libraries, promotable_set, promotion, relevant_entries, similar,
+    GLOBAL_FIELDS, GlobalAction, GlobalDoc, GlobalHint, GlobalIndex, GlobalOutcome, GotchaInput,
+    GotchaV2, Libraries, Relevant, Stack, StoredGotcha, UpgradeOutcome, Usage, add_reply,
+    check_gotcha, filtered, global_hint, global_reply, global_report, hint_candidate, is_prunable,
+    is_upgraded, line, normalize_input, parse_store, relevant_entries,
 };
 pub use crate::core::hooks::{
     HOOK_MARKER_END, HOOK_MARKER_START, HOOK_SHEBANG, HookChange, HookKind, Removal,
@@ -71,9 +70,8 @@ pub use crate::core::resolve::{Probe, Resolution, ResolveError, Source, resolve}
 pub use crate::core::scaffold::{
     BRIDGE_END, BRIDGE_START, BridgeChange, INITIAL_CONFIG, INSTRUCTIONS_BACKUP_FILE,
     INSTRUCTIONS_VERSION, ManifestInfo, TITLE_CHARS, ai_instructions, apply_bridge, bridge_block,
-    extract_global_block, gitignore_with, initial_plan, initial_project_map, initial_summary,
-    instructions_version, plan_with_idea, project_map_from_stack, splice_global_block,
-    stack_summary_suffix,
+    gitignore_with, initial_plan, initial_project_map, initial_summary, instructions_version,
+    plan_with_idea, project_map_from_stack, stack_summary_suffix,
 };
 pub use crate::core::score::{
     Score, ScoreError, ScoreEvent, calculate_score, raw_events, score_event, score_event_of,
@@ -103,12 +101,12 @@ pub use crate::core::write::{
 };
 pub use crate::wiring::{
     BridgeOutcome, CaptureOutcome, CorruptLog, DoctorOptions, DoctorReport, EditHookRun,
-    FoundProject, HooksAction, HooksOutcome, HooksReport, Inherited, InitHooks, InitOptions,
-    InitReport, ListedProject, MemoryFile, PrecheckOutcome, PrecheckRequest, Project, Recorded,
-    RegistryOp, RegistryReply, ScanReport, SearchOutput, Settings, UpgradeNotice, WiringError,
-    add_gotcha, add_plan_idea, auto_capture, brief, doctor, edit_hook, global, hooks_action,
-    init_project, other_projects, precheck, read_memory_file, record, regenerate, register_project,
-    registry_op, scan_projects, search_project, show, upgrade_notice,
+    FoundProject, HooksAction, HooksOutcome, HooksReport, InitHooks, InitOptions, InitReport,
+    ListedProject, MemoryFile, PrecheckOutcome, PrecheckRequest, Project, Recorded, RegistryOp,
+    RegistryReply, ScanReport, SearchOutput, Settings, UpgradeNotice, WiringError, add_gotcha,
+    add_plan_idea, auto_capture, brief, doctor, edit_hook, global, hooks_action, init_project,
+    other_projects, precheck, read_memory_file, record, regenerate, register_project, registry_op,
+    scan_projects, search_project, show, upgrade_notice,
 };
 pub use crate::wiring::{CachedLog, McpSettings, McpState, ToolCall, ToolReply, WriteCall};
 pub use crate::wiring::{

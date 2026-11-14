@@ -159,14 +159,7 @@ pub(crate) fn compare_with_home(
     Ok((python, differences))
 }
 
-const DIAGNOSES: &[(&str, &str)] = &[(
-    "home/.dejafix/global/library_gotchas.jsonl: only on the right",
-    "Rust bug: every attempt, decision or note write creates an empty global \
-     library_gotchas.jsonl, because GlobalStore::append_gotcha_if_new \
-     (dejafix-core/src/adapters/fs/global.rs) opens the file with create(true) \
-     before `decide` runs; Python's auto_promote_event writes the file only when \
-     a gotcha is promoted",
-)];
+const DIAGNOSES: &[(&str, &str)] = &[];
 
 pub(crate) fn assert_same(scenario: &str, differences: &[String]) {
     let explained: Vec<String> = differences

@@ -3,8 +3,8 @@ use std::fmt::Write;
 
 use serde_json::{Map, Value, json};
 
-use super::inherit::is_truthy;
 use super::record::is_upgraded;
+use super::relevant::is_truthy;
 use super::types::{AddOutcome, Entry, GlobalOutcome, Palette, Stack, Usage};
 use crate::core::json::{python_str, write_python_json_indented};
 
@@ -15,7 +15,7 @@ const STATUS_BAR_WIDTH: usize = 48;
 const SHOWN_LIBRARIES: usize = 15;
 const META_SEPARATOR: &str = " · ";
 const AVAILABLE: &str =
-    "status, list, add, add-gotcha, query, upgrade, remove, export, import, prune, detect";
+    "status, list, add, add-gotcha, query, edit, upgrade, remove, export, import, prune, detect";
 
 fn items(entry: &Entry, key: &str) -> Vec<String> {
     match entry.get(key) {
@@ -330,6 +330,9 @@ fn usage_text(usage: Usage) -> &'static str {
         Usage::Upgrade => {
             "Usage: djf global upgrade --export <file> | djf global upgrade --apply <file>\n"
         }
+        Usage::Edit => {
+            "Usage: djf global edit <id> [--library <name>] [--keyword <phrase>...] [--versions <range>] [--alias <library>=<alias>]\n"
+        }
         Usage::Remove => "Usage: djf global remove <id>\n",
         Usage::Import => "Usage: djf global import <file.json>\n",
     }
@@ -425,14 +428,14 @@ pub fn global_report(outcome: &GlobalOutcome, color: bool) -> String {
             text,
             warnings,
         } => gotcha_added(&tag, id, library, text, warnings),
-        GlobalOutcome::GotchaRejected { failures, warnings } => {
-            let mut out = format!("Not added: {}.\n", failures.join("; "));
-            for warning in warnings {
-                let _ = writeln!(out, "  Warning: {warning}");
-            }
-            out
-        }
+        GlobalOutcome::GotchaRejected { failures, warnings } => refused_text(failures, warnings),
         GlobalOutcome::Reply(text) => format!("{text}\n"),
+        GlobalOutcome::Edited {
+            id,
+            aliases,
+            warnings,
+        } => edited_text(id.as_deref(), aliases, warnings, &tag),
+        GlobalOutcome::EditRefused(reasons) => format!("Not changed: {}.\n", reasons.join("; ")),
         GlobalOutcome::UpgradeExported { file, drafts } => {
             format!(
                 "{tag} Drafts written: {drafts} records to {file}\n  Let the agent fill them, review them, then: djf global upgrade --apply {file}\n"
@@ -501,4 +504,29 @@ pub fn add_reply(outcome: &AddOutcome) -> String {
             format!("Not added: {}.", failures.join("; "))
         }
     }
+}
+
+fn edited_text(id: Option<&str>, aliases: &[String], warnings: &[String], tag: &str) -> String {
+    let mut out = String::new();
+    if let Some(id) = id {
+        let _ = writeln!(out, "{tag} Gotcha edited: {id}");
+    }
+    for alias in aliases {
+        let _ = writeln!(out, "{tag} Alias added: {alias}");
+    }
+    if out.is_empty() {
+        out.push_str("Nothing to change.\n");
+    }
+    for warning in warnings {
+        let _ = writeln!(out, "  Warning: {warning}");
+    }
+    out
+}
+
+fn refused_text(failures: &[String], warnings: &[String]) -> String {
+    let mut out = format!("Not added: {}.\n", failures.join("; "));
+    for warning in warnings {
+        let _ = writeln!(out, "  Warning: {warning}");
+    }
+    out
 }

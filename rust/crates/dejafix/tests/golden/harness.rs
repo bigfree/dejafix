@@ -236,7 +236,7 @@ pub fn run_actions(
     snapshot(&project, "project", &mut files)?;
     snapshot(&home, "home", &mut files)?;
     snapshot_git_hooks(implementation, &project, &mut files)?;
-    crate::normalize::approved_departures(&mut files);
+    crate::normalize::approved_departures(&mut files, implementation, &since);
     let python_version = python_version(&repository)?;
     let mut normalizer = Normalizer::new(
         &[
@@ -273,7 +273,10 @@ fn step_output(
             implementation,
             printed(implementation, &output.stdout),
         )),
-        stderr: normalizer.apply(&printed(implementation, &output.stderr)),
+        stderr: normalizer.apply(&crate::normalize::approved_stderr(
+            implementation,
+            printed(implementation, &output.stderr),
+        )),
     }
 }
 
@@ -314,7 +317,13 @@ fn sorted(value: &serde_json::Value) -> serde_json::Value {
     }
 }
 
-const CHANGED_TOOLS: [&str; 3] = ["add_global_gotcha", "global_query", "search_events"];
+const CHANGED_TOOLS: [&str; 5] = [
+    "add_global_gotcha",
+    "add_note",
+    "get_global_gotchas",
+    "global_query",
+    "search_events",
+];
 
 fn exact_search(implementation: Implementation, mut args: Vec<String>) -> Vec<String> {
     let regex = args.iter().any(|arg| arg == "--regex" || arg == "-r");

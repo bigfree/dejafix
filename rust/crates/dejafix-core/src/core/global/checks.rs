@@ -200,7 +200,8 @@ fn run_status(lowered: &str) -> Option<String> {
         .or_else(|| numbered_step(lowered))
 }
 
-fn is_package_name(library: &str) -> bool {
+#[must_use]
+pub fn is_package_name(library: &str) -> bool {
     !library.is_empty()
         && library.bytes().all(|byte| {
             byte.is_ascii_lowercase()

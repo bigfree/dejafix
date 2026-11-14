@@ -1,7 +1,7 @@
 use serde_json::{Map, Value};
 
 use super::types::{Entry, GotchaV2, Libraries, StoredGotcha};
-use crate::core::json::write_python_json;
+use crate::core::json::{write_canonical, write_python_json};
 
 const FORMAT_VERSION: u64 = 2;
 
@@ -213,5 +213,19 @@ impl Libraries {
         aliases.push(alias);
         aliases.sort();
         true
+    }
+}
+
+#[must_use]
+pub fn stored_line(record: &StoredGotcha) -> String {
+    match record {
+        StoredGotcha::V2(record) => line(record),
+        StoredGotcha::V1(entry) => {
+            let mut out = Vec::new();
+            if write_canonical(&mut out, &Value::Object(entry.clone())).is_err() {
+                return String::new();
+            }
+            String::from_utf8(out).unwrap_or_default()
+        }
     }
 }

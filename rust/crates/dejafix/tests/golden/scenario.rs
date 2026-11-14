@@ -124,7 +124,7 @@ fn write_scenario_matches_python() -> TestResult {
     let differences = diff(&python, &rust);
     assert!(differences.is_empty(), "{}", differences.join("\n"));
     assert!(
-        python
+        !rust
             .files
             .contains_key("home/.dejafix/global/library_gotchas.jsonl")
     );

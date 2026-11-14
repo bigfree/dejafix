@@ -77,6 +77,13 @@ pub enum GlobalAction {
         export: Option<String>,
         apply: Option<String>,
     },
+    Edit {
+        id: Option<String>,
+        library: Option<String>,
+        keywords: Vec<String>,
+        versions: Option<String>,
+        aliases: Vec<String>,
+    },
     Remove(Option<String>),
     Export,
     Import(Option<String>),
@@ -94,6 +101,7 @@ pub enum GlobalAction {
 pub enum Usage {
     Add,
     AddGotcha,
+    Edit,
     Upgrade,
     Remove,
     Import,
@@ -130,6 +138,12 @@ pub enum GlobalOutcome {
         warnings: Vec<String>,
     },
     Reply(String),
+    Edited {
+        id: Option<String>,
+        aliases: Vec<String>,
+        warnings: Vec<String>,
+    },
+    EditRefused(Vec<String>),
     UpgradeExported {
         file: String,
         drafts: usize,
@@ -294,4 +308,11 @@ pub struct UpgradeOutcome {
 pub(super) enum Verdict {
     Replace(Box<GotchaV2>),
     Drop,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GlobalHint {
+    None,
+    NamedLibrary,
+    AnyLibrary,
 }

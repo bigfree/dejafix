@@ -3,12 +3,11 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 use serde_json::{Map, Value};
 
 use super::checks::normalize_input;
-use super::record::{extra_fields, line};
+use super::record::{extra_fields, line, stored_line};
 use super::types::{
     CheckFailure, CheckReport, Draft, DraftError, Entry, GotchaInput, GotchaV2, Libraries,
     StoredGotcha, UpgradeOutcome, Verdict,
 };
-use crate::core::json::write_canonical;
 
 const INSTRUCTIONS: &str = "For every record below: translate the original text into English and write it as one general lesson of 30 to 600 characters in \"gotcha\"; remove project details (paths, ticket numbers, internal hosts, project names); give 2 to 8 English keywords of at most 4 words in \"keywords\"; correct \"library\" to the canonical package name in lower case; fill \"versions\" when the lesson applies to a version range; set \"drop\" to true for anything that is not a general lesson. Leave \"original\" and \"checks\" as they are, they are ignored when the file is applied.";
 const UNKNOWN_ID: &str = "no record has this id";
@@ -224,14 +223,6 @@ fn upgraded(entry: &Entry, input: GotchaInput, today: &str) -> GotchaV2 {
     }
 }
 
-fn canonical_line(entry: &Entry) -> String {
-    let mut out = Vec::new();
-    if write_canonical(&mut out, &Value::Object(entry.clone())).is_err() {
-        return String::new();
-    }
-    String::from_utf8(out).unwrap_or_default()
-}
-
 fn verdicts<'d>(
     records: &[StoredGotcha],
     drafts: &'d [Draft],
@@ -294,7 +285,9 @@ pub fn apply(
                 outcome.lines.push(line(replacement));
                 outcome.replaced += 1;
             }
-            (StoredGotcha::V1(entry), None) => outcome.lines.push(canonical_line(entry)),
+            (StoredGotcha::V1(entry), None) => outcome
+                .lines
+                .push(stored_line(&StoredGotcha::V1(entry.clone()))),
             (StoredGotcha::V2(kept), None) => outcome.lines.push(line(kept)),
         }
     }

@@ -107,7 +107,7 @@ const DETECT_JSON: &str = r#"{
 }
 "#;
 
-const UNKNOWN: &str = "Unknown action: frob\nAvailable: status, list, add, add-gotcha, query, upgrade, remove, export, import, prune, detect\n";
+const UNKNOWN: &str = "Unknown action: frob\nAvailable: status, list, add, add-gotcha, query, edit, upgrade, remove, export, import, prune, detect\n";
 
 fn global_dir(repo: &Repo) -> PathBuf {
     repo.registry().join("global")
@@ -629,13 +629,11 @@ fn detect_matches_python() -> TestResult {
 }
 
 #[test]
-fn detect_records_the_libraries_it_saw() -> TestResult {
+fn detect_no_longer_writes_a_promotion_cache() -> TestResult {
     let repo = Repo::new()?;
     with_stack(&repo)?;
-    run(&repo, &["detect"])?;
-    let cache: Value = serde_json::from_str(&read(&repo, ".promotable.json")?)?;
-    let libraries = cache["libraries"].as_array().ok_or("no libraries")?;
-    assert!(libraries.iter().any(|library| library == "pydantic"));
+    assert!(run(&repo, &["detect"])?.starts_with("\nDetected Stack: repo\n"));
+    assert!(!global_dir(&repo).join(".promotable.json").exists());
     Ok(())
 }
 
@@ -986,5 +984,89 @@ fn a_malformed_draft_line_is_reported_and_nothing_is_written() -> TestResult {
     assert_eq!(store_text(&repo)?, UPGRADE_STORE);
     assert!(!global_dir(&repo).join("library_gotchas.v1.jsonl").exists());
     assert!(!global_dir(&repo).join("libraries.json").exists());
+    Ok(())
+}
+
+fn added_id(repo: &Repo) -> Result<String, Box<dyn std::error::Error>> {
+    let out = run(
+        repo,
+        &[
+            "add-gotcha",
+            LESSON,
+            "--library",
+            "sqlalchemy",
+            "--keyword",
+            "async session",
+            "--keyword",
+            "request cleanup",
+        ],
+    )?;
+    Ok(Regex::new("got_[0-9a-f]{12}")?
+        .find(&out)
+        .map(|found| found.as_str().to_owned())
+        .ok_or("no id printed")?)
+}
+
+#[test]
+fn edit_changes_keywords_versions_and_library_and_rechecks() -> TestResult {
+    let repo = Repo::new()?;
+    let id = added_id(&repo)?;
+    let out = run(
+        &repo,
+        &[
+            "edit",
+            &id,
+            "--keyword",
+            "session leak",
+            "--keyword",
+            "fastapi request",
+            "--versions",
+            ">=2.0",
+            "--alias",
+            "sqlalchemy=sqla",
+        ],
+    )?;
+    assert_eq!(
+        out,
+        format!("[global] Gotcha edited: {id}\n[global] Alias added: sqlalchemy=sqla\n")
+    );
+    let line = read(&repo, "library_gotchas.jsonl")?;
+    assert!(
+        line.contains(r#""keywords": ["session leak", "fastapi request"], "versions": ">=2.0""#),
+        "{line}"
+    );
+    assert!(line.contains(r#""reviewed": "#), "{line}");
+    assert!(read(&repo, "libraries.json")?.contains("\"sqla\""));
+    let found = run(&repo, &["query", "", "--library", "sqla"])?;
+    assert!(
+        found.starts_with("Global gotchas of sqla (1 of 1 shown):"),
+        "{found}"
+    );
+    let rejected = refused(&repo, &["edit", &id, "--keyword", "only one"])?;
+    assert_eq!(rejected, "Not changed: give 2 to 8 keywords, not 1.\n");
+    assert_eq!(read(&repo, "library_gotchas.jsonl")?, line);
+    assert_eq!(
+        refused(&repo, &["edit", "got_000000000000", "--versions", "1"])?,
+        "Not changed: no record has the id got_000000000000.\n"
+    );
+    assert_eq!(
+        refused(&repo, &["edit", "--alias", "nonsense"])?,
+        "Not changed: 'nonsense' is not <library>=<alias>.\n"
+    );
+    assert_eq!(
+        refused(&repo, &["edit", "--alias", "redis=sqla"])?,
+        "Not changed: 'sqla' is already an alias of sqlalchemy.\n"
+    );
+    assert!(refused(&repo, &["edit"])?.starts_with("Usage: djf global edit <id>"));
+    Ok(())
+}
+
+#[test]
+fn a_version_one_record_must_be_upgraded_before_an_edit() -> TestResult {
+    let repo = seeded()?;
+    assert_eq!(
+        refused(&repo, &["edit", "got_000000000001", "--versions", "2"])?,
+        "Not changed: got_000000000001 is not upgraded yet; run `djf global upgrade` first.\n"
+    );
     Ok(())
 }

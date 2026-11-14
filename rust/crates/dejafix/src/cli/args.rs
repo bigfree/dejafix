@@ -180,7 +180,7 @@ pub enum Commands {
 pub struct GlobalArgs {
     #[arg(
         default_value = "status",
-        help = "Action: status, list, add, add-gotcha, query, upgrade, remove, export, import, prune, detect."
+        help = "Action: status, list, add, add-gotcha, query, edit, upgrade, remove, export, import, prune, detect."
     )]
     pub action: String,
     #[arg(help = "Pattern text, gotcha text, entry ID, or import file path.")]
@@ -236,6 +236,12 @@ pub struct GlobalArgs {
         help = "Apply the filled upgrade drafts in FILE."
     )]
     pub apply_file: Option<String>,
+    #[arg(
+        long = "alias",
+        value_name = "LIBRARY=ALIAS",
+        help = "Add an alias of a library for edit (repeatable)."
+    )]
+    pub alias: Vec<String>,
 }
 
 #[derive(Debug, Args)]

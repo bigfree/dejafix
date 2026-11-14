@@ -1,4 +1,4 @@
-use std::collections::{BTreeSet, HashSet};
+use std::collections::HashSet;
 use std::fs::{self, File, OpenOptions};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
@@ -9,14 +9,13 @@ use serde_json::{Map, Value};
 use super::store::read_python_text;
 use super::types::{GlobalStore, GotchaWrite, StoreError};
 use super::write::{write_atomic, write_text};
-use crate::core::global::{Entry, Libraries, PROMOTABLE_SEED, is_prunable};
+use crate::core::global::{Entry, Libraries, is_prunable};
 use crate::core::json::{write_canonical, write_python_json_indented};
 use crate::core::text::{platform_newlines, python_lines, python_strip, universal_newlines};
 
 const PATTERNS_FILE: &str = "patterns.jsonl";
 const GOTCHAS_FILE: &str = "library_gotchas.jsonl";
 const PREFERENCES_FILE: &str = "stack_preferences.md";
-const PROMOTABLE_FILE: &str = ".promotable.json";
 const LIBRARIES_FILE: &str = "libraries.json";
 const BACKUP_FILE: &str = "library_gotchas.v1.jsonl";
 const LOCK_ATTEMPTS: usize = 16;
@@ -49,30 +48,6 @@ fn parse_entries(text: &str) -> Option<Vec<Entry>> {
             _ => None,
         })
         .collect()
-}
-
-fn library_names(value: Option<&Value>) -> Option<Vec<String>> {
-    match value {
-        None => Some(Vec::new()),
-        Some(Value::Array(items)) => Some(
-            items
-                .iter()
-                .filter_map(Value::as_str)
-                .filter(|name| !name.is_empty())
-                .map(str::to_lowercase)
-                .collect(),
-        ),
-        Some(Value::Object(map)) => Some(
-            map.keys()
-                .filter(|name| !name.is_empty())
-                .map(|name| name.to_lowercase())
-                .collect(),
-        ),
-        Some(Value::String(text)) => {
-            Some(text.chars().map(|c| c.to_lowercase().collect()).collect())
-        }
-        Some(Value::Null | Value::Bool(_) | Value::Number(_)) => None,
-    }
 }
 
 fn invalid_store(path: &Path) -> StoreError {
@@ -136,57 +111,6 @@ impl GlobalStore {
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
             Err(_) => Err(()),
         }
-    }
-
-    #[must_use]
-    pub fn promotable(&self) -> Option<Vec<String>> {
-        let _ = self.ensure();
-        let text = match self.read(PROMOTABLE_FILE, true) {
-            Ok(Some(text)) => text,
-            Ok(None) => return Some(Vec::new()),
-            Err(()) => return None,
-        };
-        match serde_json::from_str::<Value>(&text) {
-            Ok(Value::Object(data)) => library_names(data.get("libraries")),
-            Ok(_) => None,
-            Err(_) => Some(Vec::new()),
-        }
-    }
-
-    pub fn record_promotable(&self, libraries: &[String]) -> Result<(), StoreError> {
-        let fresh: BTreeSet<String> = libraries
-            .iter()
-            .filter(|library| !library.is_empty())
-            .map(|library| library.to_lowercase())
-            .collect();
-        if fresh.is_empty() {
-            return Ok(());
-        }
-        let Some(cached) = self.promotable() else {
-            return Ok(());
-        };
-        let mut known: BTreeSet<String> = PROMOTABLE_SEED
-            .iter()
-            .map(|library| (*library).to_owned())
-            .chain(cached)
-            .collect();
-        if fresh.is_subset(&known) {
-            return Ok(());
-        }
-        known.extend(fresh);
-        let path = self.path(PROMOTABLE_FILE);
-        let value = serde_json::json!({"libraries": known.into_iter().collect::<Vec<_>>()});
-        let mut out = Vec::new();
-        write_python_json_indented(&mut out, &value, 2, true)
-            .map_err(|error| write_error(&path)(error.into()))?;
-        self.ensure()?;
-        write_text(&path, &String::from_utf8_lossy(&out))
-    }
-
-    #[must_use]
-    pub fn has_entries(&self) -> bool {
-        let _ = self.ensure();
-        self.path(PATTERNS_FILE).exists() || self.path(GOTCHAS_FILE).exists()
     }
 
     #[must_use]
@@ -530,37 +454,5 @@ impl GlobalStore {
         }
         let [patterns, gotchas] = added;
         Ok((patterns, gotchas))
-    }
-
-    pub fn append_gotcha_if_new(
-        &self,
-        decide: impl FnOnce(&[Entry]) -> Option<Entry>,
-    ) -> Result<bool, StoreError> {
-        let path = self.path(GOTCHAS_FILE);
-        let mut decide = Some(decide);
-        let mut failure = None;
-        let appended = self.change_locked(GOTCHAS_FILE, true, |existing| {
-            let Some(entry) = decide.take().and_then(|decide| decide(&existing)) else {
-                return (GotchaWrite::Keep, false);
-            };
-            match Self::canonical_lines(&path, &[&entry]) {
-                Ok(text) => (
-                    GotchaWrite::Append(text.lines().map(str::to_owned).collect()),
-                    true,
-                ),
-                Err(error) => {
-                    failure = Some(error);
-                    (GotchaWrite::Keep, false)
-                }
-            }
-        });
-        if let Some(error) = failure {
-            return Err(error);
-        }
-        match appended {
-            Ok(appended) => Ok(appended.unwrap_or(false)),
-            Err(StoreError::Read { .. }) => Ok(false),
-            Err(error) => Err(error),
-        }
     }
 }

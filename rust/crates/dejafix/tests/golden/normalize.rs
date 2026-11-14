@@ -114,16 +114,117 @@ fn minute(since: &str) -> String {
     format!("{date} {time}")
 }
 
-pub fn approved_departures(files: &mut std::collections::BTreeMap<String, String>) {
-    for (path, text) in files.iter_mut() {
-        if !path.ends_with("/.gitignore") {
+const INHERITED_HEADING: &str = "## Global Memory — Inherited Knowledge";
+const INHERITED_LINE: &str = "  Global memory: Detected stack [";
+const INJECTED_SUFFIX: &str = " injected into AI_INSTRUCTIONS.md";
+const LANGUAGE_SECTION: &str = "## Language and global memory\n\nWrite every memory record in English. Read memory in English and answer the user in their language. Before using a library, or after an unexpected failure, call `global_query`.\n\n";
+const LANGUAGE_BRIDGE: &str = "Write every memory record in English. Read memory in English and\nanswer the user in their language. Before using a library, or after\nan unexpected failure, call `global_query`.\n\n";
+const LANGUAGE_MCP: &str = "  - Before using a library, or after an unexpected failure → call global_query(query).\n\nWrite every memory record in English. Read memory in English and\nanswer the user in their language.\n";
+const LIBRARY_MCP: &str = "  - User mentions a library → call get_global_gotchas(library).\n";
+const GLOBAL_HINT: &str = "If this applies beyond this project, also call add_global_gotcha(";
+const PROMOTED_STORE: &str = "home/.dejafix/global/library_gotchas.jsonl";
+const PROMOTION_CACHE: &str = "home/.dejafix/global/.promotable.json";
+
+pub fn without_language_rules(text: &str) -> String {
+    text.replace(LANGUAGE_SECTION, "")
+        .replace(LANGUAGE_BRIDGE, "")
+        .replace(LANGUAGE_MCP, LIBRARY_MCP)
+        .replace(
+            "<!-- dejafix-instructions: 4 -->",
+            "<!-- dejafix-instructions: 3 -->",
+        )
+}
+
+fn without_inherited_block(text: &str) -> String {
+    let Some(start) = text.find(INHERITED_HEADING) else {
+        return text.to_owned();
+    };
+    let body = start + INHERITED_HEADING.len();
+    let end = text
+        .get(body..)
+        .and_then(|rest| rest.find("\n## "))
+        .map_or(text.len(), |next| body + next + 1);
+    format!(
+        "{}{}",
+        text.get(..start).unwrap_or_default(),
+        text.get(end..).unwrap_or_default()
+    )
+}
+
+fn without_inheritance_report(text: &str) -> String {
+    let lines: Vec<&str> = text.split_inclusive('\n').collect();
+    let mut kept: Vec<&str> = Vec::with_capacity(lines.len());
+    for line in lines {
+        if line.starts_with(INHERITED_LINE) {
+            if kept.last().is_some_and(|last| last.trim().is_empty()) {
+                kept.pop();
+            }
             continue;
         }
-        let kept: String = text
-            .split_inclusive('\n')
-            .filter(|line| line.trim_end_matches(['\r', '\n']) != ".djf-*")
-            .collect();
-        kept.trim_end_matches(['\r', '\n']).clone_into(text);
+        if line.trim_end().ends_with(INJECTED_SUFFIX) && line.starts_with("    ") {
+            continue;
+        }
+        kept.push(line);
+    }
+    kept.concat()
+}
+
+fn without_hints(text: &str) -> String {
+    text.split_inclusive('\n')
+        .filter(|line| !line.starts_with(GLOBAL_HINT))
+        .collect()
+}
+
+fn promoted_during(text: &str, since: &str) -> String {
+    let since = since.get(..19).unwrap_or(since);
+    text.split_inclusive('\n')
+        .filter(|line| {
+            serde_json::from_str::<serde_json::Value>(line.trim())
+                .ok()
+                .and_then(|entry| {
+                    entry
+                        .get("discovered")
+                        .and_then(serde_json::Value::as_str)
+                        .map(|day| day.get(..19).unwrap_or(day) < since)
+                })
+                .unwrap_or(true)
+        })
+        .collect()
+}
+
+pub fn approved_departures(
+    files: &mut std::collections::BTreeMap<String, String>,
+    implementation: Implementation,
+    since: &str,
+) {
+    for (path, text) in files.iter_mut() {
+        if path.ends_with("/.gitignore") {
+            let kept: String = text
+                .split_inclusive('\n')
+                .filter(|line| line.trim_end_matches(['\r', '\n']) != ".djf-*")
+                .collect();
+            kept.trim_end_matches(['\r', '\n']).clone_into(text);
+        } else if matches!(implementation, Implementation::Rust) {
+            *text = without_language_rules(text);
+        } else if path.ends_with("AI_INSTRUCTIONS.md") {
+            *text = without_inherited_block(text);
+        } else if path == PROMOTED_STORE {
+            *text = promoted_during(text, since);
+        }
+    }
+    if matches!(implementation, Implementation::Python) {
+        files.remove(PROMOTION_CACHE);
+        if files.get(PROMOTED_STORE).is_some_and(String::is_empty) {
+            files.remove(PROMOTED_STORE);
+        }
+    }
+}
+
+pub fn approved_stderr(implementation: Implementation, text: String) -> String {
+    if matches!(implementation, Implementation::Rust) && text.contains(GLOBAL_HINT) {
+        without_hints(&text)
+    } else {
+        text
     }
 }
 
@@ -139,8 +240,9 @@ fn without_upgrade_marks(text: String) -> String {
 
 pub fn approved_stdout(implementation: Implementation, text: String) -> String {
     if matches!(implementation, Implementation::Rust) {
-        return without_upgrade_marks(text);
+        return without_hints(&without_language_rules(&without_upgrade_marks(text)));
     }
+    let text = without_inheritance_report(&without_inherited_block(&text));
     if !text.contains(AUTO_CAPTURED) {
         return text;
     }

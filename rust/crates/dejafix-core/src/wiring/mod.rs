@@ -29,9 +29,9 @@ pub use setup::{
     set_auto_check, update_status,
 };
 pub use types::{
-    BridgeOutcome, CorruptLog, DoctorOptions, DoctorReport, FoundProject, Inherited, InitHooks,
-    InitOptions, InitReport, ListedProject, MemoryFile, Project, Recorded, RegistryOp,
-    RegistryReply, ScanReport, SearchOutput, Settings, UpgradeNotice, WiringError,
+    BridgeOutcome, CorruptLog, DoctorOptions, DoctorReport, FoundProject, InitHooks, InitOptions,
+    InitReport, ListedProject, MemoryFile, Project, Recorded, RegistryOp, RegistryReply,
+    ScanReport, SearchOutput, Settings, UpgradeNotice, WiringError,
 };
 
 #[cfg(test)]

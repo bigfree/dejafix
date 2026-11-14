@@ -1,204 +1,133 @@
 use serde_json::json;
 
-use super::{
-    Entry, Stack, gotcha_entry, inherited_block, is_gotcha_signal, promotable_set, promotion,
-    relevant_entries, similar,
-};
+use super::{Entry, GlobalHint, Stack, global_hint, hint_candidate, relevant_entries};
 use crate::core::event::{EventKind, Outcome};
 
 fn libs(names: &[&str]) -> Vec<String> {
     names.iter().map(|name| (*name).to_owned()).collect()
 }
 
-fn promote(
+fn hint(
     summary: &str,
     kind: EventKind,
     outcome: Option<Outcome>,
-    project: &[&str],
-    existing: &[Entry],
+    stack: &[&str],
 ) -> Option<String> {
-    let promotable = promotable_set(&libs(&["tailwindcss", "gin"]));
-    promotion(
+    global_hint(
         summary,
-        kind,
-        outcome,
-        &promotable,
-        &libs(project),
-        existing,
+        hint_candidate(summary, kind, outcome),
+        &libs(stack),
+    )
+}
+
+fn hint_for(library: &str) -> String {
+    format!(
+        "If this applies beyond this project, also call add_global_gotcha(library=\"{library}\", ...) in English without project details."
     )
 }
 
 #[test]
-fn only_lessons_are_signals() {
-    assert!(is_gotcha_signal(
-        "x",
-        EventKind::Attempt,
-        Some(Outcome::Failed)
-    ));
-    assert!(is_gotcha_signal(
-        "x",
-        EventKind::Attempt,
-        Some(Outcome::Partial)
-    ));
-    assert!(!is_gotcha_signal(
-        "x",
-        EventKind::Attempt,
-        Some(Outcome::Worked)
-    ));
-    assert!(!is_gotcha_signal("x", EventKind::Attempt, None));
-    assert!(is_gotcha_signal("  GOTCHA: vite", EventKind::Note, None));
-    assert!(is_gotcha_signal("Don't do it", EventKind::Decision, None));
-    assert!(!is_gotcha_signal("Use FastAPI", EventKind::Decision, None));
-    assert!(!is_gotcha_signal("gotcha: x", EventKind::Fix, None));
-}
-
-#[test]
-fn a_failed_react_attempt_in_a_react_project_is_promoted() {
-    assert_eq!(
-        promote(
-            "react strict mode double-invokes",
-            EventKind::Attempt,
-            Some(Outcome::Failed),
-            &["react", "javascript"],
-            &[]
-        )
-        .as_deref(),
-        Some("react")
-    );
-}
-
-#[test]
-fn english_collisions_and_foreign_stacks_are_not_promoted() {
-    assert_eq!(
-        promote(
-            "the next HMR reload",
-            EventKind::Attempt,
-            Some(Outcome::Failed),
-            &["vite"],
-            &[]
-        ),
-        None
-    );
-    assert_eq!(
-        promote(
-            "imagineering went wrong",
-            EventKind::Attempt,
-            Some(Outcome::Failed),
-            &[],
-            &[]
-        ),
-        None
-    );
-    assert_eq!(
-        promote(
-            "Use FastAPI as the core",
+fn only_lessons_and_failed_attempts_are_candidates() {
+    for (summary, kind, outcome, expected) in [
+        ("gotcha: x", EventKind::Note, None, GlobalHint::AnyLibrary),
+        (
+            "  Lesson: x",
             EventKind::Decision,
             None,
-            &["fastapi"],
-            &[]
+            GlobalHint::AnyLibrary,
+        ),
+        ("never do x", EventKind::Note, None, GlobalHint::AnyLibrary),
+        ("plain note", EventKind::Note, None, GlobalHint::None),
+        (
+            "x",
+            EventKind::Attempt,
+            Some(Outcome::Failed),
+            GlobalHint::NamedLibrary,
+        ),
+        (
+            "x",
+            EventKind::Attempt,
+            Some(Outcome::Partial),
+            GlobalHint::NamedLibrary,
+        ),
+        (
+            "x",
+            EventKind::Attempt,
+            Some(Outcome::Worked),
+            GlobalHint::None,
+        ),
+        ("gotcha: x", EventKind::Issue, None, GlobalHint::None),
+        ("gotcha: x", EventKind::Fix, None, GlobalHint::None),
+    ] {
+        assert_eq!(
+            hint_candidate(summary, kind, outcome),
+            expected,
+            "{summary}"
+        );
+    }
+}
+
+#[test]
+fn a_failed_attempt_hints_only_when_it_names_a_stack_library() {
+    assert_eq!(
+        hint(
+            "vite dev server kept the old env",
+            EventKind::Attempt,
+            Some(Outcome::Failed),
+            &["react", "vite"]
+        ),
+        Some(hint_for("vite"))
+    );
+    assert_eq!(
+        hint(
+            "the server kept the old env",
+            EventKind::Attempt,
+            Some(Outcome::Failed),
+            &["react", "vite"]
         ),
         None
+    );
+    assert_eq!(
+        hint(
+            "react-router and React both",
+            EventKind::Attempt,
+            Some(Outcome::Partial),
+            &["react", "react-router"]
+        ),
+        Some(hint_for("react-router"))
     );
 }
 
 #[test]
-fn aliases_and_longest_match_win() {
+fn a_lesson_note_hints_with_the_named_library_or_a_placeholder() {
     assert_eq!(
-        promote(
-            "gotcha: tailwindcss purge drops classes",
+        hint(
+            "gotcha: Prisma drops the index",
             EventKind::Note,
             None,
-            &["tailwind"],
-            &[]
-        )
-        .as_deref(),
-        Some("tailwindcss")
+            &["prisma"]
+        ),
+        Some(hint_for("prisma"))
     );
     assert_eq!(
-        promote(
-            "gotcha: next and react disagree",
+        hint(
+            "gotcha: the cache is per worker",
             EventKind::Note,
             None,
-            &[],
             &[]
-        )
-        .as_deref(),
-        Some("react")
+        ),
+        Some(hint_for("<library>"))
     );
-}
-
-#[test]
-fn similar_gotchas_are_not_promoted_twice() {
-    let existing: Vec<Entry> = vec![
-        json!({"library": "react", "gotcha": "react strict mode double invokes effects"})
-            .as_object()
-            .cloned()
-            .unwrap(),
-    ];
     assert_eq!(
-        promote(
-            "react strict mode double invokes reducers",
-            EventKind::Attempt,
-            Some(Outcome::Failed),
-            &[],
-            &existing
+        hint(
+            "the cache is per worker",
+            EventKind::Note,
+            None,
+            &["prisma"]
         ),
         None
     );
-    assert!(
-        promote(
-            "react portals lose context",
-            EventKind::Attempt,
-            Some(Outcome::Failed),
-            &[],
-            &existing
-        )
-        .is_some()
-    );
-    let broken: Vec<Entry> = vec![
-        json!({"library": "react", "gotcha": 3})
-            .as_object()
-            .cloned()
-            .unwrap(),
-    ];
-    assert_eq!(
-        promote(
-            "react portals lose context",
-            EventKind::Attempt,
-            Some(Outcome::Failed),
-            &[],
-            &broken
-        ),
-        None
-    );
-    assert!(similar("a b c", "A B D"));
-    assert!(!similar("a b c d e", "a b c x y"));
-    assert!(!similar("", "a"));
-}
-
-#[test]
-fn entries_have_python_fields() {
-    let library = promotion(
-        "gotcha: redis eviction",
-        EventKind::Note,
-        None,
-        &promotable_set(&[]),
-        &[],
-        &[],
-    )
-    .unwrap();
-    let entry = gotcha_entry(
-        &library,
-        "gotcha: redis eviction",
-        "got_000000000001".into(),
-        "2027-01-15T08:00:00.000001Z".into(),
-        "proj",
-    );
-    assert_eq!(
-        serde_json::Value::Object(entry),
-        json!({"id": "got_000000000001", "library": "redis", "gotcha": "gotcha: redis eviction", "tags": [], "source_project": "proj", "version_range": null, "discovered": "2027-01-15T08:00:00.000001Z"})
-    );
-    let _ = Stack::default();
+    assert_eq!(global_hint("x", GlobalHint::None, &libs(&["x"])), None);
 }
 
 fn entry(value: &serde_json::Value) -> Entry {
@@ -265,38 +194,6 @@ fn filter_tags_replace_the_project_tags() {
     assert_eq!(relevant.gotchas.len(), 1);
     let unfiltered = relevant_entries(&web_stack(), Some(&[]), &patterns, &gotchas);
     assert_eq!(unfiltered.patterns.len(), 1);
-}
-
-#[test]
-fn nothing_relevant_builds_no_block() {
-    let relevant = relevant_entries(&web_stack(), None, &[], &[]);
-    assert_eq!(inherited_block(&relevant), None);
-}
-
-#[test]
-fn the_block_renders_like_python() {
-    let patterns = vec![
-        entry(&json!({"pattern": "Prefer small PRs", "source_project": "api"})),
-        entry(&json!({"pattern": 1.5, "source_project": ""})),
-    ];
-    let gotchas = vec![
-        entry(
-            &json!({"library": "react", "gotcha": "strict mode mounts twice", "source_project": "web", "version_range": ">=18"}),
-        ),
-        entry(
-            &json!({"library": "vite", "version_range": null, "gotcha": null, "source_project": 0}),
-        ),
-        entry(&json!({"library": "vite", "gotcha": ["x"], "source_project": true})),
-    ];
-    let relevant = relevant_entries(&web_stack(), None, &patterns, &gotchas);
-    assert_eq!(
-        inherited_block(&relevant).unwrap(),
-        "## Global Memory — Inherited Knowledge\n\nThe following patterns and gotchas were inherited from your global memory\n(~/.dejafix/global/). They represent lessons learned from other projects.\n\n### Library Gotchas\n\n- **react** [>=18]: strict mode mounts twice (from web)\n- **vite**: None\n- **vite**: [\"x\"] (from True)\n\n### Cross-Project Patterns\n\n- Prefer small PRs (from api)\n- 1.5\n"
-    );
-    let only_patterns = relevant_entries(&Stack::default(), None, &patterns, &[]);
-    let block = inherited_block(&only_patterns).unwrap();
-    assert!(!block.contains("### Library Gotchas"));
-    assert!(block.ends_with("- 1.5\n"));
 }
 
 mod report {
@@ -493,7 +390,7 @@ mod report {
         );
         assert_eq!(
             global_report(&GlobalOutcome::Unknown("frob".into()), true),
-            "Unknown action: frob\nAvailable: status, list, add, add-gotcha, query, upgrade, remove, export, import, prune, detect\n"
+            "Unknown action: frob\nAvailable: status, list, add, add-gotcha, query, edit, upgrade, remove, export, import, prune, detect\n"
         );
     }
 

@@ -4,13 +4,14 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use dejafix_core::{
-    Stack, ai_instructions, bridge_block, extract_global_block, inherited_block, initial_plan,
-    initial_project_map, initial_summary, manifest_info, relevant_entries, splice_global_block,
+    ai_instructions, bridge_block, initial_plan, initial_project_map, initial_summary,
+    manifest_info,
 };
 use serde_json::{Value, json};
 
 use crate::harness::{GIT_NO_MAINTENANCE, diff, fixed, run_scenario};
 use crate::m2::oracle;
+use crate::normalize::without_language_rules;
 use crate::scenario::canonical;
 use crate::types::{Arguments, Implementation};
 
@@ -21,12 +22,12 @@ fn templates_match_python() -> TestResult {
     let dir = tempfile::tempdir()?;
     let python: Value = serde_json::from_str(&oracle(&["templates"], dir.path(), "")?)?;
     let rust = json!({
-        "instructions": ai_instructions(),
+        "instructions": without_language_rules(ai_instructions()),
         "summary": initial_summary("demo"),
         "map": initial_project_map("demo"),
         "plan": initial_plan("demo"),
-        "bridge": bridge_block(Some("demo")),
-        "anonymous": bridge_block(None),
+        "bridge": without_language_rules(&bridge_block(Some("demo"))),
+        "anonymous": without_language_rules(&bridge_block(None)),
     });
     for key in [
         "instructions",
@@ -37,120 +38,6 @@ fn templates_match_python() -> TestResult {
         "anonymous",
     ] {
         assert_eq!(python[key], rust[key], "{key}");
-    }
-    Ok(())
-}
-
-const HEADING: &str = "## Global Memory — Inherited Knowledge";
-
-fn splice_corpus() -> Vec<(String, String)> {
-    let block = format!("{HEADING}\n\n- new\n");
-    [
-        String::new(),
-        "# Title\n".to_owned(),
-        "# Title\n\n## Rules summary\n- r\n".to_owned(),
-        format!("# T\n\n{HEADING}\n\n- old\n\n## Rules summary\n- r\n"),
-        format!("# T\n{HEADING}\n### Sub\n- old\n\n\n## Next\nx\n## Rules\ny\n"),
-        HEADING.to_owned(),
-        format!("{HEADING}\n- a\n## Rules\n{HEADING}\n- b\n"),
-        format!("x\n\n\n{HEADING}\n\n\n"),
-        ai_instructions().to_owned(),
-    ]
-    .into_iter()
-    .map(|content| (content, block.clone()))
-    .collect()
-}
-
-#[test]
-fn global_block_splicing_matches_python() -> TestResult {
-    let corpus = splice_corpus();
-    let stdin = corpus
-        .iter()
-        .map(|pair| json!([pair.0, pair.1]).to_string())
-        .collect::<Vec<_>>()
-        .join("\n");
-    let dir = tempfile::tempdir()?;
-    let expected = oracle(&["splice"], dir.path(), &stdin)?;
-    for ((content, block), python) in corpus.iter().zip(expected.lines()) {
-        let rust = json!([
-            extract_global_block(content).unwrap_or_default(),
-            splice_global_block(content, block)
-        ]);
-        assert_eq!(serde_json::from_str::<Value>(python)?, rust, "{content:?}");
-    }
-    Ok(())
-}
-
-fn inherit_corpus() -> Vec<Value> {
-    let patterns = json!([
-        {"pattern": "everywhere", "tags": [], "source_project": "api"},
-        {"pattern": "untagged"},
-        {"pattern": "react only", "tags": ["react"]},
-        {"pattern": "python only", "tags": ["python"], "source_project": ""},
-        {"pattern": "chars", "tags": "py"},
-        {"pattern": 2, "tags": {"react": true}}
-    ]);
-    let gotchas = json!([
-        {"library": "React", "gotcha": "mounts twice", "source_project": "web", "version_range": ">=18"},
-        {"library": "vite", "gotcha": "caches env", "version_range": null},
-        {"library": "django", "gotcha": "never"},
-        {"library": "python", "gotcha": "by tag", "source_project": 0},
-        {"gotcha": "no library"},
-        {"library": "vite", "gotcha": null, "source_project": false}
-    ]);
-    let web = json!({"tags": ["javascript", "react"], "libraries": ["react", "vite"]});
-    vec![
-        json!([web, null, patterns, gotchas]),
-        json!([web, ["python", "p"], patterns, gotchas]),
-        json!([web, [], patterns, gotchas]),
-        json!([web, null, [], []]),
-        json!([{"tags": [], "libraries": []}, null, patterns, []]),
-        json!([web, null, [], gotchas]),
-    ]
-}
-
-fn strings(value: &Value) -> Vec<String> {
-    value
-        .as_array()
-        .map(|items| {
-            items
-                .iter()
-                .filter_map(Value::as_str)
-                .map(str::to_owned)
-                .collect()
-        })
-        .unwrap_or_default()
-}
-
-fn entries(value: &Value) -> Vec<serde_json::Map<String, Value>> {
-    value
-        .as_array()
-        .map(|items| items.iter().filter_map(Value::as_object).cloned().collect())
-        .unwrap_or_default()
-}
-
-#[test]
-fn inheritance_matches_python() -> TestResult {
-    let corpus = inherit_corpus();
-    let stdin = corpus
-        .iter()
-        .map(Value::to_string)
-        .collect::<Vec<_>>()
-        .join("\n");
-    let dir = tempfile::tempdir()?;
-    let expected = oracle(&["inherit"], dir.path(), &stdin)?;
-    for (case, python) in corpus.iter().zip(expected.lines()) {
-        let stack = Stack {
-            tags: strings(&case[0]["tags"]),
-            libraries: strings(&case[0]["libraries"]),
-            ..Stack::default()
-        };
-        let filter = case[1].is_array().then(|| strings(&case[1]));
-        let patterns = entries(&case[2]);
-        let gotchas = entries(&case[3]);
-        let relevant = relevant_entries(&stack, filter.as_deref(), &patterns, &gotchas);
-        let rust = inherited_block(&relevant).unwrap_or_default();
-        assert_eq!(serde_json::from_str::<String>(python)?, rust, "{case}");
     }
     Ok(())
 }
@@ -371,7 +258,6 @@ fn cli_scenario_matches_python() -> TestResult {
         "project/.dejafix/plan.md",
         "home/.dejafix/projects.json",
         "home/.dejafix/projects.meta.json",
-        "home/.dejafix/global/.promotable.json",
     ] {
         assert!(python.files.contains_key(file), "{file}");
     }

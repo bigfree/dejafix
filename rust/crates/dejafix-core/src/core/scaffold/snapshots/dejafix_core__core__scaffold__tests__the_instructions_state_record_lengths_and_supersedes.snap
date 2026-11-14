@@ -4,11 +4,15 @@ expression: text
 ---
 # dejafix AI Instructions
 
-<!-- dejafix-instructions: 3 -->
+<!-- dejafix-instructions: 4 -->
 
 These instructions are MANDATORY for all AI coding agents working in this project. Failure to follow them means your work is incomplete and the audit trail is corrupted.
 
 This file is stable operating guidance. Do not rewrite it unless the user asks or dejafix itself changes.
+
+## Language and global memory
+
+Write every memory record in English. Read memory in English and answer the user in their language. Before using a library, or after an unexpected failure, call `global_query`.
 
 ## Start of every session
 

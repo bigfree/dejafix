@@ -8,7 +8,7 @@ use dejafix_core::{
 };
 
 use super::args::InitArgs;
-use super::output::{ARROW, RULE_DOUBLE, WARN, json_escaped, secho};
+use super::output::{RULE_DOUBLE, WARN, json_escaped, secho};
 use super::types::{McpBlock, Outcome, Platform, Style};
 use crate::config::Config;
 
@@ -228,27 +228,6 @@ pub fn run(
         )?;
     }
     print_hooks(report.hooks.as_ref(), out, err)?;
-    if let Some(inherited) = &report.inherited {
-        writeln!(
-            out,
-            "\n  Global memory: Detected stack [{}]",
-            inherited.tags.join(", ")
-        )?;
-        if inherited.gotchas > 0 {
-            writeln!(
-                out,
-                "    {ARROW} {} library gotchas injected into AI_INSTRUCTIONS.md",
-                inherited.gotchas
-            )?;
-        }
-        if inherited.patterns > 0 {
-            writeln!(
-                out,
-                "    {ARROW} {} patterns injected into AI_INSTRUCTIONS.md",
-                inherited.patterns
-            )?;
-        }
-    }
     if !no_mcp_config {
         let pinned = if mcp_config_single {
             Vec::new()

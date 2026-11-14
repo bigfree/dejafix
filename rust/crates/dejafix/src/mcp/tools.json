@@ -466,7 +466,7 @@
     }
   },
   {
-    "description": "Query cross-project library gotchas from ~/.dejafix/global/.\n\nReturns lessons learned in past projects that apply to the libraries\nyou're about to use. Call whenever working with an unfamiliar library\nor starting a new feature.\n\nRead-only. Reads from ~/.dejafix/global/ (cross-project memory,\nnot this repo's .dejafix/).",
+    "description": "List one library's lessons from global memory (~/.dejafix/global/).\n\nTo search by what you are doing or by a failure, call global_query\ninstead; it ranks lessons by relevance.\n\nRead-only. Reads from ~/.dejafix/global/ (cross-project memory,\nnot this repo's .dejafix/).",
     "inputSchema": {
       "properties": {
         "library": {
@@ -479,7 +479,7 @@
             }
           ],
           "default": null,
-          "description": "Optional library name to filter by (case-insensitive substring match — 'react' also matches 'react-router'). When omitted, returns all gotchas across every library — useful when starting a new feature to scan for any relevant past lessons.",
+          "description": "Library name or one of its aliases ('nextjs' finds 'next'). When omitted, lists every library's lessons within the default reply budget.",
           "title": "Library"
         },
         "project": {
@@ -827,11 +827,11 @@
     }
   },
   {
-    "description": "Record a gotcha, setup detail, or other durable context.\n\nUse when you discover something important that doesn't fit as an\nissue or decision. Notes survive across sessions and appear in\nwrap context blocks.\n\nReplies with the note's event id. Side effects: appends a `note`\nevent. Notes prefixed `gotcha:`,\n`lesson:`, or `warning:` are eligible for auto-promotion to\n~/.dejafix/global/ for cross-project recall (L-046).",
+    "description": "Record a gotcha, setup detail, or other durable context.\n\nUse when you discover something important that doesn't fit as an\nissue or decision. Notes survive across sessions and appear in\nwrap context blocks.\n\nReplies with the note's event id. Side effects: appends a `note`\nevent. Nothing is written to global memory; a lesson that holds\nbeyond this project goes to add_global_gotcha.",
     "inputSchema": {
       "properties": {
         "summary": {
-          "description": "One-line description of the gotcha, setup detail, or context worth preserving. Prefix with 'gotcha:' or 'lesson:' to enable cross-project promotion — e.g., 'gotcha: bcrypt v4 silently truncates passwords longer than 72 bytes'. Keep it under 300 characters: summary.md clips longer text.",
+          "description": "One-line description in English of the gotcha, setup detail, or context worth preserving — e.g., 'gotcha: bcrypt v4 silently truncates passwords longer than 72 bytes'. Keep it under 300 characters: summary.md clips longer text.",
           "title": "Summary",
           "type": "string"
         },

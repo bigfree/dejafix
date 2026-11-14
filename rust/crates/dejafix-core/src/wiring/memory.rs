@@ -3,11 +3,11 @@ use std::path::Path;
 
 use serde_json::Value;
 
-use super::global::{gotcha_action, upgrade_action};
-use super::init::detect_and_record;
+use super::global::{edit_action, gotcha_action, upgrade_action};
 use super::types::{Project, Settings, WiringError};
 use crate::adapters::fs::{
-    FsResolver, GlobalStore, path_context, project_name, read_events_file, read_json_text,
+    FsResolver, GlobalStore, detect_stack, path_context, project_name, read_events_file,
+    read_json_text,
 };
 use crate::adapters::git::GitHistory;
 use crate::core::brief::{BriefInput, render_brief};
@@ -33,7 +33,7 @@ pub fn brief(cwd: &Path, settings: &Settings, color: bool) -> Result<String, Wir
         None::<&HashSet<&str>>,
         STALE_COMMIT_THRESHOLD,
     );
-    let stack = detect_and_record(cwd, settings);
+    let stack = detect_stack(cwd);
     let store = GlobalStore::new(&settings.dejafix_home);
     let stored = store
         .load_patterns()
@@ -132,6 +132,7 @@ pub fn global(
             gotcha_action(settings, &project, action, ids)
         }
         GlobalAction::Upgrade { export, apply } => upgrade_action(settings, cwd, export, apply),
+        action @ GlobalAction::Edit { .. } => edit_action(settings, action),
         GlobalAction::Remove(id) => {
             let Some(id) = non_empty(id) else {
                 return Ok(GlobalOutcome::Usage(Usage::Remove));
@@ -161,7 +162,7 @@ pub fn global(
             )?,
             older_than,
         }),
-        GlobalAction::Detect { json } => detect(&store, cwd, settings, json),
+        GlobalAction::Detect { json } => detect(&store, cwd, json),
         GlobalAction::Unknown(action) => Ok(GlobalOutcome::Unknown(action)),
     }
 }
@@ -190,13 +191,8 @@ fn add_pattern(
     Ok(GlobalOutcome::PatternAdded { id, text })
 }
 
-fn detect(
-    store: &GlobalStore,
-    cwd: &Path,
-    settings: &Settings,
-    json: bool,
-) -> Result<GlobalOutcome, WiringError> {
-    let stack = detect_and_record(cwd, settings);
+fn detect(store: &GlobalStore, cwd: &Path, json: bool) -> Result<GlobalOutcome, WiringError> {
+    let stack = detect_stack(cwd);
     let patterns = store.load_patterns()?;
     let gotchas = store.load_gotchas()?;
     let relevant = relevant_entries(&stack, None, &patterns, &gotchas);

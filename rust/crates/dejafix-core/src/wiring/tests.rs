@@ -143,7 +143,7 @@ fn a_stale_marker_is_cleared_even_when_the_command_fails() {
 }
 
 #[test]
-fn appending_an_event_stays_inside_an_isolated_home() {
+fn lessons_and_failed_attempts_write_no_global_record_and_hint_instead() {
     let dir = tempfile::tempdir().unwrap();
     let home = tempfile::tempdir().unwrap();
     empty_project(dir.path());
@@ -153,23 +153,40 @@ fn appending_an_event_stays_inside_an_isolated_home() {
     )
     .unwrap();
     let project = Project::open(dir.path(), settings(home.path())).unwrap();
-    record(
+    let hint = |library: &str| {
+        format!(
+            "If this applies beyond this project, also call add_global_gotcha(library=\"{library}\", ...) in English without project details."
+        )
+    };
+    let lesson = record(
         &project,
         note("gotcha: react strict mode mounts twice"),
         &mut SeqIds::default(),
     )
     .unwrap();
-    record(
+    assert_eq!(lesson.hints, [hint("react")]);
+    let failed = record(
         &project,
-        note("gotcha: react strict mode mounts twice in dev"),
+        Command::Attempt {
+            text: "zod schema rejects the empty string".into(),
+            outcomes: vec![Outcome::Failed],
+            location: None,
+            issue: None,
+            auto_issue: true,
+        },
         &mut SeqIds::default(),
     )
     .unwrap();
-    let gotchas = read(home.path().join("global/library_gotchas.jsonl"));
-    assert_eq!(gotchas.lines().count(), 1);
-    assert!(gotchas.contains("\"library\": \"react\""));
-    assert!(gotchas.contains("\"discovered\": \"2027-01-15T08:00:00Z\""));
-    assert!(read(home.path().join("global/.promotable.json")).contains("\"zod\""));
+    assert_eq!(failed.hints, [hint("zod")]);
+    let plain = record(
+        &project,
+        note("the build takes a minute"),
+        &mut SeqIds::default(),
+    )
+    .unwrap();
+    assert_eq!(plain.hints, Vec::<String>::new());
+    assert!(!home.path().join("global/library_gotchas.jsonl").exists());
+    assert!(!home.path().join("global/.promotable.json").exists());
 }
 
 #[test]
@@ -341,7 +358,6 @@ fn init_creates_the_memory_files_and_registers_the_project() {
         ]
     );
     assert_eq!(report.project_map, None);
-    assert_eq!(report.inherited, None);
     assert!(read(project.root.join("CLAUDE.md")).contains("**checkout-api**"));
     let gitignore = read(project.root.join(".gitignore"));
     assert!(gitignore.contains(".dejafix/events.jsonl") && !gitignore.contains("plan.md"));
@@ -392,7 +408,7 @@ fn an_unregistrable_home_falls_back_to_the_folder_slug() {
 }
 
 #[test]
-fn init_refreshes_an_older_marker_and_keeps_the_global_block() {
+fn init_refreshes_an_older_marker_and_drops_the_global_block() {
     let project = initialised("app");
     let mem = project.root.join(".dejafix");
     fs::create_dir_all(&mem).unwrap();
@@ -404,7 +420,7 @@ fn init_refreshes_an_older_marker_and_keeps_the_global_block() {
     assert!(report.refreshed_instructions);
     let text = read(mem.join("AI_INSTRUCTIONS.md"));
     assert_eq!(instructions_version(&text), INSTRUCTIONS_VERSION);
-    assert!(text.contains("- kept\n"));
+    assert_eq!(text, ai_instructions());
     assert_eq!(read(mem.join("AI_INSTRUCTIONS.md.bak")), stale);
     assert!(read(project.root.join(".gitignore")).contains(".dejafix/AI_INSTRUCTIONS.md.bak\n"));
     fs::write(mem.join("AI_INSTRUCTIONS.md"), "old, no marker\n").unwrap();
@@ -440,7 +456,7 @@ fn with_global_gotcha(home: &Path) {
 }
 
 #[test]
-fn global_memory_and_the_stack_map_are_inherited() {
+fn init_maps_the_stack_and_copies_no_global_record() {
     let project = initialised("shop");
     fs::write(
         project.root.join("package.json"),
@@ -449,44 +465,29 @@ fn global_memory_and_the_stack_map_are_inherited() {
     .unwrap();
     fs::create_dir(project.root.join("src")).unwrap();
     with_global_gotcha(&project.home);
+    let store = fs::read(project.home.join("global/library_gotchas.jsonl")).unwrap();
     let report = init_project(&project.root, None, &settings(&project.home), &options()).unwrap();
     assert_eq!(report.project_map.as_deref(), Some(" (react)"));
-    let inherited = report.inherited.unwrap();
-    assert_eq!((inherited.gotchas, inherited.patterns), (1, 0));
-    assert_eq!(inherited.tags, ["javascript", "react"]);
     let instructions = read(project.root.join(".dejafix/AI_INSTRUCTIONS.md"));
-    assert!(instructions.contains("- **react**: strict mode mounts twice (from web)\n"));
+    assert!(!instructions.contains("strict mode mounts twice"));
+    assert!(!instructions.contains("Inherited Knowledge"));
+    assert!(instructions.contains("call `global_query`"));
     let map = read(project.root.join(".dejafix/PROJECT_MAP.md"));
     assert!(
         map.contains("## Project purpose\nShop\n")
             && map.contains("- `src/` — package or application code")
     );
-    assert!(project.home.join("global/.promotable.json").is_file());
+    assert!(!project.home.join("global/.promotable.json").exists());
+    assert_eq!(
+        fs::read(project.home.join("global/library_gotchas.jsonl")).unwrap(),
+        store
+    );
     let again = init_project(&project.root, None, &settings(&project.home), &options()).unwrap();
     assert_eq!(again.project_map, None);
-    let twice = read(project.root.join(".dejafix/AI_INSTRUCTIONS.md"));
-    assert_eq!(twice, instructions);
-    let mut python = options();
-    python.global_tags = Some(" python , x".into());
-    let filtered = init_project(&project.root, None, &settings(&project.home), &python).unwrap();
     assert_eq!(
-        filtered.inherited.map(|inherited| inherited.patterns),
-        Some(1)
+        read(project.root.join(".dejafix/AI_INSTRUCTIONS.md")),
+        instructions
     );
-}
-
-#[test]
-fn nothing_is_inherited_without_global_files_or_a_stack() {
-    let project = initialised("plain");
-    with_global_gotcha(&project.home);
-    let report = init_project(&project.root, None, &settings(&project.home), &options()).unwrap();
-    assert_eq!(report.inherited, None);
-    assert_eq!(report.project_map, None);
-    let other = initialised("other");
-    fs::write(other.root.join("Cargo.toml"), "[package]\n").unwrap();
-    let report = init_project(&other.root, None, &settings(&other.home), &options()).unwrap();
-    assert_eq!(report.inherited, None);
-    assert!(other.home.join("global").is_dir());
 }
 
 #[test]
