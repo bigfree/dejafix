@@ -23,6 +23,8 @@
 # * `plan` and `build-local-artifacts` install dist with
 #   .github/scripts/install-dist.sh, which checks the archive against a pinned
 #   SHA-256, instead of piping dist's installer into a shell;
+# * the workflow starts only on tags `v[1-9]*`, so a Python v0.x tag never
+#   starts a release;
 # * `build-wheels` builds the maturin wheels, `host` waits for them;
 # * `publish-pypi` uploads them through PyPI trusted publishing. It must stay a
 #   job of this file: PyPI does not support trusted publishing from a reusable
@@ -60,7 +62,7 @@ permissions:
 on:
   push:
     tags:
-      - '**[0-9]+.[0-9]+.[0-9]+*'
+      - 'v[1-9]*'
 
 jobs:
   # Run 'dist plan' (or host) to determine what tasks we need to do
