@@ -1,23 +1,92 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;
-use std::ffi::OsStr;
+use std::ffi::{OsStr, OsString};
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
+use std::sync::OnceLock;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::types::{Action, Arguments, Implementation, Normalizer, Run, Step, StepOutput};
 
+#[expect(
+    clippy::panic,
+    reason = "a missing Python must fail every golden test with one message"
+)]
 pub fn python(repository: &Path) -> PathBuf {
-    if let Some(python) = std::env::var_os("DEJAFIX_PYTHON") {
-        return PathBuf::from(python);
+    static CHOSEN: OnceLock<Result<PathBuf, String>> = OnceLock::new();
+    match CHOSEN
+        .get_or_init(|| choose_python(std::env::var_os("DEJAFIX_PYTHON"), repository, has_typer))
+    {
+        Ok(path) => path.clone(),
+        Err(message) => panic!("{message}"),
     }
-    let venv = repository.join(".venv");
-    [venv.join("bin/python"), venv.join("Scripts/python.exe")]
-        .into_iter()
-        .find(|path| path.is_file())
-        .unwrap_or_else(|| PathBuf::from("python3"))
+}
+
+pub fn python_candidates(configured: Option<OsString>, repository: &Path) -> Vec<PathBuf> {
+    if let Some(python) = configured {
+        return vec![PathBuf::from(python)];
+    }
+    let mut roots = vec![repository.to_path_buf()];
+    if let Some(main) = main_checkout(repository).filter(|main| main.as_path() != repository) {
+        roots.push(main);
+    }
+    let mut candidates: Vec<PathBuf> = roots
+        .iter()
+        .flat_map(|root| {
+            let venv = root.join(".venv");
+            [venv.join("bin/python"), venv.join("Scripts/python.exe")]
+        })
+        .filter(|path| path.is_file())
+        .collect();
+    candidates.push(PathBuf::from("python3"));
+    candidates
+}
+
+pub fn choose_python(
+    configured: Option<OsString>,
+    repository: &Path,
+    usable: impl Fn(&Path) -> bool,
+) -> Result<PathBuf, String> {
+    let candidates = python_candidates(configured, repository);
+    candidates
+        .iter()
+        .find(|candidate| usable(candidate))
+        .cloned()
+        .ok_or_else(|| {
+            let tried: Vec<String> = candidates
+                .iter()
+                .map(|path| path.display().to_string())
+                .collect();
+            format!(
+                "no Python with dejafix's dependencies: tried {}; set DEJAFIX_PYTHON to one",
+                tried.join(", ")
+            )
+        })
+}
+
+fn has_typer(python: &Path) -> bool {
+    Command::new(python)
+        .args(["-c", "import typer"])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .is_ok_and(|status| status.success())
+}
+
+fn main_checkout(repository: &Path) -> Option<PathBuf> {
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(repository)
+        .args(["rev-parse", "--path-format=absolute", "--git-common-dir"])
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let common = PathBuf::from(String::from_utf8(output.stdout).ok()?.trim());
+    fs::canonicalize(common.parent()?).ok()
 }
 
 pub fn repository() -> Result<PathBuf, Box<dyn Error>> {
