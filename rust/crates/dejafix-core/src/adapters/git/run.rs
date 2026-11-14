@@ -18,6 +18,7 @@ pub(super) const HARDENING: [&str; 6] = [
     "safe.bareRepository=explicit",
 ];
 pub(super) const LITERAL: &str = "--literal-pathspecs";
+pub(super) const NO_OPTIONAL_LOCKS: &str = "--no-optional-locks";
 
 pub(crate) fn git<S: AsRef<OsStr>>(root: &Path, args: &[S]) -> Option<Vec<u8>> {
     git_status(root, args).ok()
@@ -27,6 +28,7 @@ pub(crate) fn git_status<S: AsRef<OsStr>>(root: &Path, args: &[S]) -> Result<Vec
     let mut child = Command::new("git")
         .args(HARDENING)
         .arg(LITERAL)
+        .arg(NO_OPTIONAL_LOCKS)
         .args(args)
         .current_dir(root)
         .stdin(Stdio::null())

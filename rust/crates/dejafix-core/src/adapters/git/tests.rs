@@ -780,4 +780,5 @@ fn a_logged_glob_counts_only_the_file_of_that_name() {
     );
     assert_eq!(super::recent_changes(dir.path(), "a.py", 30), Some(1));
     assert_eq!(super::run::LITERAL, "--literal-pathspecs");
+    assert_eq!(super::run::NO_OPTIONAL_LOCKS, "--no-optional-locks");
 }
