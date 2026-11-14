@@ -678,7 +678,10 @@ fn status_never_runs_the_repository_s_fsmonitor() {
         .current_dir(dir.path())
         .output()
         .unwrap();
-    assert!(marker.exists(), "control: plain git status must run the hook");
+    assert!(
+        marker.exists(),
+        "control: plain git status must run the hook"
+    );
     fs::remove_file(&marker).unwrap();
     let _ = status_files(dir.path());
     assert!(!marker.exists());
@@ -750,4 +753,31 @@ fn every_git_call_carries_the_hardening() {
             "safe.bareRepository=explicit",
         ]
     );
+}
+
+#[test]
+fn a_logged_glob_counts_only_the_file_of_that_name() {
+    let dir = tempfile::tempdir().unwrap();
+    git(dir.path(), &["init", "-q"]);
+    for name in ["a.py", "b.py"] {
+        fs::write(dir.path().join(name), "x\n").unwrap();
+        git(dir.path(), &["add", name]);
+        git(dir.path(), &["commit", "-q", "-m", name]);
+    }
+    let control = Command::new("git")
+        .args(["log", "--oneline", "--", "*.py"])
+        .current_dir(dir.path())
+        .output()
+        .unwrap();
+    assert_eq!(String::from_utf8_lossy(&control.stdout).lines().count(), 2);
+    assert_eq!(super::recent_changes(dir.path(), "*.py", 30), Some(0));
+    let history = super::GitHistory {
+        root: dir.path().to_path_buf(),
+    };
+    assert_eq!(
+        crate::core::stale::FileHistory::commit_times(&history, "*.py", None),
+        Some(Vec::new())
+    );
+    assert_eq!(super::recent_changes(dir.path(), "a.py", 30), Some(1));
+    assert_eq!(super::run::LITERAL, "--literal-pathspecs");
 }

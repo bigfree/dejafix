@@ -17,6 +17,7 @@ pub(super) const HARDENING: [&str; 6] = [
     "-c",
     "safe.bareRepository=explicit",
 ];
+pub(super) const LITERAL: &str = "--literal-pathspecs";
 
 pub(crate) fn git<S: AsRef<OsStr>>(root: &Path, args: &[S]) -> Option<Vec<u8>> {
     git_status(root, args).ok()
@@ -25,6 +26,7 @@ pub(crate) fn git<S: AsRef<OsStr>>(root: &Path, args: &[S]) -> Option<Vec<u8>> {
 pub(crate) fn git_status<S: AsRef<OsStr>>(root: &Path, args: &[S]) -> Result<Vec<u8>, GitFailure> {
     let mut child = Command::new("git")
         .args(HARDENING)
+        .arg(LITERAL)
         .args(args)
         .current_dir(root)
         .stdin(Stdio::null())
