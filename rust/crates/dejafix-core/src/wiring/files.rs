@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use super::types::{MemoryFile, WiringError};
-use crate::adapters::fs::{find_memory_dir, read_text, read_text_within, write_text};
+use crate::adapters::fs::{find_memory_dir, read_text_inside, read_text_within, write_text};
 use crate::core::scaffold::plan_with_idea;
 
 impl MemoryFile {
@@ -15,13 +15,10 @@ impl MemoryFile {
     }
 }
 
-fn memory_file(cwd: &Path, file: MemoryFile) -> Result<PathBuf, WiringError> {
-    Ok(find_memory_dir(cwd)?.dir.join(file.file_name()))
-}
-
 pub fn read_memory_file(cwd: &Path, file: MemoryFile) -> Result<(PathBuf, String), WiringError> {
-    let path = memory_file(cwd, file)?;
-    let text = read_text(&path)?;
+    let memory = find_memory_dir(cwd)?;
+    let path = memory.dir.join(file.file_name());
+    let text = read_text_inside(&path, &memory.root)?;
     Ok((path, text))
 }
 

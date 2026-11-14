@@ -90,6 +90,15 @@ pub(crate) fn points_outside(path: &Path, root: &Path) -> bool {
     }
 }
 
+pub fn read_text_inside(path: &Path, root: &Path) -> Result<String, StoreError> {
+    if points_outside(path, root) {
+        return Err(StoreError::OutsideProject {
+            path: path.to_path_buf(),
+        });
+    }
+    read_text(path)
+}
+
 pub fn read_text_within(path: &Path, root: &Path) -> Result<Option<String>, StoreError> {
     if points_outside(path, root) {
         return Ok(None);

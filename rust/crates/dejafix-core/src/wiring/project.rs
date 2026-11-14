@@ -8,7 +8,7 @@ use jiff::tz::TimeZone;
 use super::types::{Project, Settings, WiringError};
 use crate::adapters::fs::{
     MemoryDir, StoreError, find_memory_dir, issues_dir, path_context, project_name,
-    read_optional_text, write_text, write_text_if_changed,
+    read_text_within, write_text, write_text_if_changed,
 };
 use crate::core::log::EventLog;
 use crate::core::summary::{
@@ -55,11 +55,12 @@ pub(super) fn regenerate_locked(
     project: &Project,
     log: &EventLog<'_>,
 ) -> Result<PathBuf, WiringError> {
-    let map = read_optional_text(&project.memory.dir.join(PROJECT_MAP_FILE))
+    let root = &project.memory.root;
+    let map = read_text_within(&project.memory.dir.join(PROJECT_MAP_FILE), root)
         .ok()
         .flatten();
     let path = project.summary_path();
-    let existing = read_optional_text(&path).ok().flatten();
+    let existing = read_text_within(&path, root).ok().flatten();
     let purpose = map
         .as_deref()
         .and_then(extract_purpose_from_map)

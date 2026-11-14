@@ -12,7 +12,7 @@ pub fn events_path(mem_dir: &Path) -> PathBuf {
     mem_dir.join(EVENTS_FILE)
 }
 
-fn checked_events_path(mem_dir: &Path) -> Result<PathBuf, StoreError> {
+pub(crate) fn checked_events_path(mem_dir: &Path) -> Result<PathBuf, StoreError> {
     let path = events_path(mem_dir);
     let root = mem_dir.parent().unwrap_or(mem_dir);
     if points_outside(&path, root) {

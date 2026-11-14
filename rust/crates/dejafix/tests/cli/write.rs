@@ -376,3 +376,47 @@ fn an_event_log_linked_out_of_the_project_is_never_appended_to() -> TestResult {
     assert_eq!(fs::read_to_string(&secret)?, "export TOKEN=1\n");
     Ok(())
 }
+
+#[cfg(unix)]
+#[test]
+fn memory_files_linked_out_of_the_project_are_never_printed() -> TestResult {
+    let repo = Repo::new()?;
+    let secret = repo.home.join("credentials");
+    fs::write(&secret, "TOKEN=hunter2\n")?;
+    for name in ["summary.md", "AI_INSTRUCTIONS.md"] {
+        std::os::unix::fs::symlink(&secret, repo.mem().join(name))?;
+    }
+    for args in [["show"], ["instructions"]] {
+        let output = repo.djf(&args).assert().code(1).get_output().clone();
+        let stdout = String::from_utf8(output.stdout)?;
+        let stderr = String::from_utf8(output.stderr)?;
+        assert!(!stdout.contains("hunter2"), "{stdout}");
+        assert!(
+            stderr.contains("points outside the project; refusing to use it"),
+            "{stderr}"
+        );
+    }
+    Ok(())
+}
+
+#[cfg(unix)]
+#[test]
+fn init_snooze_and_auto_capture_never_write_into_an_outside_memory_folder() -> TestResult {
+    let repo = Repo::bare()?;
+    let outside = repo.home.with_file_name("outside");
+    fs::create_dir_all(&outside)?;
+    fs::write(outside.join("config.toml"), "")?;
+    std::os::unix::fs::symlink(&outside, repo.mem())?;
+    repo.djf(&["init", "--no-mcp-config"]).assert().code(1);
+    repo.djf(&["precheck", "--snooze", "1h"]).assert().code(1);
+    repo.djf(&["_auto-capture", "commit"])
+        .assert()
+        .success()
+        .stdout("");
+    let mut names: Vec<String> = fs::read_dir(&outside)?
+        .map(|entry| entry.map(|entry| entry.file_name().to_string_lossy().into_owned()))
+        .collect::<Result<_, _>>()?;
+    names.sort();
+    assert_eq!(names, ["config.toml"]);
+    Ok(())
+}

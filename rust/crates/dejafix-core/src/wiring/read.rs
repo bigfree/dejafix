@@ -1,10 +1,13 @@
 use super::types::{Project, SearchOutput, WiringError};
-use crate::adapters::fs::{FsResolver, read_events_file, read_text};
+use crate::adapters::fs::{FsResolver, read_events_file, read_text_inside};
 use crate::core::log::EventLog;
 use crate::core::search::{SearchQuery, match_line, no_match_message, search};
 
 pub fn show(project: &Project) -> Result<String, WiringError> {
-    Ok(read_text(&project.summary_path())?)
+    Ok(read_text_inside(
+        &project.summary_path(),
+        &project.memory.root,
+    )?)
 }
 
 pub fn search_project(
