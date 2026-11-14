@@ -53,6 +53,7 @@ pub use crate::core::precheck::{
     Warning, WarningKind, age, analyze, expiry_iso, parse_snooze, read_expiry, remaining,
     render_warnings, snooze_note, snoozed_until, targets,
 };
+pub use crate::core::rank::{Analyzer, STOP_WORDS, stem};
 pub use crate::core::redact::redact_event;
 pub use crate::core::redact::{REDACTABLE_FIELDS, Redaction, SecretKind, redact, redaction_notice};
 pub use crate::core::registry::{
