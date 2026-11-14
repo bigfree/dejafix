@@ -4,11 +4,12 @@ use super::registry::load_registry;
 use super::types::{GotchaChanges, Settings, WiringError};
 use crate::adapters::fs::{GlobalStore, GotchaWrite, read_json_text};
 use crate::core::global::{
-    AddOutcome, GlobalAction, GlobalIndex, GlobalOutcome, GotchaInput, GotchaV2, Libraries,
-    StoredGotcha, Usage, apply_upgrade, check_gotcha, export_notes, global_reply, is_package_name,
-    legacy_input, line, normalize_input, parse_drafts, parse_store, stored_line,
-    touches_version_one, upgrade_drafts,
+    AddOutcome, CheckReport, Entry, GlobalAction, GlobalIndex, GlobalOutcome, GotchaInput,
+    GotchaV2, Libraries, StoredGotcha, Usage, apply_upgrade, check_gotcha, export_notes,
+    global_reply, is_package_name, legacy_input, line, normalize_input, parse_drafts, parse_store,
+    stored_line, touches_version_one, upgrade_drafts,
 };
+use crate::core::registry::Registry;
 use crate::core::write::Ids;
 
 pub(super) fn today(settings: &Settings) -> String {
@@ -20,48 +21,73 @@ pub(super) fn today(settings: &Settings) -> String {
         .to_string()
 }
 
+pub(crate) fn registry_names(registry: &Registry) -> Vec<String> {
+    registry
+        .projects
+        .iter()
+        .flat_map(|project| std::iter::once(project.id.clone()).chain(project.alias.clone()))
+        .collect()
+}
+
 pub(super) fn project_names(settings: &Settings) -> Vec<String> {
     load_registry(settings)
-        .map(|registry| {
-            registry
-                .projects
-                .into_iter()
-                .flat_map(|project| std::iter::once(project.id).chain(project.alias))
-                .collect()
-        })
+        .map(|registry| registry_names(&registry))
         .unwrap_or_default()
+}
+
+fn with_libraries<T>(
+    store: &GlobalStore,
+    mut decide: impl FnMut(Vec<Entry>, &mut Libraries) -> (GotchaWrite, T, bool),
+) -> Result<Option<T>, WiringError> {
+    let mut failure = None;
+    let value = store.edit_gotchas(|entries| {
+        let mut libraries = match store.libraries() {
+            Ok(libraries) => libraries,
+            Err(error) => {
+                failure = Some(error);
+                return (GotchaWrite::Keep, None);
+            }
+        };
+        let (write, value, save) = decide(entries, &mut libraries);
+        if save && let Err(error) = store.save_libraries(&libraries) {
+            failure = Some(error);
+            return (GotchaWrite::Keep, None);
+        }
+        (write, Some(value))
+    })?;
+    failure.map_or(Ok(value), |error| Err(error.into()))
 }
 
 pub fn add_gotcha(
     settings: &Settings,
-    input: GotchaInput,
+    input: &GotchaInput,
     source_project: Option<&str>,
+    projects: &[String],
     ids: &mut impl Ids,
 ) -> Result<AddOutcome, WiringError> {
     let store = GlobalStore::new(&settings.dejafix_home);
-    let mut libraries = store.libraries()?;
-    let input = normalize_input(input, &libraries);
-    let names = project_names(settings);
-    let projects: Vec<&str> = names.iter().map(String::as_str).collect();
+    let projects: Vec<&str> = projects.iter().map(String::as_str).collect();
     let discovered = today(settings);
-    let outcome = store.edit_gotchas(|entries| {
+    let outcome = with_libraries(&store, |entries, libraries| {
+        let input = normalize_input(input.clone(), libraries);
         let records = parse_store(entries);
-        let report = check_gotcha(&input, &libraries, &projects, &records, None);
+        let report = check_gotcha(&input, libraries, &projects, &records, None);
         if !report.failures.is_empty() {
-            return (GotchaWrite::Keep, AddOutcome::Rejected(report));
+            return (GotchaWrite::Keep, AddOutcome::Rejected(report), false);
         }
         let record = GotchaV2 {
             id: ids.entry_id("got"),
             library: input.library.clone(),
-            keywords: input.keywords.clone(),
-            versions: input.versions.clone(),
-            gotcha: input.gotcha.clone(),
+            keywords: input.keywords,
+            versions: input.versions,
+            gotcha: input.gotcha,
             source_project: source_project
                 .filter(|name| !name.is_empty())
                 .map(str::to_owned),
             discovered: Some(discovered.clone()),
             ..GotchaV2::default()
         };
+        let save = libraries.add_library(&record.library);
         (
             GotchaWrite::Append(vec![line(&record)]),
             AddOutcome::Added {
@@ -69,12 +95,10 @@ pub fn add_gotcha(
                 library: record.library,
                 warnings: report.warnings,
             },
+            save,
         )
     })?;
-    if matches!(outcome, AddOutcome::Added { .. }) && libraries.add_library(&input.library) {
-        store.save_libraries(&libraries)?;
-    }
-    Ok(outcome)
+    Ok(outcome.unwrap_or(AddOutcome::Rejected(CheckReport::default())))
 }
 
 pub fn global_query(
@@ -132,31 +156,30 @@ fn apply_drafts(settings: &Settings, cwd: &Path, file: &str) -> Result<GlobalOut
         }
     };
     let store = GlobalStore::new(&settings.dejafix_home);
-    let mut libraries = store.libraries()?;
     if touches_version_one(&parse_store(store.load_gotchas()?), &drafts) {
         store.backup_v1()?;
     }
     let names = project_names(settings);
     let projects: Vec<&str> = names.iter().map(String::as_str).collect();
     let today = today(settings);
-    let mut outcome = store.edit_gotchas(|entries| {
+    let Some(mut outcome) = with_libraries(&store, |entries, libraries| {
         let records = parse_store(entries);
-        let mut outcome = apply_upgrade(&records, &drafts, &today, &libraries, |id, input| {
-            check_gotcha(input, &libraries, &projects, &records, Some(id))
+        let mut outcome = apply_upgrade(&records, &drafts, &today, libraries, |id, input| {
+            check_gotcha(input, libraries, &projects, &records, Some(id))
         });
         if outcome.replaced + outcome.dropped == 0 {
-            return (GotchaWrite::Keep, outcome);
+            return (GotchaWrite::Keep, outcome, false);
+        }
+        let mut save = false;
+        for library in &outcome.libraries {
+            save |= libraries.add_library(library);
         }
         let lines = std::mem::take(&mut outcome.lines);
-        (GotchaWrite::Replace(lines), outcome)
-    })?;
-    let mut added = false;
-    for library in &outcome.libraries {
-        added |= libraries.add_library(library);
-    }
-    if added {
-        store.save_libraries(&libraries)?;
-    }
+        (GotchaWrite::Replace(lines), outcome, save)
+    })?
+    else {
+        return Ok(GlobalOutcome::Usage(Usage::Upgrade));
+    };
     outcome.kept.sort_unstable();
     Ok(GlobalOutcome::UpgradeApplied {
         replaced: outcome.replaced,
@@ -178,64 +201,50 @@ pub(super) fn upgrade_action(
     }
 }
 
-fn non_empty(text: Option<String>) -> Option<String> {
+pub(super) fn non_empty(text: Option<String>) -> Option<String> {
     text.filter(|text| !text.is_empty())
 }
 
-pub(super) fn gotcha_action(
+pub(super) fn add_action(
     settings: &Settings,
     project: &str,
-    action: GlobalAction,
+    library: Option<String>,
+    text: Option<String>,
+    keywords: Vec<String>,
+    versions: Option<String>,
     ids: &mut impl Ids,
 ) -> Result<GlobalOutcome, WiringError> {
-    match action {
-        GlobalAction::AddGotcha {
-            library,
-            text,
-            keywords,
-            versions,
-        } => {
-            let (Some(library), Some(gotcha)) = (non_empty(library), non_empty(text)) else {
-                return Ok(GlobalOutcome::Usage(Usage::AddGotcha));
-            };
-            if keywords.is_empty() {
-                return Ok(GlobalOutcome::Usage(Usage::AddGotcha));
-            }
-            let input = GotchaInput {
-                library,
-                keywords,
-                gotcha: gotcha.clone(),
-                versions,
-            };
-            Ok(match add_gotcha(settings, input, Some(project), ids)? {
-                AddOutcome::Added {
-                    id,
-                    library,
-                    warnings,
-                } => GlobalOutcome::GotchaAdded {
-                    id,
-                    library,
-                    text: gotcha,
-                    warnings: warnings.iter().map(ToString::to_string).collect(),
-                },
-                AddOutcome::Rejected(report) => GlobalOutcome::GotchaRejected {
-                    failures: report.failures.iter().map(ToString::to_string).collect(),
-                    warnings: report.warnings.iter().map(ToString::to_string).collect(),
-                },
-            })
-        }
-        GlobalAction::Query {
-            text,
-            library,
-            budget,
-        } => Ok(GlobalOutcome::Reply(global_query(
-            settings,
-            text.as_deref().unwrap_or(""),
-            library.as_deref(),
-            budget,
-        )?)),
-        _ => Ok(GlobalOutcome::Usage(Usage::AddGotcha)),
+    let (Some(library), Some(gotcha)) = (non_empty(library), non_empty(text)) else {
+        return Ok(GlobalOutcome::Usage(Usage::AddGotcha));
+    };
+    if keywords.is_empty() {
+        return Ok(GlobalOutcome::Usage(Usage::AddGotcha));
     }
+    let input = GotchaInput {
+        library,
+        keywords,
+        gotcha: gotcha.clone(),
+        versions,
+    };
+    let projects = project_names(settings);
+    Ok(
+        match add_gotcha(settings, &input, Some(project), &projects, ids)? {
+            AddOutcome::Added {
+                id,
+                library,
+                warnings,
+            } => GlobalOutcome::GotchaAdded {
+                id,
+                library,
+                text: gotcha,
+                warnings: warnings.iter().map(ToString::to_string).collect(),
+            },
+            AddOutcome::Rejected(report) => GlobalOutcome::GotchaRejected {
+                failures: report.failures.iter().map(ToString::to_string).collect(),
+                warnings: report.warnings.iter().map(ToString::to_string).collect(),
+            },
+        },
+    )
 }
 
 fn add_aliases(libraries: &mut Libraries, aliases: &[String]) -> Result<Vec<String>, Vec<String>> {
@@ -344,48 +353,59 @@ fn edit_gotcha(
         return Ok(GlobalOutcome::Usage(Usage::Edit));
     }
     let store = GlobalStore::new(&settings.dejafix_home);
-    let mut libraries = store.libraries()?;
-    let added = match add_aliases(&mut libraries, aliases) {
-        Ok(added) => added,
-        Err(refused) => return Ok(GlobalOutcome::EditRefused(refused)),
-    };
-    let mut warnings = Vec::new();
-    let mut new_library = false;
-    if let Some(id) = &id {
-        let names = project_names(settings);
-        let projects: Vec<&str> = names.iter().map(String::as_str).collect();
-        let today = today(settings);
-        let result = store.edit_gotchas(|entries| {
+    let names = project_names(settings);
+    let projects: Vec<&str> = names.iter().map(String::as_str).collect();
+    let today = today(settings);
+    let outcome = with_libraries(&store, |entries, libraries| {
+        let mut revised = libraries.clone();
+        let added = match add_aliases(&mut revised, aliases) {
+            Ok(added) => added,
+            Err(refused) => {
+                return (
+                    GotchaWrite::Keep,
+                    GlobalOutcome::EditRefused(refused),
+                    false,
+                );
+            }
+        };
+        let mut write = GotchaWrite::Keep;
+        let mut warnings = Vec::new();
+        if let Some(id) = &id {
             match edited(
                 &parse_store(entries),
                 id,
                 changes,
-                &libraries,
+                &revised,
                 &projects,
                 &today,
             ) {
-                Ok((lines, library, warnings)) => {
-                    (GotchaWrite::Replace(lines), Ok((library, warnings)))
+                Ok((lines, library, found)) => {
+                    revised.add_library(&library);
+                    write = GotchaWrite::Replace(lines);
+                    warnings = found;
                 }
-                Err(refused) => (GotchaWrite::Keep, Err(refused)),
+                Err(refused) => {
+                    return (
+                        GotchaWrite::Keep,
+                        GlobalOutcome::EditRefused(refused),
+                        false,
+                    );
+                }
             }
-        })?;
-        match result {
-            Ok((library, found)) => {
-                warnings = found;
-                new_library = libraries.add_library(&library);
-            }
-            Err(refused) => return Ok(GlobalOutcome::EditRefused(refused)),
         }
-    }
-    if new_library || !added.is_empty() {
-        store.save_libraries(&libraries)?;
-    }
-    Ok(GlobalOutcome::Edited {
-        id,
-        aliases: added,
-        warnings,
-    })
+        let save = revised != *libraries;
+        *libraries = revised;
+        (
+            write,
+            GlobalOutcome::Edited {
+                id: id.clone(),
+                aliases: added,
+                warnings,
+            },
+            save,
+        )
+    })?;
+    Ok(outcome.unwrap_or(GlobalOutcome::Usage(Usage::Edit)))
 }
 
 pub(super) fn edit_action(

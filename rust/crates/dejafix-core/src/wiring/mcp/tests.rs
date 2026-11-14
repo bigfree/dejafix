@@ -952,3 +952,28 @@ fn a_warm_ranked_search_reuses_the_log_index() {
     assert!(!Arc::ptr_eq(&cached, &rebuilt));
     assert_eq!(rebuilt.index().len(), 2);
 }
+
+#[test]
+fn add_global_gotcha_refuses_an_unknown_project_argument() {
+    let world = World::new();
+    let root = world.project("alpha");
+    world.register(&root);
+    let state = world.state(None, &world.base);
+    let reply = call(
+        &state,
+        global_gotcha(
+            "bullmq",
+            "bullmq Worker.close() never resolves when Redis is unreachable; pass a timeout.",
+            &["shutdown", "worker close"],
+        ),
+        Some("nope"),
+    );
+    assert!(reply.error, "{}", reply.text);
+    assert!(reply.text.contains("No project 'nope'"), "{}", reply.text);
+    assert!(
+        !world
+            .home
+            .join(".dejafix/global/library_gotchas.jsonl")
+            .exists()
+    );
+}

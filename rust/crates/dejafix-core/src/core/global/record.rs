@@ -167,8 +167,18 @@ impl Libraries {
             libraries.push((library.to_lowercase(), aliases));
         }
         libraries.sort_unstable();
-        libraries.dedup_by(|later, earlier| later.0 == earlier.0);
-        Some(Self(libraries))
+        let mut merged: Vec<(String, Vec<String>)> = Vec::with_capacity(libraries.len());
+        for (library, aliases) in libraries {
+            match merged.last_mut() {
+                Some((last, known)) if *last == library => {
+                    known.extend(aliases);
+                    known.sort_unstable();
+                    known.dedup();
+                }
+                _ => merged.push((library, aliases)),
+            }
+        }
+        Some(Self(merged))
     }
 
     #[must_use]

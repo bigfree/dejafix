@@ -196,12 +196,15 @@ pub fn global_reply(
         .saturating_mul(CHARS_PER_TOKEN);
     let mut body = String::new();
     let mut shown = 0;
+    let mut used = 0;
     for record in &found {
         let entry = entry_text(record);
-        if shown > 0 && body.len() + entry.len() > budget {
+        let size = entry.chars().count();
+        if shown > 0 && used + size > budget {
             break;
         }
         body.push_str(&entry);
+        used += size;
         shown += 1;
     }
     let library = library.map(str::trim).filter(|library| !library.is_empty());

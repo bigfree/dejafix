@@ -5,7 +5,7 @@ use super::rank::ranked;
 use super::types::{SearchMode, SearchQuery};
 use crate::core::event::Event;
 use crate::core::log::EventLog;
-use crate::core::rank::Index;
+use crate::core::rank::{Analyzer, Index};
 use crate::core::summary::{RECORD_CHARS, clip_record};
 use crate::core::text::{casefold, char_len, char_prefix, collapse_whitespace};
 
@@ -40,9 +40,23 @@ pub fn excerpt(text: &str, query: &str) -> String {
     }
 }
 
+fn mentions(text: &str, query: &str) -> bool {
+    if casefold(text).contains(casefold(query).as_ref()) {
+        return true;
+    }
+    let mut wanted = Vec::new();
+    Analyzer.terms(query, &mut wanted);
+    if wanted.is_empty() {
+        return false;
+    }
+    let mut found = Vec::new();
+    Analyzer.terms(text, &mut found);
+    wanted.iter().any(|term| found.contains(term))
+}
+
 fn match_text(event: &Event<'_>, query: &str, full: bool) -> String {
     let summary = event.summary.as_str();
-    let in_summary = casefold(summary).contains(casefold(query).as_ref());
+    let in_summary = mentions(summary, query);
     let notes = event.notes.as_deref().filter(|notes| !notes.is_empty());
     let shown = |source: &str| -> String {
         if full {

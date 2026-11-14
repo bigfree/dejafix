@@ -170,24 +170,16 @@ impl GlobalStore {
         Ok(String::from_utf8_lossy(&bytes).into_owned())
     }
 
-    fn append(&self, name: &str, entry: &Entry) -> Result<(), StoreError> {
-        self.ensure()?;
-        let path = self.path(name);
-        let text = Self::canonical_lines(&path, &[entry])?;
-        OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&path)
-            .and_then(|mut file| file.write_all(platform_newlines(&text).as_bytes()))
-            .map_err(write_error(&path))
+    fn split_lines(text: &str) -> Vec<String> {
+        text.lines().map(str::to_owned).collect()
     }
 
     pub fn append_pattern(&self, entry: &Entry) -> Result<(), StoreError> {
-        self.append(PATTERNS_FILE, entry)
-    }
-
-    pub fn append_gotcha(&self, entry: &Entry) -> Result<(), StoreError> {
-        self.append(GOTCHAS_FILE, entry)
+        let lines = Self::split_lines(&Self::canonical_lines(&self.path(PATTERNS_FILE), &[entry])?);
+        self.change_locked(PATTERNS_FILE, true, |_| {
+            (GotchaWrite::Append(lines.clone()), ())
+        })
+        .map(drop)
     }
 
     fn change_locked<T>(
@@ -283,10 +275,7 @@ impl GlobalStore {
                 return (GotchaWrite::Keep, 0);
             }
             match Self::canonical_lines(&path, &kept) {
-                Ok(text) => (
-                    GotchaWrite::Replace(text.lines().map(str::to_owned).collect()),
-                    removed,
-                ),
+                Ok(text) => (GotchaWrite::Replace(Self::split_lines(&text)), removed),
                 Err(error) => {
                     failure = Some(error);
                     (GotchaWrite::Keep, 0)
@@ -417,33 +406,46 @@ impl GlobalStore {
         }))
     }
 
-    pub fn import(&self, data: &Map<String, Value>) -> Result<(usize, usize), StoreError> {
-        let known = |entries: Vec<Entry>| -> HashSet<String> {
-            entries
+    fn import_entries(&self, name: &str, items: &[Value]) -> Result<usize, StoreError> {
+        let path = self.path(name);
+        let mut failure = None;
+        let added = self.change_locked(name, true, |existing| {
+            let known: HashSet<String> = existing
                 .iter()
                 .filter_map(|entry| entry.get("id"))
                 .map(Value::to_string)
-                .collect()
-        };
-        let known_patterns = known(self.load_patterns()?);
-        let known_gotchas = known(self.load_gotchas()?);
-        let mut added = [0_usize; 2];
-        for (slot, (key, name, known)) in added.iter_mut().zip([
-            ("patterns", PATTERNS_FILE, &known_patterns),
-            ("gotchas", GOTCHAS_FILE, &known_gotchas),
-        ]) {
-            let Some(Value::Array(items)) = data.get(key) else {
-                continue;
-            };
-            for entry in items.iter().filter_map(Value::as_object) {
-                if entry
-                    .get("id")
-                    .is_some_and(|id| known.contains(&id.to_string()))
-                {
-                    continue;
+                .collect();
+            let fresh: Vec<&Entry> = items
+                .iter()
+                .filter_map(Value::as_object)
+                .filter(|entry| {
+                    entry
+                        .get("id")
+                        .is_none_or(|id| !known.contains(&id.to_string()))
+                })
+                .collect();
+            if fresh.is_empty() {
+                return (GotchaWrite::Keep, 0);
+            }
+            match Self::canonical_lines(&path, &fresh) {
+                Ok(text) => (GotchaWrite::Append(Self::split_lines(&text)), fresh.len()),
+                Err(error) => {
+                    failure = Some(error);
+                    (GotchaWrite::Keep, 0)
                 }
-                self.append(name, entry)?;
-                *slot += 1;
+            }
+        })?;
+        failure.map_or(Ok(added.unwrap_or(0)), Err)
+    }
+
+    pub fn import(&self, data: &Map<String, Value>) -> Result<(usize, usize), StoreError> {
+        let mut added = [0_usize; 2];
+        for (slot, (key, name)) in added
+            .iter_mut()
+            .zip([("patterns", PATTERNS_FILE), ("gotchas", GOTCHAS_FILE)])
+        {
+            if let Some(Value::Array(items)) = data.get(key) {
+                *slot = self.import_entries(name, items)?;
             }
         }
         if let Some(Value::String(preferences)) = data.get("preferences")

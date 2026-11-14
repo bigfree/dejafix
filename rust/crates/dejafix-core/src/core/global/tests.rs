@@ -1454,3 +1454,18 @@ mod relevance {
         }
     }
 }
+
+mod review_fixes {
+    use serde_json::json;
+
+    use super::super::Libraries;
+
+    #[test]
+    fn library_names_that_differ_only_in_case_keep_every_alias() {
+        let libraries =
+            Libraries::from_value(&json!({"Next": ["nextjs"], "next": ["next.js"]})).unwrap();
+        assert_eq!(libraries.aliases("next"), ["next.js", "nextjs"]);
+        assert_eq!(libraries.canonical("nextjs"), "next");
+        assert_eq!(libraries.canonical("next.js"), "next");
+    }
+}

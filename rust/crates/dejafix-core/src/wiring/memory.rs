@@ -3,7 +3,7 @@ use std::path::Path;
 
 use serde_json::Value;
 
-use super::global::{edit_action, gotcha_action, upgrade_action};
+use super::global::{add_action, edit_action, global_query, non_empty, upgrade_action};
 use super::types::{Project, Settings, WiringError};
 use crate::adapters::fs::{
     FsResolver, GlobalStore, detect_stack, path_context, project_name, read_events_file,
@@ -71,10 +71,6 @@ fn tags_of(tag: Option<String>) -> Value {
     )
 }
 
-fn non_empty(text: Option<String>) -> Option<String> {
-    text.filter(|text| !text.is_empty())
-}
-
 fn import(store: &GlobalStore, cwd: &Path, file: &str) -> Result<GlobalOutcome, WiringError> {
     let Some(text) = read_json_text(&cwd.join(file))? else {
         return Ok(GlobalOutcome::FileNotFound(file.to_owned()));
@@ -128,9 +124,22 @@ pub fn global(
         GlobalAction::Add { text, tag } => {
             add_pattern(&store, &project, settings, non_empty(text), tag, ids)
         }
-        action @ (GlobalAction::AddGotcha { .. } | GlobalAction::Query { .. }) => {
-            gotcha_action(settings, &project, action, ids)
-        }
+        GlobalAction::AddGotcha {
+            library,
+            text,
+            keywords,
+            versions,
+        } => add_action(settings, &project, library, text, keywords, versions, ids),
+        GlobalAction::Query {
+            text,
+            library,
+            budget,
+        } => Ok(GlobalOutcome::Reply(global_query(
+            settings,
+            text.as_deref().unwrap_or(""),
+            library.as_deref(),
+            budget,
+        )?)),
         GlobalAction::Upgrade { export, apply } => upgrade_action(settings, cwd, export, apply),
         action @ GlobalAction::Edit { .. } => edit_action(settings, action),
         GlobalAction::Remove(id) => {

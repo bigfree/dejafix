@@ -279,3 +279,21 @@ fn search_reply_lists_the_best_matches_first_in_the_same_line_format() {
         "No events match 'zebra'."
     );
 }
+
+#[test]
+fn a_ranked_match_in_the_summary_shows_the_summary_not_the_notes() {
+    let lines = [json!({"id": "evt_1", "summary": "startup is slow because the cache warms twice", "notes": "seen after the deploy", "timestamp": "2027-01-01T00:00:00Z", "type": "note"})]
+    .iter()
+    .map(|event| event.to_string() + "\n")
+    .collect::<String>();
+    let log = parsed(&lines);
+    let index = event_index(&log);
+    assert_eq!(
+        search_reply(&log, &index, "slow startup", 10, false),
+        "Found 1 match(es) for 'slow startup':\n  [note] evt_1 2027-01-01: startup is slow because the cache warms twice"
+    );
+    assert_eq!(
+        search_reply(&log, &index, "deployment notes", 10, false),
+        "Found 1 match(es) for 'deployment notes':\n  [note] evt_1 2027-01-01: startup is slow because the cache warms twice | notes: seen after the deploy"
+    );
+}

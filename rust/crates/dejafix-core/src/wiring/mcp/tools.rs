@@ -22,7 +22,7 @@ use crate::core::session::session_start;
 use crate::core::text::{is_python_word, python_strip};
 use crate::core::time::Clock;
 use crate::core::write::Ids;
-use crate::wiring::global::add_gotcha;
+use crate::wiring::global::{add_gotcha, registry_names};
 use crate::wiring::hooks::analyze_files;
 use crate::wiring::registry::load_registry;
 use crate::wiring::types::Settings;
@@ -86,9 +86,16 @@ impl McpState {
         project: Option<&str>,
         clock: &Clock,
     ) -> Result<Resolution, ToolError> {
-        let registry = self.registry(clock)?;
+        self.resolve_in(&self.registry(clock)?, project)
+    }
+
+    fn resolve_in(
+        &self,
+        registry: &Registry,
+        project: Option<&str>,
+    ) -> Result<Resolution, ToolError> {
         Ok(resolve(
-            &registry,
+            registry,
             project,
             self.settings.pinned.as_deref(),
             &[],
@@ -139,7 +146,9 @@ impl McpState {
                     budget,
                 ));
             }
-            ToolCall::AddGlobalGotcha(input) => return self.add_global(input, project, clock, ids),
+            ToolCall::AddGlobalGotcha(input) => {
+                return self.add_global(&input, project, clock, ids);
+            }
             ToolCall::Write(write) => return self.write(write, project, clock, ids),
             ToolCall::PrecheckFiles(paths) if paths.len() > MAX_PRECHECK_PATHS => {
                 return Ok(format!(
@@ -229,16 +238,24 @@ impl McpState {
 
     fn add_global(
         &self,
-        input: GotchaInput,
+        input: &GotchaInput,
         project: Option<&str>,
         clock: &Clock,
         ids: &mut impl Ids,
     ) -> Result<String, ToolError> {
-        let source = self
-            .resolution(project, clock)
-            .ok()
-            .map(|target| target.name);
-        let outcome = add_gotcha(&self.project_settings(clock), input, source.as_deref(), ids)?;
+        let registry = self.registry(clock)?;
+        let resolved = self.resolve_in(&registry, project);
+        let source = match (project, resolved) {
+            (Some(_), resolved) => Some(resolved?.name),
+            (None, resolved) => resolved.ok().map(|target| target.name),
+        };
+        let outcome = add_gotcha(
+            &self.project_settings(clock),
+            input,
+            source.as_deref(),
+            &registry_names(&registry),
+            ids,
+        )?;
         Ok(add_reply(&outcome))
     }
 
