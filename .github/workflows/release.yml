@@ -20,6 +20,9 @@
 #   only `publish-pypi` may request an OIDC token;
 # * `custom-test` calls ./.github/workflows/test.yml without inherited secrets
 #   and every build needs it;
+# * `plan` and `build-local-artifacts` install dist with
+#   .github/scripts/install-dist.sh, which checks the archive against a pinned
+#   SHA-256, instead of piping dist's installer into a shell;
 # * `build-wheels` builds the maturin wheels, `host` waits for them;
 # * `publish-pypi` uploads them through PyPI trusted publishing. It must stay a
 #   job of this file: PyPI does not support trusted publishing from a reusable
@@ -76,10 +79,8 @@ jobs:
           persist-credentials: false
           submodules: recursive
       - name: Install dist
-        # we specify bash to get pipefail; it guards against the `curl` command
-        # failing. otherwise `sh` won't catch that `curl` returned non-0
         shell: bash
-        run: "curl --proto '=https' --tlsv1.2 -LsSf https://github.com/axodotdev/cargo-dist/releases/download/v0.34.0/cargo-dist-installer.sh | sh"
+        run: bash .github/scripts/install-dist.sh x86_64-unknown-linux-gnu
       - name: Cache dist
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
@@ -164,7 +165,7 @@ jobs:
       #
       # - runner: the github runner
       # - dist-args: cli flags to pass to dist
-      # - install-dist: expression to run to install dist on the runner
+      # - host: the runner's triple (a container entry names its own host)
       #
       # Typically there will be:
       # - 1 "global" task that builds universal installers
@@ -191,7 +192,10 @@ jobs:
             echo "$HOME/.cargo/bin" >> $GITHUB_PATH
           fi
       - name: Install dist
-        run: ${{ matrix.install_dist.run }}
+        shell: bash
+        env:
+          HOST: ${{ matrix.host }}
+        run: bash .github/scripts/install-dist.sh "$HOST"
       # Get the dist-manifest
       - name: Fetch local artifacts
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
