@@ -493,7 +493,7 @@ mod report {
         );
         assert_eq!(
             global_report(&GlobalOutcome::Unknown("frob".into()), true),
-            "Unknown action: frob\nAvailable: status, list, add, add-gotcha, query, remove, export, import, prune, detect\n"
+            "Unknown action: frob\nAvailable: status, list, add, add-gotcha, query, upgrade, remove, export, import, prune, detect\n"
         );
     }
 
@@ -1117,5 +1117,351 @@ mod query {
             parse_store(vec![json!({"id": "x"}).as_object().cloned().unwrap()]).first(),
             Some(StoredGotcha::V1(_))
         ));
+    }
+}
+
+mod upgrade {
+    use serde_json::{Value, json};
+
+    use super::super::{
+        CheckFailure, CheckReport, Draft, DraftError, Entry, GotchaInput, Libraries, StoredGotcha,
+        apply_upgrade, export_notes, legacy_input, line, parse_drafts, parse_store,
+        touches_version_one, upgrade_drafts,
+    };
+
+    const LESSON: &str =
+        "BullMQ Worker.close() never resolves when Redis is unreachable; pass a timeout.";
+
+    fn entry(value: &Value) -> Entry {
+        value.as_object().cloned().unwrap()
+    }
+
+    fn v1(id: &str, library: &str, text: &str) -> Entry {
+        entry(&json!({
+            "id": id,
+            "library": library,
+            "gotcha": text,
+            "source_project": "home-log",
+            "discovered": "2026-08-27T10:00:00Z",
+            "tags": ["node"],
+            "version_range": ">=6",
+        }))
+    }
+
+    fn v2_entry(id: &str) -> Entry {
+        entry(&json!({
+            "v": 2, "id": id, "library": "zod", "keywords": ["a", "b"], "versions": null,
+            "gotcha": "Zod parse results drop unknown keys unless strict is used.",
+            "discovered": "2026-01-01",
+        }))
+    }
+
+    fn store() -> Vec<StoredGotcha> {
+        parse_store(vec![
+            v1("got_1", "bull", "stará poznámka"),
+            v2_entry("got_2"),
+            v1("got_3", "react", "effects run twice"),
+        ])
+    }
+
+    fn draft(id: &str, library: &str, gotcha: &str, keywords: &[&str], drop: bool) -> Draft {
+        Draft {
+            id: id.to_owned(),
+            input: GotchaInput {
+                library: library.to_owned(),
+                keywords: keywords
+                    .iter()
+                    .map(|keyword| (*keyword).to_owned())
+                    .collect(),
+                gotcha: gotcha.to_owned(),
+                versions: None,
+            },
+            drop,
+        }
+    }
+
+    fn passing(_: &str, _: &GotchaInput) -> CheckReport {
+        CheckReport::default()
+    }
+
+    fn libraries() -> Libraries {
+        Libraries::from_value(&json!({"bullmq": ["bull", "bullmq-pro"]})).unwrap()
+    }
+
+    #[test]
+    fn export_lists_only_version_one_records_with_their_notes() {
+        let lines = upgrade_drafts(&store(), |entry| {
+            vec![format!("note for {}", legacy_input(entry).library)]
+        });
+        assert_eq!(lines.len(), 3);
+        let header: Value = serde_json::from_str(lines.first().unwrap()).unwrap();
+        assert!(header["instructions"].as_str().unwrap().contains("English"));
+        assert_eq!(header.as_object().unwrap().len(), 1);
+        let first: Value = serde_json::from_str(lines.get(1).unwrap()).unwrap();
+        assert_eq!(
+            first,
+            json!({
+                "id": "got_1", "library": "bull", "source_project": "home-log",
+                "discovered": "2026-08-27T10:00:00Z", "original": "stará poznámka",
+                "gotcha": "", "keywords": [], "versions": ">=6", "drop": false,
+                "checks": ["note for bull"],
+            })
+        );
+        assert!(lines.get(1).unwrap().contains("stará"));
+        assert!(lines.get(2).unwrap().contains("got_3"));
+        assert!(!lines.join("\n").contains("got_2"));
+    }
+
+    #[test]
+    fn export_notes_leave_out_what_every_version_one_record_lacks() {
+        let report = CheckReport {
+            failures: vec![
+                CheckFailure::KeywordCount(0),
+                CheckFailure::EmptyKeyword,
+                CheckFailure::Length(5),
+            ],
+            warnings: Vec::new(),
+            duplicate_of: None,
+        };
+        assert_eq!(
+            export_notes(&report),
+            ["the gotcha must be 30 to 600 characters long, not 5"]
+        );
+    }
+
+    #[test]
+    fn a_draft_file_is_parsed_and_its_header_skipped() {
+        let text = format!(
+            "{}\n\n{}\n{}\n",
+            r#"{"instructions": "fill in"}"#,
+            json!({"id": "got_1", "library": "BullMQ", "original": "x", "gotcha": LESSON,
+                   "keywords": ["shutdown", "close"], "versions": ">=6", "drop": false,
+                   "checks": ["n"], "source_project": "x"}),
+            json!({"id": "got_3", "drop": true}),
+        );
+        let drafts = parse_drafts(&text).unwrap();
+        assert_eq!(drafts.len(), 2);
+        assert_eq!(
+            drafts.first().unwrap(),
+            &Draft {
+                id: "got_1".into(),
+                input: GotchaInput {
+                    library: "BullMQ".into(),
+                    keywords: vec!["shutdown".into(), "close".into()],
+                    gotcha: LESSON.into(),
+                    versions: Some(">=6".into()),
+                },
+                drop: false,
+            }
+        );
+        assert!(drafts.get(1).unwrap().drop);
+        assert_eq!(parse_drafts("").unwrap(), Vec::new());
+    }
+
+    #[test]
+    fn malformed_lines_are_reported_with_their_line_numbers() {
+        let text = [
+            r#"{"instructions": "x"}"#,
+            "not json",
+            "[1]",
+            r#"{"library": "x"}"#,
+            r#"{"id": ""}"#,
+            r#"{"id": 4}"#,
+            r#"{"id": "a", "keywords": "one"}"#,
+            r#"{"id": "b", "keywords": [1]}"#,
+            r#"{"id": "c", "drop": "yes"}"#,
+            r#"{"id": "d", "gotcha": 5}"#,
+            r#"{"id": "e", "library": ["x"]}"#,
+            r#"{"id": "f", "versions": 2}"#,
+            r#"{"id": "g"}"#,
+            r#"{"id": "g"}"#,
+        ]
+        .join("\n");
+        let errors = parse_drafts(&text).unwrap_err();
+        let wrong = |line, field| DraftError::WrongType { line, field };
+        assert!(matches!(
+            errors.first(),
+            Some(DraftError::Json { line: 2, .. })
+        ));
+        assert_eq!(
+            errors.get(1..).unwrap(),
+            [
+                DraftError::NotObject { line: 3 },
+                DraftError::MissingId { line: 4 },
+                DraftError::MissingId { line: 5 },
+                wrong(6, "id"),
+                wrong(7, "keywords"),
+                wrong(8, "keywords"),
+                wrong(9, "drop"),
+                wrong(10, "gotcha"),
+                wrong(11, "library"),
+                wrong(12, "versions"),
+                DraftError::DuplicateId {
+                    line: 14,
+                    id: "g".into()
+                },
+            ]
+        );
+        assert_eq!(
+            errors.get(1).unwrap().to_string(),
+            "line 3: not a JSON object"
+        );
+    }
+
+    #[test]
+    fn an_accepted_draft_replaces_the_record_and_keeps_its_origin() {
+        let records = store();
+        let drafts = [draft(
+            "got_1",
+            "Bull",
+            LESSON,
+            &["shutdown", "close"],
+            false,
+        )];
+        let outcome = apply_upgrade(&records, &drafts, "2026-11-14", &libraries(), passing);
+        assert_eq!((outcome.replaced, outcome.dropped), (1, 0));
+        assert_eq!(outcome.kept, Vec::<(String, Vec<String>)>::new());
+        assert_eq!(outcome.libraries, ["bullmq"]);
+        assert_eq!(outcome.lines.len(), 3);
+        let replaced: Value = serde_json::from_str(outcome.lines.first().unwrap()).unwrap();
+        assert_eq!(
+            replaced,
+            json!({
+                "v": 2, "id": "got_1", "library": "bullmq",
+                "keywords": ["shutdown", "close"], "versions": null, "gotcha": LESSON,
+                "source_project": "home-log", "discovered": "2026-08-27T10:00:00Z",
+                "reviewed": "2026-11-14", "tags": ["node"],
+            })
+        );
+        assert!(
+            outcome
+                .lines
+                .first()
+                .unwrap()
+                .starts_with(r#"{"v": 2, "id": "got_1", "library": "bullmq", "keywords""#)
+        );
+        let StoredGotcha::V2(untouched) = records.get(1).unwrap() else {
+            panic!("not version 2");
+        };
+        assert_eq!(outcome.lines.get(1).unwrap(), &line(untouched));
+        assert_eq!(
+            outcome.lines.get(2).unwrap(),
+            r#"{"discovered": "2026-08-27T10:00:00Z", "gotcha": "effects run twice", "id": "got_3", "library": "react", "source_project": "home-log", "tags": ["node"], "version_range": ">=6"}"#
+        );
+    }
+
+    #[test]
+    fn a_draft_can_set_versions_and_the_library_is_normalised() {
+        let mut filled = draft(
+            "got_3",
+            " React ",
+            "Effects run twice in strict mode, so clean up.",
+            &["strict mode", "effects"],
+            false,
+        );
+        filled.input.versions = Some(" >=18 ".into());
+        let outcome = apply_upgrade(&store(), &[filled], "2026-11-14", &libraries(), passing);
+        let line: Value = serde_json::from_str(outcome.lines.get(2).unwrap()).unwrap();
+        assert_eq!(line["library"], "react");
+        assert_eq!(line["versions"], ">=18");
+        assert_eq!(outcome.libraries, ["react"]);
+    }
+
+    #[test]
+    fn drop_removes_the_record() {
+        let drafts = [draft("got_1", "", "", &[], true)];
+        let outcome = apply_upgrade(&store(), &drafts, "2026-11-14", &libraries(), passing);
+        assert_eq!((outcome.replaced, outcome.dropped), (0, 1));
+        assert_eq!(outcome.lines.len(), 2);
+        assert!(!outcome.lines.join("\n").contains("got_1"));
+        assert_eq!(outcome.libraries, Vec::<String>::new());
+    }
+
+    #[test]
+    fn a_draft_failing_a_hard_check_keeps_the_version_one_record() {
+        let drafts = [draft("got_1", "bull", "short", &["a"], false)];
+        let outcome = apply_upgrade(&store(), &drafts, "2026-11-14", &libraries(), |_, input| {
+            CheckReport {
+                failures: vec![CheckFailure::Length(input.gotcha.chars().count())],
+                ..CheckReport::default()
+            }
+        });
+        assert_eq!((outcome.replaced, outcome.dropped), (0, 0));
+        assert_eq!(
+            outcome.kept,
+            [(
+                "got_1".to_owned(),
+                vec!["the gotcha must be 30 to 600 characters long, not 5".to_owned()]
+            )]
+        );
+        assert!(outcome.lines.first().unwrap().contains(r#""id": "got_1""#));
+        assert!(!outcome.lines.first().unwrap().contains(r#""v": 2"#));
+    }
+
+    #[test]
+    fn the_check_sees_the_record_id_and_the_normalised_input() {
+        let drafts = [draft("got_1", "Bull", LESSON, &["a", "b"], false)];
+        let outcome = apply_upgrade(
+            &store(),
+            &drafts,
+            "2026-11-14",
+            &libraries(),
+            |id, input| {
+                assert_eq!((id, input.library.as_str()), ("got_1", "bullmq"));
+                CheckReport::default()
+            },
+        );
+        assert_eq!(outcome.replaced, 1);
+    }
+
+    #[test]
+    fn unknown_and_already_upgraded_ids_change_nothing_and_are_listed() {
+        let drafts = [
+            draft("got_2", "zod", LESSON, &["a", "b"], false),
+            draft("got_9", "zod", LESSON, &["a", "b"], true),
+        ];
+        let records = store();
+        let outcome = apply_upgrade(&records, &drafts, "2026-11-14", &libraries(), passing);
+        assert_eq!((outcome.replaced, outcome.dropped), (0, 0));
+        assert_eq!(
+            outcome.kept,
+            [
+                (
+                    "got_2".to_owned(),
+                    vec!["the record is already version 2".to_owned()]
+                ),
+                ("got_9".to_owned(), vec!["no record has this id".to_owned()]),
+            ]
+        );
+        assert!(!touches_version_one(&records, &drafts));
+        assert!(touches_version_one(
+            &records,
+            &[draft("got_3", "", "", &[], true)]
+        ));
+    }
+
+    #[test]
+    fn applying_the_same_drafts_again_changes_nothing() {
+        let drafts = [
+            draft("got_1", "Bull", LESSON, &["shutdown", "close"], false),
+            draft("got_3", "", "", &[], true),
+        ];
+        let first = apply_upgrade(&store(), &drafts, "2026-11-14", &libraries(), passing);
+        assert_eq!((first.replaced, first.dropped), (1, 1));
+        let entries: Vec<Entry> = first
+            .lines
+            .iter()
+            .map(|line| entry(&serde_json::from_str(line).unwrap()))
+            .collect();
+        let second = apply_upgrade(
+            &parse_store(entries),
+            &drafts,
+            "2026-12-01",
+            &libraries(),
+            passing,
+        );
+        assert_eq!((second.replaced, second.dropped), (0, 0));
+        assert_eq!(second.lines, first.lines);
+        assert_eq!(second.kept.len(), 2);
     }
 }

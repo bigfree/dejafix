@@ -107,7 +107,7 @@ const DETECT_JSON: &str = r#"{
 }
 "#;
 
-const UNKNOWN: &str = "Unknown action: frob\nAvailable: status, list, add, add-gotcha, query, remove, export, import, prune, detect\n";
+const UNKNOWN: &str = "Unknown action: frob\nAvailable: status, list, add, add-gotcha, query, upgrade, remove, export, import, prune, detect\n";
 
 fn global_dir(repo: &Repo) -> PathBuf {
     repo.registry().join("global")
@@ -723,5 +723,268 @@ fn query_ranks_global_gotchas_and_checks_the_budget() -> TestResult {
     repo.djf(&["global", "query", "x", "--budget", "100"])
         .assert()
         .code(2);
+    Ok(())
+}
+
+const UPGRADE_STORE: &str = concat!(
+    r#"{"discovered": "2026-08-01T09:00:00Z", "gotcha": "Session zůstává otevřená, pokud ji handler nezavře.", "id": "got_000000000001", "library": "SQLAlchemy", "source_project": "alpha", "tags": ["python"], "version_range": ">=2.0"}"#,
+    "\n",
+    r#"{"discovered": "2026-08-02T09:00:00Z", "gotcha": "Worker.close() hangs in apps/heating/queue.ts when Redis is down.", "id": "got_000000000002", "library": "bullmq", "source_project": "home-log", "tags": []}"#,
+    "\n",
+    r#"{"v": 2, "id": "got_000000000003", "library": "zod", "keywords": ["strict", "unknown keys"], "versions": null, "gotcha": "Zod parse results drop unknown keys unless strict is used.", "discovered": "2026-01-01", "reviewed": "2026-02-02"}"#,
+    "\n",
+);
+
+fn upgrade_repo() -> Result<Repo, Box<dyn std::error::Error>> {
+    let repo = Repo::new()?;
+    fs::create_dir_all(global_dir(&repo))?;
+    fs::write(
+        global_dir(&repo).join("library_gotchas.jsonl"),
+        UPGRADE_STORE,
+    )?;
+    Ok(repo)
+}
+
+fn drafts_path(repo: &Repo) -> PathBuf {
+    repo.root.join("drafts.jsonl")
+}
+
+fn export_drafts(repo: &Repo) -> Result<Vec<Value>, Box<dyn std::error::Error>> {
+    run(repo, &["upgrade", "--export", "drafts.jsonl"])?;
+    text(&drafts_path(repo))?
+        .lines()
+        .map(|line| Ok(serde_json::from_str(line)?))
+        .collect()
+}
+
+fn write_drafts(repo: &Repo, lines: &[Value]) -> TestResult {
+    let mut out = String::new();
+    for line in lines {
+        out.push_str(&serde_json::to_string(line)?);
+        out.push('\n');
+    }
+    fs::write(drafts_path(repo), out)?;
+    Ok(())
+}
+
+fn fill(drafts: &mut [Value], id: &str, fields: &Value) -> TestResult {
+    let draft = drafts
+        .iter_mut()
+        .find(|draft| draft["id"] == id)
+        .ok_or("no such draft")?;
+    for (key, value) in fields.as_object().ok_or("fields are not an object")? {
+        draft[key] = value.clone();
+    }
+    Ok(())
+}
+
+fn store_text(repo: &Repo) -> Result<String, Box<dyn std::error::Error>> {
+    read(repo, "library_gotchas.jsonl")
+}
+
+#[test]
+fn upgrade_export_lists_only_version_one_records_with_their_notes() -> TestResult {
+    let repo = upgrade_repo()?;
+    let out = run(&repo, &["upgrade", "--export", "drafts.jsonl"])?;
+    assert_eq!(
+        out,
+        "[global] Drafts written: 2 records to drafts.jsonl\n  Let the agent fill them, review them, then: djf global upgrade --apply drafts.jsonl\n"
+    );
+    let lines = text(&drafts_path(&repo))?;
+    assert!(lines.contains("\"original\":\"Worker.close() hangs"));
+    let drafts = export_drafts_from(&lines)?;
+    assert_eq!(drafts.len(), 3);
+    assert!(
+        drafts[0]["instructions"]
+            .as_str()
+            .is_some_and(|text| text.contains("English"))
+    );
+    assert_eq!(drafts[1]["id"], "got_000000000001");
+    assert_eq!(drafts[1]["library"], "SQLAlchemy");
+    assert_eq!(drafts[1]["source_project"], "alpha");
+    assert_eq!(drafts[1]["discovered"], "2026-08-01T09:00:00Z");
+    assert_eq!(drafts[1]["versions"], ">=2.0");
+    assert_eq!(drafts[1]["gotcha"], "");
+    assert_eq!(drafts[1]["keywords"], serde_json::json!([]));
+    assert_eq!(drafts[1]["drop"], false);
+    let checks = |draft: &Value| draft["checks"].to_string();
+    assert!(checks(&drafts[1]).contains("not English"), "{drafts:?}");
+    assert!(!checks(&drafts[1]).contains("keyword"));
+    assert!(checks(&drafts[2]).contains("apps/heating/queue.ts"));
+    assert!(!lines.contains("got_000000000003"));
+    assert_eq!(store_text(&repo)?, UPGRADE_STORE);
+    Ok(())
+}
+
+fn export_drafts_from(text: &str) -> Result<Vec<Value>, Box<dyn std::error::Error>> {
+    text.lines()
+        .map(|line| Ok(serde_json::from_str(line)?))
+        .collect()
+}
+
+#[test]
+fn upgrade_export_never_overwrites_an_existing_file() -> TestResult {
+    let repo = upgrade_repo()?;
+    fs::write(drafts_path(&repo), "filled by the agent\n")?;
+    assert_eq!(
+        refused(&repo, &["upgrade", "--export", "drafts.jsonl"])?,
+        "Not written: drafts.jsonl already exists; move it away or choose another name.\n"
+    );
+    assert_eq!(text(&drafts_path(&repo))?, "filled by the agent\n");
+    Ok(())
+}
+
+#[test]
+fn upgrade_needs_exactly_one_of_export_and_apply() -> TestResult {
+    let repo = upgrade_repo()?;
+    let usage = "Usage: djf global upgrade --export <file> | djf global upgrade --apply <file>\n";
+    assert_eq!(refused(&repo, &["upgrade"])?, usage);
+    assert_eq!(
+        refused(&repo, &["upgrade", "--export", "a", "--apply", "b"])?,
+        usage
+    );
+    assert_eq!(
+        refused(&repo, &["upgrade", "--apply", "missing.jsonl"])?,
+        "File not found: missing.jsonl\n"
+    );
+    assert_eq!(store_text(&repo)?, UPGRADE_STORE);
+    Ok(())
+}
+
+#[test]
+fn upgrade_apply_replaces_drops_and_backs_up_the_version_one_store() -> TestResult {
+    let repo = upgrade_repo()?;
+    let mut drafts = export_drafts(&repo)?;
+    fill(
+        &mut drafts,
+        "got_000000000001",
+        &serde_json::json!({
+            "library": "SQLAlchemy ",
+            "gotcha": LESSON,
+            "keywords": ["async session", "request cleanup"],
+        }),
+    )?;
+    fill(
+        &mut drafts,
+        "got_000000000002",
+        &serde_json::json!({"drop": true}),
+    )?;
+    write_drafts(&repo, &drafts)?;
+    let out = run(&repo, &["upgrade", "--apply", "drafts.jsonl"])?;
+    assert_eq!(out, "[global] Upgrade: 1 replaced, 1 dropped, 0 kept\n");
+    let lines: Vec<String> = store_text(&repo)?.lines().map(str::to_owned).collect();
+    assert_eq!(lines.len(), 2);
+    let pattern = Regex::new(&format!(
+        r#"^\{{"v": 2, "id": "got_000000000001", "library": "sqlalchemy", "keywords": \["async session", "request cleanup"\], "versions": ">=2.0", "gotcha": "{}", "source_project": "alpha", "discovered": "2026-08-01T09:00:00Z", "reviewed": "\d{{4}}-\d\d-\d\d", "tags": \["python"\]\}}$"#,
+        regex::escape(LESSON)
+    ))?;
+    assert!(pattern.is_match(&lines[0]), "{}", lines[0]);
+    assert_eq!(
+        format!("{}\n", lines[1]),
+        UPGRADE_STORE
+            .lines()
+            .nth(2)
+            .map(|line| format!("{line}\n"))
+            .unwrap_or_default()
+    );
+    assert_eq!(read(&repo, "library_gotchas.v1.jsonl")?, UPGRADE_STORE);
+    let libraries: Value = serde_json::from_str(&read(&repo, "libraries.json")?)?;
+    assert_eq!(libraries["sqlalchemy"], serde_json::json!([]));
+    Ok(())
+}
+
+#[test]
+fn applying_the_same_file_again_changes_nothing_and_keeps_the_backup() -> TestResult {
+    let repo = upgrade_repo()?;
+    let mut drafts = export_drafts(&repo)?;
+    fill(
+        &mut drafts,
+        "got_000000000001",
+        &serde_json::json!({"gotcha": LESSON, "keywords": ["async session", "request cleanup"]}),
+    )?;
+    fill(
+        &mut drafts,
+        "got_000000000002",
+        &serde_json::json!({"drop": true}),
+    )?;
+    write_drafts(&repo, &drafts)?;
+    run(&repo, &["upgrade", "--apply", "drafts.jsonl"])?;
+    let store = store_text(&repo)?;
+    let libraries = read(&repo, "libraries.json")?;
+    let backup = global_dir(&repo).join("library_gotchas.v1.jsonl");
+    let stamp = fs::metadata(&backup)?.modified()?;
+    let second = run(&repo, &["upgrade", "--apply", "drafts.jsonl"])?;
+    assert_eq!(
+        second,
+        "[global] Upgrade: 0 replaced, 0 dropped, 2 kept\n  got_000000000001: the record is already version 2\n  got_000000000002: no record has this id\n"
+    );
+    assert_eq!(store_text(&repo)?, store);
+    assert_eq!(read(&repo, "libraries.json")?, libraries);
+    assert_eq!(read(&repo, "library_gotchas.v1.jsonl")?, UPGRADE_STORE);
+    assert_eq!(fs::metadata(&backup)?.modified()?, stamp);
+    Ok(())
+}
+
+#[test]
+fn a_draft_failing_a_hard_check_keeps_the_record_and_is_listed() -> TestResult {
+    let repo = upgrade_repo()?;
+    let mut drafts = export_drafts(&repo)?;
+    fill(
+        &mut drafts,
+        "got_000000000001",
+        &serde_json::json!({"gotcha": LESSON, "keywords": ["async session", "request cleanup"]}),
+    )?;
+    fill(
+        &mut drafts,
+        "got_000000000002",
+        &serde_json::json!({"gotcha": "Too short.", "keywords": ["only one"]}),
+    )?;
+    write_drafts(&repo, &drafts)?;
+    let out = run(&repo, &["upgrade", "--apply", "drafts.jsonl"])?;
+    assert_eq!(
+        out,
+        "[global] Upgrade: 1 replaced, 0 dropped, 1 kept\n  got_000000000002: give 2 to 8 keywords, not 1; the gotcha must be 30 to 600 characters long, not 10\n"
+    );
+    let lines: Vec<String> = store_text(&repo)?.lines().map(str::to_owned).collect();
+    assert_eq!(lines.len(), 3);
+    assert!(lines[0].starts_with(r#"{"v": 2, "id": "got_000000000001""#));
+    assert_eq!(
+        format!("{}\n", lines[1]),
+        UPGRADE_STORE
+            .lines()
+            .nth(1)
+            .map(|line| format!("{line}\n"))
+            .unwrap_or_default()
+    );
+    Ok(())
+}
+
+#[test]
+fn a_malformed_draft_line_is_reported_and_nothing_is_written() -> TestResult {
+    let repo = upgrade_repo()?;
+    let mut drafts = export_drafts(&repo)?;
+    fill(
+        &mut drafts,
+        "got_000000000001",
+        &serde_json::json!({"gotcha": LESSON, "keywords": ["async session", "request cleanup"]}),
+    )?;
+    write_drafts(&repo, &drafts)?;
+    let mut broken = text(&drafts_path(&repo))?;
+    broken.push_str("{\"id\": \"got_000000000002\", \"keywords\": \"one\"}\n");
+    broken.push_str("not json at all\n");
+    fs::write(drafts_path(&repo), broken)?;
+    let err = refused(&repo, &["upgrade", "--apply", "drafts.jsonl"])?;
+    assert!(
+        err.starts_with("Draft file not applied, nothing was written:\n"),
+        "{err}"
+    );
+    assert!(
+        err.contains("  line 4: the field 'keywords' has the wrong type\n"),
+        "{err}"
+    );
+    assert!(err.contains("  line 5: not valid JSON"), "{err}");
+    assert_eq!(store_text(&repo)?, UPGRADE_STORE);
+    assert!(!global_dir(&repo).join("library_gotchas.v1.jsonl").exists());
+    assert!(!global_dir(&repo).join("libraries.json").exists());
     Ok(())
 }

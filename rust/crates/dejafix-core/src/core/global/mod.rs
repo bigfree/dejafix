@@ -6,6 +6,7 @@ mod query;
 mod record;
 mod report;
 mod types;
+mod upgrade;
 
 pub use checks::{check_gotcha, normalize_input};
 pub(crate) use inherit::is_truthy;
@@ -19,9 +20,13 @@ pub use query::{DEFAULT_BUDGET, GLOBAL_FIELDS, global_reply};
 pub use record::{is_upgraded, line, parse_store};
 pub use report::{add_reply, filtered, global_report};
 pub use types::{
-    AddOutcome, CheckFailure, CheckReport, CheckWarning, Entry, GlobalAction, GlobalDoc,
-    GlobalIndex, GlobalOutcome, GotchaInput, GotchaV2, Libraries, Relevant, Stack, StoredGotcha,
-    Usage,
+    AddOutcome, CheckFailure, CheckReport, CheckWarning, Draft, DraftError, Entry, GlobalAction,
+    GlobalDoc, GlobalIndex, GlobalOutcome, GotchaInput, GotchaV2, Libraries, Relevant, Stack,
+    StoredGotcha, UpgradeOutcome, Usage,
+};
+pub use upgrade::{
+    apply as apply_upgrade, drafts as upgrade_drafts, export_notes, legacy_input, parse_drafts,
+    touches_version_one,
 };
 
 #[cfg(test)]

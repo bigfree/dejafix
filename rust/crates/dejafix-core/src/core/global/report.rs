@@ -15,7 +15,7 @@ const STATUS_BAR_WIDTH: usize = 48;
 const SHOWN_LIBRARIES: usize = 15;
 const META_SEPARATOR: &str = " · ";
 const AVAILABLE: &str =
-    "status, list, add, add-gotcha, query, remove, export, import, prune, detect";
+    "status, list, add, add-gotcha, query, upgrade, remove, export, import, prune, detect";
 
 fn items(entry: &Entry, key: &str) -> Vec<String> {
     match entry.get(key) {
@@ -327,9 +327,58 @@ fn usage_text(usage: Usage) -> &'static str {
         Usage::AddGotcha => {
             "Usage: djf global add-gotcha \"<text>\" --library <name> --keyword <phrase> --keyword <phrase> [--versions <range>]\nWrite one lesson in English, 30 to 600 characters, without project details; give 2 to 8 keywords.\n"
         }
+        Usage::Upgrade => {
+            "Usage: djf global upgrade --export <file> | djf global upgrade --apply <file>\n"
+        }
         Usage::Remove => "Usage: djf global remove <id>\n",
         Usage::Import => "Usage: djf global import <file.json>\n",
     }
+}
+
+fn gotcha_added(tag: &str, id: &str, library: &str, text: &str, warnings: &[String]) -> String {
+    let mut out = format!("{tag} Gotcha added: {id}\n  [{library}] {text}\n");
+    for warning in warnings {
+        let _ = writeln!(out, "  Warning: {warning}");
+    }
+    out
+}
+
+fn detected(
+    name: &str,
+    stack: &Stack,
+    inherited: (usize, usize),
+    json: bool,
+    palette: Palette,
+) -> String {
+    if json {
+        detect_json(name, stack)
+    } else {
+        detect_text(name, stack, inherited, palette)
+    }
+}
+
+fn upgrade_invalid(problems: &[String]) -> String {
+    let mut out = String::from("Draft file not applied, nothing was written:\n");
+    for problem in problems {
+        let _ = writeln!(out, "  {problem}");
+    }
+    out
+}
+
+fn upgrade_applied(
+    tag: &str,
+    replaced: usize,
+    dropped: usize,
+    kept: &[(String, Vec<String>)],
+) -> String {
+    let mut out = format!(
+        "{tag} Upgrade: {replaced} replaced, {dropped} dropped, {} kept\n",
+        kept.len()
+    );
+    for (id, reasons) in kept {
+        let _ = writeln!(out, "  {id}: {}", reasons.join("; "));
+    }
+    out
 }
 
 #[must_use]
@@ -375,13 +424,7 @@ pub fn global_report(outcome: &GlobalOutcome, color: bool) -> String {
             library,
             text,
             warnings,
-        } => {
-            let mut out = format!("{tag} Gotcha added: {id}\n  [{library}] {text}\n");
-            for warning in warnings {
-                let _ = writeln!(out, "  Warning: {warning}");
-            }
-            out
-        }
+        } => gotcha_added(&tag, id, library, text, warnings),
         GlobalOutcome::GotchaRejected { failures, warnings } => {
             let mut out = format!("Not added: {}.\n", failures.join("; "));
             for warning in warnings {
@@ -390,6 +433,21 @@ pub fn global_report(outcome: &GlobalOutcome, color: bool) -> String {
             out
         }
         GlobalOutcome::Reply(text) => format!("{text}\n"),
+        GlobalOutcome::UpgradeExported { file, drafts } => {
+            format!(
+                "{tag} Drafts written: {drafts} records to {file}\n  Let the agent fill them, review them, then: djf global upgrade --apply {file}\n"
+            )
+        }
+        GlobalOutcome::UpgradeExists(file) => {
+            format!("Not written: {file} already exists; move it away or choose another name.\n")
+        }
+        GlobalOutcome::UpgradeMissing(file) => format!("File not found: {file}\n"),
+        GlobalOutcome::UpgradeInvalid(problems) => upgrade_invalid(problems),
+        GlobalOutcome::UpgradeApplied {
+            replaced,
+            dropped,
+            kept,
+        } => upgrade_applied(&tag, *replaced, *dropped, kept),
         GlobalOutcome::Removed(id) => format!("{tag} Removed: {id}\n"),
         GlobalOutcome::NotFound(id) => format!("Entry not found: {id}\n"),
         GlobalOutcome::Exported(value) => json_text(value),
@@ -411,18 +469,13 @@ pub fn global_report(outcome: &GlobalOutcome, color: bool) -> String {
             inherited_patterns,
             inherited_gotchas,
             json,
-        } => {
-            if *json {
-                detect_json(name, stack)
-            } else {
-                detect_text(
-                    name,
-                    stack,
-                    (*inherited_patterns, *inherited_gotchas),
-                    palette,
-                )
-            }
-        }
+        } => detected(
+            name,
+            stack,
+            (*inherited_patterns, *inherited_gotchas),
+            *json,
+            palette,
+        ),
         GlobalOutcome::Unknown(action) => {
             format!("Unknown action: {action}\nAvailable: {AVAILABLE}\n")
         }

@@ -15,6 +15,8 @@ fn args(action: &str, text: Option<&str>, library: Option<&str>) -> GlobalArgs {
         keyword: Vec::new(),
         versions: None,
         budget: 2_000,
+        export_file: None,
+        apply_file: None,
     }
 }
 

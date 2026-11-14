@@ -180,7 +180,7 @@ pub enum Commands {
 pub struct GlobalArgs {
     #[arg(
         default_value = "status",
-        help = "Action: status, list, add, add-gotcha, query, remove, export, import, prune, detect."
+        help = "Action: status, list, add, add-gotcha, query, upgrade, remove, export, import, prune, detect."
     )]
     pub action: String,
     #[arg(help = "Pattern text, gotcha text, entry ID, or import file path.")]
@@ -224,6 +224,18 @@ pub struct GlobalArgs {
         help = "Output format for list/detect: text, json."
     )]
     pub format: String,
+    #[arg(
+        long = "export",
+        value_name = "FILE",
+        help = "Write upgrade drafts for version 1 gotchas to FILE."
+    )]
+    pub export_file: Option<String>,
+    #[arg(
+        long = "apply",
+        value_name = "FILE",
+        help = "Apply the filled upgrade drafts in FILE."
+    )]
+    pub apply_file: Option<String>,
 }
 
 #[derive(Debug, Args)]

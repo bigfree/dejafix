@@ -73,6 +73,10 @@ pub enum GlobalAction {
         library: Option<String>,
         budget: u32,
     },
+    Upgrade {
+        export: Option<String>,
+        apply: Option<String>,
+    },
     Remove(Option<String>),
     Export,
     Import(Option<String>),
@@ -90,6 +94,7 @@ pub enum GlobalAction {
 pub enum Usage {
     Add,
     AddGotcha,
+    Upgrade,
     Remove,
     Import,
 }
@@ -125,6 +130,18 @@ pub enum GlobalOutcome {
         warnings: Vec<String>,
     },
     Reply(String),
+    UpgradeExported {
+        file: String,
+        drafts: usize,
+    },
+    UpgradeExists(String),
+    UpgradeMissing(String),
+    UpgradeInvalid(Vec<String>),
+    UpgradeApplied {
+        replaced: usize,
+        dropped: usize,
+        kept: Vec<(String, Vec<String>)>,
+    },
     Removed(String),
     NotFound(String),
     Exported(Value),
@@ -241,4 +258,40 @@ pub struct GlobalIndex {
     pub(super) records: Vec<StoredGotcha>,
     pub(super) canonical: Vec<Box<str>>,
     pub(super) libraries: Libraries,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Draft {
+    pub id: String,
+    pub input: GotchaInput,
+    pub drop: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum DraftError {
+    #[error("line {line}: not valid JSON ({message})")]
+    Json { line: usize, message: String },
+    #[error("line {line}: not a JSON object")]
+    NotObject { line: usize },
+    #[error("line {line}: the id is missing")]
+    MissingId { line: usize },
+    #[error("line {line}: the field '{field}' has the wrong type")]
+    WrongType { line: usize, field: &'static str },
+    #[error("line {line}: the id {id} is already used by an earlier line")]
+    DuplicateId { line: usize, id: String },
+}
+
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct UpgradeOutcome {
+    pub replaced: usize,
+    pub dropped: usize,
+    pub kept: Vec<(String, Vec<String>)>,
+    pub lines: Vec<String>,
+    pub libraries: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(super) enum Verdict {
+    Replace(Box<GotchaV2>),
+    Drop,
 }

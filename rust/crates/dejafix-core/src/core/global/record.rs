@@ -48,12 +48,16 @@ fn version_two(entry: &Entry) -> Option<GotchaV2> {
         source_project: optional(entry, "source_project").ok()?,
         discovered: optional(entry, "discovered").ok()?,
         reviewed: optional(entry, "reviewed").ok()?,
-        extra: entry
-            .iter()
-            .filter(|(key, _)| !KNOWN_FIELDS.contains(&key.as_str()))
-            .map(|(key, value)| (key.clone(), value.clone()))
-            .collect(),
+        extra: extra_fields(entry),
     })
+}
+
+pub(super) fn extra_fields(entry: &Entry) -> Entry {
+    entry
+        .iter()
+        .filter(|(key, _)| !KNOWN_FIELDS.contains(&key.as_str()))
+        .map(|(key, value)| (key.clone(), value.clone()))
+        .collect()
 }
 
 impl StoredGotcha {

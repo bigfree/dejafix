@@ -412,6 +412,17 @@ impl GlobalStore {
         write_text(&path, &String::from_utf8_lossy(&out))
     }
 
+    pub fn create_new(path: &Path, text: &str) -> Result<bool, StoreError> {
+        match OpenOptions::new().write(true).create_new(true).open(path) {
+            Ok(mut file) => file
+                .write_all(platform_newlines(text).as_bytes())
+                .map(|()| true)
+                .map_err(write_error(path)),
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => Ok(false),
+            Err(error) => Err(write_error(path)(error)),
+        }
+    }
+
     pub fn backup_v1(&self) -> Result<PathBuf, StoreError> {
         self.ensure()?;
         let backup = self.path(BACKUP_FILE);

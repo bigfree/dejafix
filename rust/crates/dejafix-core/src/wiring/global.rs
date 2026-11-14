@@ -1,9 +1,12 @@
+use std::path::Path;
+
 use super::registry::load_registry;
 use super::types::{Settings, WiringError};
-use crate::adapters::fs::{GlobalStore, GotchaWrite};
+use crate::adapters::fs::{GlobalStore, GotchaWrite, read_json_text};
 use crate::core::global::{
     AddOutcome, GlobalAction, GlobalIndex, GlobalOutcome, GotchaInput, GotchaV2, Usage,
-    check_gotcha, global_reply, line, normalize_input, parse_store,
+    apply_upgrade, check_gotcha, export_notes, global_reply, legacy_input, line, normalize_input,
+    parse_drafts, parse_store, touches_version_one, upgrade_drafts,
 };
 use crate::core::write::Ids;
 
@@ -83,6 +86,95 @@ pub fn global_query(
     let records = parse_store(store.load_gotchas()?);
     let index = GlobalIndex::build(records, store.libraries()?);
     Ok(global_reply(&index, query, library, budget))
+}
+
+fn export_drafts(
+    settings: &Settings,
+    cwd: &Path,
+    file: &str,
+) -> Result<GlobalOutcome, WiringError> {
+    let store = GlobalStore::new(&settings.dejafix_home);
+    let libraries = store.libraries()?;
+    let names = project_names(settings);
+    let projects: Vec<&str> = names.iter().map(String::as_str).collect();
+    let records = parse_store(store.load_gotchas()?);
+    let lines = upgrade_drafts(&records, |entry| {
+        let input = normalize_input(legacy_input(entry), &libraries);
+        let id = entry.get("id").and_then(serde_json::Value::as_str);
+        export_notes(&check_gotcha(&input, &libraries, &projects, &records, id))
+    });
+    let text = lines.iter().fold(String::new(), |mut text, line| {
+        text.push_str(line);
+        text.push('\n');
+        text
+    });
+    Ok(if GlobalStore::create_new(&cwd.join(file), &text)? {
+        GlobalOutcome::UpgradeExported {
+            file: file.to_owned(),
+            drafts: lines.len().saturating_sub(1),
+        }
+    } else {
+        GlobalOutcome::UpgradeExists(file.to_owned())
+    })
+}
+
+fn apply_drafts(settings: &Settings, cwd: &Path, file: &str) -> Result<GlobalOutcome, WiringError> {
+    let Some(text) = read_json_text(&cwd.join(file))? else {
+        return Ok(GlobalOutcome::UpgradeMissing(file.to_owned()));
+    };
+    let drafts = match parse_drafts(&text) {
+        Ok(drafts) => drafts,
+        Err(errors) => {
+            return Ok(GlobalOutcome::UpgradeInvalid(
+                errors.iter().map(ToString::to_string).collect(),
+            ));
+        }
+    };
+    let store = GlobalStore::new(&settings.dejafix_home);
+    let mut libraries = store.libraries()?;
+    if touches_version_one(&parse_store(store.load_gotchas()?), &drafts) {
+        store.backup_v1()?;
+    }
+    let names = project_names(settings);
+    let projects: Vec<&str> = names.iter().map(String::as_str).collect();
+    let today = today(settings);
+    let mut outcome = store.edit_gotchas(|entries| {
+        let records = parse_store(entries);
+        let mut outcome = apply_upgrade(&records, &drafts, &today, &libraries, |id, input| {
+            check_gotcha(input, &libraries, &projects, &records, Some(id))
+        });
+        if outcome.replaced + outcome.dropped == 0 {
+            return (GotchaWrite::Keep, outcome);
+        }
+        let lines = std::mem::take(&mut outcome.lines);
+        (GotchaWrite::Replace(lines), outcome)
+    })?;
+    let mut added = false;
+    for library in &outcome.libraries {
+        added |= libraries.add_library(library);
+    }
+    if added {
+        store.save_libraries(&libraries)?;
+    }
+    outcome.kept.sort();
+    Ok(GlobalOutcome::UpgradeApplied {
+        replaced: outcome.replaced,
+        dropped: outcome.dropped,
+        kept: outcome.kept,
+    })
+}
+
+pub(super) fn upgrade_action(
+    settings: &Settings,
+    cwd: &Path,
+    export: Option<String>,
+    apply: Option<String>,
+) -> Result<GlobalOutcome, WiringError> {
+    match (non_empty(export), non_empty(apply)) {
+        (Some(file), None) => export_drafts(settings, cwd, &file),
+        (None, Some(file)) => apply_drafts(settings, cwd, &file),
+        _ => Ok(GlobalOutcome::Usage(Usage::Upgrade)),
+    }
 }
 
 fn non_empty(text: Option<String>) -> Option<String> {

@@ -3,7 +3,7 @@ use std::path::Path;
 
 use serde_json::Value;
 
-use super::global::gotcha_action;
+use super::global::{gotcha_action, upgrade_action};
 use super::init::detect_and_record;
 use super::types::{Project, Settings, WiringError};
 use crate::adapters::fs::{
@@ -131,6 +131,7 @@ pub fn global(
         action @ (GlobalAction::AddGotcha { .. } | GlobalAction::Query { .. }) => {
             gotcha_action(settings, &project, action, ids)
         }
+        GlobalAction::Upgrade { export, apply } => upgrade_action(settings, cwd, export, apply),
         GlobalAction::Remove(id) => {
             let Some(id) = non_empty(id) else {
                 return Ok(GlobalOutcome::Usage(Usage::Remove));

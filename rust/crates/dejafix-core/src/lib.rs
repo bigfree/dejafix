@@ -27,12 +27,12 @@ pub use crate::core::event::{
     Outcome, Summary,
 };
 pub use crate::core::global::{
-    AddOutcome, CheckFailure, CheckReport, CheckWarning, DEFAULT_BUDGET, Entry, GLOBAL_FIELDS,
-    GlobalAction, GlobalDoc, GlobalIndex, GlobalOutcome, GotchaInput, GotchaV2, Libraries,
-    PROMOTABLE_SEED, Relevant, Stack, StoredGotcha, Usage, add_reply, check_gotcha, filtered,
-    global_reply, global_report, gotcha_entry, inherited_block, is_gotcha_signal, is_prunable,
-    is_upgraded, line, normalize_input, parse_store, promotable_libraries, promotable_set,
-    promotion, relevant_entries, similar,
+    AddOutcome, CheckFailure, CheckReport, CheckWarning, DEFAULT_BUDGET, Draft, DraftError, Entry,
+    GLOBAL_FIELDS, GlobalAction, GlobalDoc, GlobalIndex, GlobalOutcome, GotchaInput, GotchaV2,
+    Libraries, PROMOTABLE_SEED, Relevant, Stack, StoredGotcha, UpgradeOutcome, Usage, add_reply,
+    check_gotcha, filtered, global_reply, global_report, gotcha_entry, inherited_block,
+    is_gotcha_signal, is_prunable, is_upgraded, line, normalize_input, parse_store,
+    promotable_libraries, promotable_set, promotion, relevant_entries, similar,
 };
 pub use crate::core::hooks::{
     HOOK_MARKER_END, HOOK_MARKER_START, HOOK_SHEBANG, HookChange, HookKind, Removal,
