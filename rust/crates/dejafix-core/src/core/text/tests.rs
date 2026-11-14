@@ -255,7 +255,7 @@ fn latin_letters_beyond_ascii_are_not_a_foreign_script() {
 #[test]
 fn terse_commit_like_english_is_never_rejected() {
     for text in [
-        "Merge: feat(config): add ECHO_CODELIST_TTL_SECONDS",
+        "Merge: feat(config): add SHOP_CATALOG_TTL_SECONDS",
         "fix: guard the login submit",
         "Revert \"fix: guard the login submit\"",
         "chore(deps): bump serde from 1.0.1 to 1.0.2",

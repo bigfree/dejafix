@@ -335,7 +335,7 @@ fn a_refused_gotcha_lists_every_failure_and_writes_nothing() -> TestResult {
         &repo,
         &[
             "add-gotcha",
-            "See ECHO-3233: the config in apps/heating/ breaks",
+            "See SHOP-3233: the config in apps/heating/ breaks",
             "--library",
             "nx",
             "--keyword",
@@ -344,7 +344,7 @@ fn a_refused_gotcha_lists_every_failure_and_writes_nothing() -> TestResult {
     )?;
     assert_eq!(
         err,
-        "Not added: give 2 to 8 keywords, not 1; it names a project path (apps/heating/); it names a ticket number (ECHO-3233).\n"
+        "Not added: give 2 to 8 keywords, not 1; it names a project path (apps/heating/); it names a ticket number (SHOP-3233).\n"
     );
     assert!(!global_dir(&repo).join("library_gotchas.jsonl").exists());
     assert!(!global_dir(&repo).join("libraries.json").exists());

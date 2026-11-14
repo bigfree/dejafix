@@ -676,7 +676,7 @@ mod checks {
         let report = check_gotcha(
             &input("bullmq", gotcha, &["shutdown", "worker close"]),
             &Libraries::default(),
-            &["home-log", "cra-portal"],
+            &["home-log", "web-portal"],
             &[],
             None,
         );
@@ -803,8 +803,8 @@ mod checks {
     #[test]
     fn ticket_numbers_are_refused_with_the_standard_exceptions() {
         assert_eq!(
-            failures(&padded("Fixed in ECHO-3233 after the upgrade")),
-            [CheckFailure::Ticket("ECHO-3233".into())]
+            failures(&padded("Fixed in SHOP-3233 after the upgrade")),
+            [CheckFailure::Ticket("SHOP-3233".into())]
         );
         assert_eq!(
             failures(&padded("See issue #1234 upstream for details")),
@@ -821,9 +821,9 @@ mod checks {
             "ECMA-262 spec",
             "#12 is short",
             "AB-12 too short",
-            "ECHO-1 too short",
-            "ECHOs-123 mixed",
-            "xECHO-123 glued",
+            "SHOP-1 too short",
+            "SHOPs-123 mixed",
+            "xSHOP-123 glued",
         ] {
             assert_eq!(failures(&padded(fine)), [], "{fine}");
         }
@@ -865,6 +865,135 @@ mod checks {
                 "{fine}"
             );
         }
+    }
+
+    #[test]
+    fn home_shared_and_windows_paths_are_refused() {
+        for path in [
+            "$HOME/.cache/tool",
+            "${HOME}/.cache/tool",
+            "%USERPROFILE%\\.npmrc",
+            "D:/build/out",
+            "\\\\fileserver\\share\\file.txt",
+        ] {
+            assert!(
+                matches!(
+                    failures(&padded(&format!("It reads {path} first"))).as_slice(),
+                    [CheckFailure::ProjectPath(_)]
+                ),
+                "{path}"
+            );
+        }
+    }
+
+    #[test]
+    fn two_letter_keys_with_long_numbers_and_inner_internal_labels_are_refused() {
+        assert_eq!(
+            failures(&padded("Fixed in AB-1234 after the upgrade")),
+            [CheckFailure::Ticket("AB-1234".into())]
+        );
+        for host in [
+            "jenkins.int.example.cz",
+            "gitlab.intra.example.com",
+            "build.corp.example.net",
+            "wiki.Internal.example.de",
+            "dev.int.example.com",
+            "app.lan.example.io",
+        ] {
+            assert_eq!(
+                failures(&padded(&format!("It calls {host} at start"))),
+                [CheckFailure::InternalHost(host.into())],
+                "{host}"
+            );
+        }
+    }
+
+    #[test]
+    fn library_facts_pass_without_warnings() {
+        for fine in [
+            "/usr/lib/libssl.so.3",
+            "/etc/hosts",
+            "/etc/ssl/certs/ca.pem",
+            "/var/run/docker.sock",
+            "/opt/homebrew/bin/node",
+            "/proc/self/fd/0",
+            "/System/Library/Frameworks",
+            "/mnt/c under WSL",
+            "/root/.npmrc",
+            "/workspaces/ in Codespaces",
+            "io.netty.internal.tcnative",
+            "AVX-512 builds",
+            "ARM-64 images",
+            "FIPS-140 mode",
+            "node_modules/.bin/tsc",
+            "https://example.com/docs/api/v2",
+            "file:///etc/hosts",
+            "http://localhost:3000/api/v1",
+            "settings.local.py",
+            "config.local.json",
+            ".env.local",
+            "com.example.internal.Foo",
+            "java.base/jdk.internal.misc=ALL-UNNAMED",
+            "PEP-484 hints",
+            "AES-256 keys",
+            "IE-11 quirks",
+            "CWE-79 issues",
+            "RFC-1234 text",
+            "UTF-8 input",
+            "the regex \\\\d+\\\\s",
+        ] {
+            assert_eq!(
+                report(&padded(&format!("It reads {fine} first"))),
+                (Vec::new(), Vec::new()),
+                "{fine}"
+            );
+        }
+    }
+
+    #[test]
+    fn doubtful_paths_tickets_and_hosts_only_warn() {
+        for (text, warning) in [
+            (
+                "It reads /data/acme/shared/config.yml first",
+                CheckWarning::PossiblePath("/data/acme/shared/config.yml".into()),
+            ),
+            (
+                "It reads /workspaces/acme/src first",
+                CheckWarning::PossiblePath("/workspaces/acme/src".into()),
+            ),
+            (
+                "It reads /mnt/builds/acme/cache first",
+                CheckWarning::PossiblePath("/mnt/builds/acme/cache".into()),
+            ),
+            (
+                "Fixed in AB-12 after the upgrade",
+                CheckWarning::PossibleTicket("AB-12".into()),
+            ),
+            (
+                "It calls http://jenkins:8080/job first",
+                CheckWarning::PossibleHost("jenkins".into()),
+            ),
+            (
+                "It connects to postgres://app@db:5432/main first",
+                CheckWarning::PossibleHost("db".into()),
+            ),
+        ] {
+            assert_eq!(report(&padded(text)), (Vec::new(), vec![warning]), "{text}");
+        }
+        assert_eq!(
+            report(&padded("It reads /data/acme/shared/x for SHOP-3233")),
+            (
+                vec![CheckFailure::Ticket("SHOP-3233".into())],
+                vec![CheckWarning::PossiblePath("/data/acme/shared/x".into())]
+            )
+        );
+        assert_eq!(
+            report(&padded("It reads /Users/someone/acme/x first")),
+            (
+                vec![CheckFailure::ProjectPath("/Users/someone/acme/x".into())],
+                Vec::new()
+            )
+        );
     }
 
     #[test]

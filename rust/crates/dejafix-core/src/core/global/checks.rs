@@ -13,9 +13,49 @@ const DUPLICATE_NUMERATOR: usize = 4;
 const DUPLICATE_DENOMINATOR: usize = 5;
 
 const ABSOLUTE_PATHS: [&str; 3] = ["/Users/", "/home/", "~/"];
+const HOME_VARIABLES: [&str; 3] = ["$HOME/", "${HOME}/", "%USERPROFILE%"];
+const SYSTEM_DIRECTORIES: [&str; 22] = [
+    "Applications",
+    "Library",
+    "System",
+    "bin",
+    "boot",
+    "dev",
+    "etc",
+    "home",
+    "lib",
+    "lib32",
+    "lib64",
+    "nix",
+    "opt",
+    "private",
+    "proc",
+    "run",
+    "sbin",
+    "snap",
+    "sys",
+    "tmp",
+    "usr",
+    "var",
+];
 const MONOREPO_PATHS: [&str; 4] = ["apps/", "libs/", "packages/", "tools/"];
-const TICKET_EXCEPTIONS: [&str; 8] = ["CVE", "ECMA", "IEEE", "ISO", "RFC", "SHA", "TLS", "UTF"];
+const TICKET_EXCEPTIONS: [&str; 40] = [
+    "AES", "AMD", "ANSI", "ARM", "AVX", "BIP", "BS", "CP", "CVE", "CWE", "ECMA", "EIP", "EN",
+    "ERC", "ES", "FIPS", "GB", "HS", "IE", "IEC", "IEEE", "ISO", "ITU", "JEP", "JSR", "KEP", "MD",
+    "NIST", "OWASP", "PEP", "POSIX", "PS", "RFC", "RS", "RSA", "SHA", "SSE", "TLS", "UTF", "WCAG",
+];
 const INTERNAL_SUFFIXES: [&str; 6] = [".int", ".local", ".internal", ".lan", ".corp", ".home"];
+const INTERNAL_LABELS: [&str; 7] = [
+    "corp", "int", "internal", "intra", "intranet", "lan", "local",
+];
+const REVERSE_DOMAIN_ROOTS: [&str; 9] = [
+    "android", "com", "edu", "gov", "io", "java", "javax", "net", "org",
+];
+const GENERIC_DOMAINS: [&str; 8] = ["app", "biz", "cloud", "com", "dev", "info", "net", "org"];
+const SHORT_EXTENSIONS: [&str; 18] = [
+    "cs", "db", "el", "ex", "go", "gz", "hs", "js", "kt", "md", "ml", "pl", "py", "rb", "rs", "sh",
+    "so", "ts",
+];
 const RUN_STATUS_PHRASES: [&str; 8] = [
     "not pushed",
     "not merged",
@@ -51,6 +91,16 @@ fn starts_word(text: &str, at: usize) -> bool {
         .is_none_or(|before| !is_path_char(before))
 }
 
+fn unc_share(text: &str, from: usize) -> bool {
+    let tail = text.get(from..).unwrap_or_default();
+    let host = tail
+        .bytes()
+        .take_while(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'.'))
+        .count();
+    let share = tail.get(host..).unwrap_or_default().as_bytes();
+    host >= 2 && matches!(share, [b'\\', first, ..] if first.is_ascii_alphanumeric())
+}
+
 fn project_path(text: &str) -> Option<String> {
     if let Some(at) = ABSOLUTE_PATHS
         .iter()
@@ -61,12 +111,20 @@ fn project_path(text: &str) -> Option<String> {
     }
     let bytes = text.as_bytes();
     for (at, window) in bytes.windows(3).enumerate() {
-        if let [drive, b':', b'\\'] = window
-            && drive.is_ascii_alphabetic()
-            && starts_word(text, at)
-        {
+        let windows_root =
+            matches!(window, [drive, b':', b'\\' | b'/'] if drive.is_ascii_alphabetic());
+        let share = window.starts_with(b"\\\\") && unc_share(text, at + 2);
+        if (windows_root || share) && starts_word(text, at) {
             return Some(token_at(text, at));
         }
+    }
+    if let Some(at) = HOME_VARIABLES
+        .iter()
+        .flat_map(|marker| text.match_indices(marker).map(|(at, _)| at))
+        .filter(|at| starts_word(text, *at))
+        .min()
+    {
+        return Some(token_at(text, at));
     }
     text.char_indices()
         .map(|(at, _)| at)
@@ -77,6 +135,25 @@ fn project_path(text: &str) -> Option<String> {
                 .any(|prefix| text.get(*at..).is_some_and(|tail| tail.starts_with(prefix)))
         })
         .map(|at| token_at(text, at))
+}
+
+fn possible_path(text: &str) -> Option<String> {
+    text.match_indices('/')
+        .filter(|(at, _)| starts_word(text, *at))
+        .map(|(at, _)| token_at(text, at))
+        .find(|token| {
+            if token.starts_with("//") {
+                return false;
+            }
+            let segments: Vec<&str> = token
+                .split('/')
+                .filter(|segment| !segment.is_empty())
+                .collect();
+            segments.len() >= 3
+                && segments
+                    .first()
+                    .is_some_and(|top| !SYSTEM_DIRECTORIES.contains(top))
+        })
 }
 
 fn hash_ticket(text: &str) -> Option<String> {
@@ -90,41 +167,57 @@ fn hash_ticket(text: &str) -> Option<String> {
     })
 }
 
-fn key_ticket(text: &str) -> Option<String> {
+fn key_tickets(text: &str) -> impl Iterator<Item = (String, bool)> + '_ {
     let bytes = text.as_bytes();
     let mut at = 0;
-    while at < bytes.len() {
-        let previous = at.checked_sub(1).and_then(|before| bytes.get(before));
-        let letters = bytes
-            .get(at..)
-            .unwrap_or_default()
-            .iter()
-            .take_while(|byte| byte.is_ascii_uppercase())
-            .count();
-        if letters == 0 || previous.is_some_and(u8::is_ascii_alphanumeric) {
-            at += letters.max(1);
-            continue;
+    std::iter::from_fn(move || {
+        while at < bytes.len() {
+            let start = at;
+            let previous = start.checked_sub(1).and_then(|before| bytes.get(before));
+            let letters = bytes
+                .get(start..)
+                .unwrap_or_default()
+                .iter()
+                .take_while(|byte| byte.is_ascii_uppercase())
+                .count();
+            if letters == 0 || previous.is_some_and(u8::is_ascii_alphanumeric) {
+                at += letters.max(1);
+                continue;
+            }
+            let dash = start + letters;
+            at = dash.max(start + 1);
+            let digits = bytes
+                .get(dash + 1..)
+                .unwrap_or_default()
+                .iter()
+                .take_while(|byte| byte.is_ascii_digit())
+                .count();
+            let end = dash + 1 + digits;
+            let key = text.get(start..dash).unwrap_or_default();
+            if letters >= 2
+                && bytes.get(dash) == Some(&b'-')
+                && digits >= 2
+                && !bytes.get(end).is_some_and(u8::is_ascii_alphanumeric)
+                && !TICKET_EXCEPTIONS.contains(&key)
+            {
+                let hard = letters >= 3 || digits >= 3;
+                return text.get(start..end).map(|ticket| (ticket.to_owned(), hard));
+            }
         }
-        let dash = at + letters;
-        let digits = bytes
-            .get(dash + 1..)
-            .unwrap_or_default()
-            .iter()
-            .take_while(|byte| byte.is_ascii_digit())
-            .count();
-        let end = dash + 1 + digits;
-        let key = text.get(at..dash).unwrap_or_default();
-        if letters >= 3
-            && bytes.get(dash) == Some(&b'-')
-            && digits >= 2
-            && !bytes.get(end).is_some_and(u8::is_ascii_alphanumeric)
-            && !TICKET_EXCEPTIONS.contains(&key)
-        {
-            return text.get(at..end).map(str::to_owned);
-        }
-        at = dash.max(at + 1);
-    }
-    None
+        None
+    })
+}
+
+fn key_ticket(text: &str) -> Option<String> {
+    key_tickets(text)
+        .find(|(_, hard)| *hard)
+        .map(|(ticket, _)| ticket)
+}
+
+fn possible_ticket(text: &str) -> Option<String> {
+    key_tickets(text)
+        .find(|(_, hard)| !*hard)
+        .map(|(ticket, _)| ticket)
 }
 
 fn is_private_ipv4(token: &str) -> bool {
@@ -161,18 +254,65 @@ fn ends_with_ignoring_case(text: &str, suffix: &str) -> bool {
             .is_some_and(|tail| tail.eq_ignore_ascii_case(suffix))
 }
 
-fn internal_host(text: &str) -> Option<String> {
+fn host_tokens(text: &str) -> impl Iterator<Item = (&str, bool)> {
     text.split(|character: char| {
         !(character.is_ascii_alphanumeric() || matches!(character, '.' | '-' | '_'))
     })
-    .map(|token| token.trim_matches(['.', '-']))
-    .find(|token| {
-        is_private_ipv4(token)
-            || INTERNAL_SUFFIXES
-                .iter()
-                .any(|suffix| ends_with_ignoring_case(token, suffix))
+    .map(|token| (token.trim_matches(['.', '-']), token.starts_with('.')))
+}
+
+fn has_internal_label(token: &str) -> bool {
+    let labels: Vec<&str> = token.split('.').collect();
+    let (Some(first), Some(last)) = (labels.first(), labels.last()) else {
+        return false;
+    };
+    labels.len() >= 3
+        && !REVERSE_DOMAIN_ROOTS.contains(first)
+        && last.bytes().all(|byte| byte.is_ascii_lowercase())
+        && ((last.len() == 2 && !SHORT_EXTENSIONS.contains(last)) || GENERIC_DOMAINS.contains(last))
+        && labels
+            .get(1..labels.len() - 1)
+            .unwrap_or_default()
+            .iter()
+            .any(|label| INTERNAL_LABELS.contains(&label.to_ascii_lowercase().as_str()))
+}
+
+fn internal_host(text: &str) -> Option<String> {
+    host_tokens(text)
+        .find(|(token, dotfile)| {
+            is_private_ipv4(token)
+                || (!dotfile
+                    && (INTERNAL_SUFFIXES
+                        .iter()
+                        .any(|suffix| ends_with_ignoring_case(token, suffix))
+                        || has_internal_label(token)))
+        })
+        .map(|(token, _)| token.to_owned())
+}
+
+fn bare_url_host(text: &str) -> Option<String> {
+    text.match_indices("://").find_map(|(at, _)| {
+        let rest = text.get(at + 3..)?;
+        let authority_end = rest
+            .find(|character: char| {
+                character.is_whitespace() || matches!(character, '/' | '?' | '#')
+            })
+            .unwrap_or(rest.len());
+        let authority = rest.get(..authority_end)?;
+        let rest = authority
+            .rfind('@')
+            .and_then(|at| authority.get(at + 1..))
+            .unwrap_or(authority);
+        let end = rest
+            .find(|character: char| !(character.is_ascii_alphanumeric() || character == '-'))
+            .unwrap_or(rest.len());
+        let host = rest.get(..end)?;
+        let ends_host = rest
+            .get(end..)
+            .is_none_or(|tail| !tail.starts_with(['.', '[', '$', '{', '<', '%', '_']));
+        (!host.is_empty() && ends_host && !host.eq_ignore_ascii_case("localhost"))
+            .then(|| host.to_owned())
     })
-    .map(str::to_owned)
 }
 
 fn numbered_step(lowered: &str) -> Option<String> {
@@ -282,6 +422,19 @@ fn details(input: &GotchaInput, projects: &[&str], report: &mut CheckReport) {
     }
     if let Some(host) = first(internal_host) {
         report.failures.push(CheckFailure::InternalHost(host));
+    }
+    let path_refused = report
+        .failures
+        .iter()
+        .any(|failure| matches!(failure, CheckFailure::ProjectPath(_)));
+    if let Some(path) = first(possible_path).filter(|_| !path_refused) {
+        report.warnings.push(CheckWarning::PossiblePath(path));
+    }
+    if let Some(ticket) = first(possible_ticket) {
+        report.warnings.push(CheckWarning::PossibleTicket(ticket));
+    }
+    if let Some(host) = first(bare_url_host) {
+        report.warnings.push(CheckWarning::PossibleHost(host));
     }
     let lowered = texts.join("\n").to_lowercase();
     if let Some(name) = projects

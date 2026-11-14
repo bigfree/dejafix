@@ -241,6 +241,12 @@ pub enum CheckWarning {
     RunStatus(String),
     #[error("{0}")]
     Redacted(String),
+    #[error("it may name a project path ({0})")]
+    PossiblePath(String),
+    #[error("it may name a ticket number ({0})")]
+    PossibleTicket(String),
+    #[error("it may name an internal host ({0})")]
+    PossibleHost(String),
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
