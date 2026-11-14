@@ -40,11 +40,11 @@ pub fn auto_capture(
     let Ok(context) = path_context(cwd) else {
         return CaptureOutcome::Skipped;
     };
+    let Ok(memory) = MemoryDir::at(cwd) else {
+        return CaptureOutcome::Skipped;
+    };
     let project = Project {
-        memory: MemoryDir {
-            root: cwd.to_path_buf(),
-            dir,
-        },
+        memory,
         settings: settings.clone(),
         context,
     };

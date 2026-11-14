@@ -7,7 +7,7 @@ use super::registry::{load_registry, now_text};
 use super::types::InitHooks;
 use super::types::{BridgeOutcome, Inherited, InitOptions, InitReport, Settings, WiringError};
 use crate::adapters::fs::{
-    GlobalStore, RegistryFiles, StoreError, detect_stack, manifest_info, project_name,
+    GlobalStore, MemoryDir, RegistryFiles, StoreError, detect_stack, manifest_info, project_name,
     read_optional_text, read_text_within, resolve_path, write_text,
 };
 use crate::adapters::git::hooks_dir;
@@ -76,7 +76,7 @@ fn initialize(
     settings: &Settings,
     home: Option<&Path>,
 ) -> Result<(PathBuf, Option<Registry>), StoreError> {
-    let memory = root.join(MEMORY_DIR);
+    let memory = MemoryDir::at(root)?.dir;
     ensure_dir(&memory)?;
     ensure_dir(&memory.join("issues"))?;
     let events = memory.join("events.jsonl");

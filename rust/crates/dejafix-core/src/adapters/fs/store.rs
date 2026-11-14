@@ -13,25 +13,31 @@ fn is_project_memory(candidate: &Path) -> bool {
     candidate.is_dir() && candidate.join(CONFIG_FILE).exists()
 }
 
-fn memory_at(root: &Path) -> MemoryDir {
-    MemoryDir {
-        root: root.to_path_buf(),
-        dir: root.join(MEMORY_DIR),
+impl MemoryDir {
+    pub fn at(root: &Path) -> Result<Self, StoreError> {
+        let dir = root.join(MEMORY_DIR);
+        if points_outside(&dir, root) {
+            return Err(StoreError::OutsideProject { path: dir });
+        }
+        Ok(Self {
+            root: root.to_path_buf(),
+            dir,
+        })
     }
 }
 
 pub fn find_memory_dir(cwd: &Path) -> Result<MemoryDir, StoreError> {
     if is_project_memory(&cwd.join(MEMORY_DIR)) {
-        return Ok(memory_at(cwd));
+        return MemoryDir::at(cwd);
     }
     let resolved = canonical_path(cwd).unwrap_or_else(|| cwd.to_path_buf());
     resolved
         .ancestors()
         .find(|ancestor| is_project_memory(&ancestor.join(MEMORY_DIR)))
-        .map(memory_at)
         .ok_or_else(|| StoreError::NotFound {
             cwd: cwd.to_path_buf(),
         })
+        .and_then(MemoryDir::at)
 }
 
 pub(crate) fn read_python_text(path: &Path, strip_bom: bool) -> io::Result<String> {
@@ -64,14 +70,22 @@ pub fn read_optional_text(path: &Path) -> Result<Option<String>, StoreError> {
     }
 }
 
-pub(crate) fn points_outside(path: &Path, root: &Path) -> bool {
-    let is_link =
-        fs::symlink_metadata(path).is_ok_and(|metadata| metadata.file_type().is_symlink());
-    if !is_link {
-        return false;
+fn existing_target(path: &Path) -> Option<PathBuf> {
+    for candidate in path.ancestors() {
+        match fs::canonicalize(candidate) {
+            Ok(target) => return Some(target),
+            Err(error)
+                if error.kind() == io::ErrorKind::NotFound
+                    && fs::symlink_metadata(candidate).is_err() => {}
+            Err(_) => return None,
+        }
     }
-    match (fs::canonicalize(path), fs::canonicalize(root)) {
-        (Ok(target), Ok(root)) => !target.starts_with(root),
+    None
+}
+
+pub(crate) fn points_outside(path: &Path, root: &Path) -> bool {
+    match (existing_target(path), fs::canonicalize(root)) {
+        (Some(target), Ok(root)) => !target.starts_with(root),
         _ => true,
     }
 }

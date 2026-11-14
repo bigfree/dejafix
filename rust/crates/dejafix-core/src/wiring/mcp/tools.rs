@@ -7,7 +7,8 @@ use super::types::{
     FsProbe, GitMemo, LogCache, McpSettings, McpState, MemoGit, ToolCall, ToolError, ToolReply,
 };
 use crate::adapters::fs::{
-    FsResolver, GlobalStore, MEMORY_DIR, events_path, read_text, resolve_path,
+    FsResolver, GlobalStore, MEMORY_DIR, StoreError, events_path, points_outside, read_text,
+    resolve_path,
 };
 use crate::adapters::git::{GitHistory, status_files};
 use crate::core::context::{ContextInput, generate_context};
@@ -271,6 +272,9 @@ fn issue_text(root: &Path, requested: &str) -> Result<String, ToolError> {
 
 fn score(root: &Path) -> Result<String, ToolError> {
     let path = events_path(&root.join(MEMORY_DIR));
+    if points_outside(&path, root) {
+        return Err(StoreError::OutsideProject { path }.into());
+    }
     let text = fs::read(&path)
         .map_err(|error| io_error(&path, &error))
         .and_then(|bytes| {

@@ -672,3 +672,25 @@ fn precheck_sees_a_new_commit_at_once_through_the_memo() {
         "the fourth commit must not wait for the memo to expire"
     );
 }
+
+#[cfg(unix)]
+#[test]
+fn a_memory_folder_linked_out_of_the_project_is_refused_over_mcp() {
+    let world = World::new();
+    let outside = world.project("outside");
+    let root = world.base.join("alpha");
+    fs::create_dir_all(&root).unwrap();
+    std::os::unix::fs::symlink(outside.join(".dejafix"), root.join(".dejafix")).unwrap();
+    let state = world.state(Some(&root), &world.base);
+    let reply = call(&state, note("x"), None);
+    assert!(reply.error, "{}", reply.text);
+    assert!(
+        reply
+            .text
+            .contains("points outside the project; refusing to use it"),
+        "{}",
+        reply.text
+    );
+    assert_eq!(events(&outside), "");
+    assert!(call(&state, ToolCall::GetScore, None).error);
+}

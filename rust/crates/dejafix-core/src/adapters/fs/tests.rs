@@ -611,3 +611,93 @@ fn global_removal_rewrites_in_place_so_a_locked_append_is_never_lost() {
         "{\"gotcha\": \"b\", \"id\": \"got_b\", \"library\": \"x\"}\n"
     );
 }
+
+mod containment {
+    use std::fs;
+
+    use super::super::{
+        MemoryDir, StoreError, find_memory_dir, lock_events, points_outside, read_events_file,
+    };
+
+    #[cfg(unix)]
+    #[test]
+    fn a_memory_folder_linked_out_of_the_project_is_refused() {
+        use std::os::unix::fs::symlink;
+        let base = tempfile::tempdir().unwrap();
+        let root = base.path().join("repo");
+        let outside = base.path().join("outside");
+        fs::create_dir_all(&root).unwrap();
+        fs::create_dir_all(&outside).unwrap();
+        fs::write(outside.join("config.toml"), "").unwrap();
+        fs::write(outside.join("summary.md"), "SECRET\n").unwrap();
+        symlink(&outside, root.join(".dejafix")).unwrap();
+        assert!(points_outside(&root.join(".dejafix/summary.md"), &root));
+        assert!(matches!(
+            find_memory_dir(&root),
+            Err(StoreError::OutsideProject { .. })
+        ));
+        assert!(matches!(
+            MemoryDir::at(&root),
+            Err(StoreError::OutsideProject { .. })
+        ));
+        assert!(matches!(
+            lock_events(&root.join(".dejafix")),
+            Err(StoreError::OutsideProject { .. })
+        ));
+        assert!(!outside.join("events.jsonl").exists());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn an_event_log_linked_out_of_the_project_is_neither_read_nor_appended() {
+        use std::os::unix::fs::symlink;
+        let base = tempfile::tempdir().unwrap();
+        let root = base.path().join("repo");
+        let secret = base.path().join("zshrc");
+        fs::create_dir_all(root.join(".dejafix")).unwrap();
+        fs::write(root.join(".dejafix/config.toml"), "").unwrap();
+        fs::write(&secret, "export TOKEN=1\n").unwrap();
+        symlink(&secret, root.join(".dejafix/events.jsonl")).unwrap();
+        let memory = root.join(".dejafix");
+        assert!(matches!(
+            lock_events(&memory),
+            Err(StoreError::OutsideProject { .. })
+        ));
+        assert!(matches!(
+            read_events_file(&memory),
+            Err(StoreError::OutsideProject { .. })
+        ));
+        assert_eq!(fs::read_to_string(&secret).unwrap(), "export TOKEN=1\n");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn links_that_stay_inside_the_project_still_work() {
+        use std::os::unix::fs::symlink;
+        let base = tempfile::tempdir().unwrap();
+        let root = base.path().join("repo");
+        fs::create_dir_all(root.join("memory")).unwrap();
+        fs::write(root.join("memory/config.toml"), "").unwrap();
+        symlink(root.join("memory"), root.join(".dejafix")).unwrap();
+        let memory = find_memory_dir(&root).unwrap();
+        let (mut locked, bytes) = lock_events(&memory.dir).unwrap();
+        assert_eq!(bytes, b"");
+        locked.append(b"{}\n").unwrap();
+        drop(locked);
+        assert_eq!(
+            fs::read_to_string(root.join("memory/events.jsonl")).unwrap(),
+            "{}\n"
+        );
+    }
+
+    #[test]
+    fn a_missing_file_is_judged_by_its_nearest_existing_folder() {
+        let base = tempfile::tempdir().unwrap();
+        let root = base.path().join("repo");
+        fs::create_dir_all(&root).unwrap();
+        assert!(!points_outside(&root.join(".dejafix/events.jsonl"), &root));
+        assert!(!points_outside(&root.join(".gitignore"), &root));
+        assert!(points_outside(&base.path().join("other/x"), &root));
+        assert!(MemoryDir::at(&root).is_ok());
+    }
+}

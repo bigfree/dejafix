@@ -28,6 +28,8 @@ pub enum StoreError {
         #[source]
         source: io::Error,
     },
+    #[error("{} points outside the project; refusing to use it", path.display())]
+    OutsideProject { path: PathBuf },
     #[error(
         "No .dejafix directory found in {} or any parent. If running over MCP, set the project root via the `cwd` field in your MCP client config or via the DEJAFIX_ROOT environment variable. Otherwise run `dejafix init` to create one.",
         cwd.display()
