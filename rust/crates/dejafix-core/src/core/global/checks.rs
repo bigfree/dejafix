@@ -1,6 +1,7 @@
 use super::query::{GLOBAL_FIELDS, global_docs};
 use super::types::{CheckFailure, CheckReport, CheckWarning, GotchaInput, Libraries, StoredGotcha};
 use crate::core::rank::Index;
+use crate::core::redact::{redact, redaction_notice};
 use crate::core::text::{LanguageVerdict, contains_word, language_verdict};
 
 const MIN_KEYWORDS: usize = 2;
@@ -344,4 +345,29 @@ pub fn check_gotcha(
         report.duplicate_of = Some(id);
     }
     report
+}
+
+fn redacted(text: &str, fired: &mut Vec<crate::core::redact::SecretKind>) -> String {
+    let redaction = redact(text);
+    fired.extend(redaction.fired);
+    redaction.text.into_owned()
+}
+
+#[must_use]
+pub fn redact_input(input: &GotchaInput) -> (GotchaInput, Option<String>) {
+    let mut fired = Vec::new();
+    let clean = GotchaInput {
+        library: input.library.clone(),
+        keywords: input
+            .keywords
+            .iter()
+            .map(|keyword| redacted(keyword, &mut fired))
+            .collect(),
+        gotcha: redacted(&input.gotcha, &mut fired),
+        versions: input
+            .versions
+            .as_deref()
+            .map(|versions| redacted(versions, &mut fired)),
+    };
+    (clean, redaction_notice(&fired))
 }

@@ -977,3 +977,30 @@ fn add_global_gotcha_refuses_an_unknown_project_argument() {
             .exists()
     );
 }
+
+#[test]
+fn a_secret_in_a_global_gotcha_is_redacted_and_reported() {
+    let world = World::new();
+    let root = world.project("alpha");
+    let state = world.state(Some(&root), &world.base);
+    let token = format!("{}{}", "ghp_", "a".repeat(36));
+    let reply = text(
+        &state,
+        global_gotcha(
+            "octokit",
+            &format!(
+                "octokit needs a token such as {token} in the environment before the first call."
+            ),
+            &["auth token", "environment"],
+        ),
+        None,
+    );
+    assert!(reply.starts_with("Added global gotcha "), "{reply}");
+    assert!(
+        reply.contains("\nWarning: dejafix: redacted 1 secret(s) before write"),
+        "{reply}"
+    );
+    let store =
+        fs::read_to_string(world.home.join(".dejafix/global/library_gotchas.jsonl")).unwrap();
+    assert!(!store.contains(&token), "{store}");
+}

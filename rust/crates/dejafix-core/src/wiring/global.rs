@@ -4,10 +4,10 @@ use super::registry::load_registry;
 use super::types::{GotchaChanges, Settings, WiringError};
 use crate::adapters::fs::{GlobalStore, GotchaWrite, read_json_text};
 use crate::core::global::{
-    AddOutcome, CheckReport, Entry, GlobalAction, GlobalIndex, GlobalOutcome, GotchaInput,
-    GotchaV2, Libraries, StoredGotcha, Usage, apply_upgrade, check_gotcha, export_notes,
-    global_reply, is_package_name, legacy_input, line, normalize_input, parse_drafts, parse_store,
-    stored_line, touches_version_one, upgrade_drafts,
+    AddOutcome, CheckReport, CheckWarning, Entry, GlobalAction, GlobalIndex, GlobalOutcome,
+    GotchaInput, GotchaV2, Libraries, StoredGotcha, Usage, apply_upgrade, check_gotcha,
+    export_notes, global_reply, is_package_name, legacy_input, line, normalize_input, parse_drafts,
+    parse_store, redact_input, stored_line, touches_version_one, upgrade_drafts,
 };
 use crate::core::registry::Registry;
 use crate::core::write::Ids;
@@ -68,10 +68,18 @@ pub fn add_gotcha(
     let store = GlobalStore::new(&settings.dejafix_home);
     let projects: Vec<&str> = projects.iter().map(String::as_str).collect();
     let discovered = today(settings);
+    let (input, notice) = if settings.redact {
+        redact_input(input)
+    } else {
+        (input.clone(), None)
+    };
     let outcome = with_libraries(&store, |entries, libraries| {
         let input = normalize_input(input.clone(), libraries);
         let records = parse_store(entries);
-        let report = check_gotcha(&input, libraries, &projects, &records, None);
+        let mut report = check_gotcha(&input, libraries, &projects, &records, None);
+        report
+            .warnings
+            .extend(notice.clone().map(CheckWarning::Redacted));
         if !report.failures.is_empty() {
             return (GotchaWrite::Keep, AddOutcome::Rejected(report), false);
         }
@@ -148,6 +156,13 @@ fn apply_drafts(settings: &Settings, cwd: &Path, file: &str) -> Result<GlobalOut
         return Ok(GlobalOutcome::UpgradeMissing(file.to_owned()));
     };
     let drafts = match parse_drafts(&text) {
+        Ok(drafts) if settings.redact => drafts
+            .into_iter()
+            .map(|mut draft| {
+                draft.input = redact_input(&draft.input).0;
+                draft
+            })
+            .collect(),
         Ok(drafts) => drafts,
         Err(errors) => {
             return Ok(GlobalOutcome::UpgradeInvalid(
@@ -352,6 +367,22 @@ fn edit_gotcha(
     if id.is_none() && aliases.is_empty() {
         return Ok(GlobalOutcome::Usage(Usage::Edit));
     }
+    let clean;
+    let changes = if settings.redact {
+        let (input, _) = redact_input(&GotchaInput {
+            keywords: changes.keywords.clone(),
+            versions: changes.versions.clone(),
+            ..GotchaInput::default()
+        });
+        clean = GotchaChanges {
+            library: changes.library.clone(),
+            keywords: input.keywords,
+            versions: input.versions,
+        };
+        &clean
+    } else {
+        changes
+    };
     let store = GlobalStore::new(&settings.dejafix_home);
     let names = project_names(settings);
     let projects: Vec<&str> = names.iter().map(String::as_str).collect();

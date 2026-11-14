@@ -239,6 +239,8 @@ pub enum CheckWarning {
     ProjectName(String),
     #[error("it reads like a run status ('{0}')")]
     RunStatus(String),
+    #[error("{0}")]
+    Redacted(String),
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]

@@ -8,7 +8,7 @@ mod report;
 mod types;
 mod upgrade;
 
-pub use checks::{check_gotcha, is_package_name, normalize_input};
+pub use checks::{check_gotcha, is_package_name, normalize_input, redact_input};
 pub use hint::{global_hint, hint_candidate};
 pub use prune::is_prunable;
 pub use query::{DEFAULT_BUDGET, GLOBAL_FIELDS, global_reply};
