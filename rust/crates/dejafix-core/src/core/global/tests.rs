@@ -1458,7 +1458,10 @@ mod relevance {
 mod review_fixes {
     use serde_json::json;
 
-    use super::super::Libraries;
+    use super::super::{
+        AddOutcome, CheckFailure, CheckReport, CheckWarning, Libraries, StoredGotcha, add_reply,
+        upgrade_drafts,
+    };
 
     #[test]
     fn library_names_that_differ_only_in_case_keep_every_alias() {
@@ -1467,5 +1470,39 @@ mod review_fixes {
         assert_eq!(libraries.aliases("next"), ["next.js", "nextjs"]);
         assert_eq!(libraries.canonical("nextjs"), "next");
         assert_eq!(libraries.canonical("next.js"), "next");
+    }
+
+    #[test]
+    fn a_refused_add_also_names_the_warnings() {
+        let reply = add_reply(&AddOutcome::Rejected(CheckReport {
+            failures: vec![CheckFailure::KeywordCount(1)],
+            warnings: vec![CheckWarning::ProjectName("alpha".into())],
+            duplicate_of: None,
+        }));
+        assert_eq!(
+            reply,
+            "Not added: give 2 to 8 keywords, not 1.\nWarning: it names the project 'alpha'."
+        );
+    }
+
+    #[test]
+    fn a_version_one_record_without_an_id_gets_no_draft() {
+        let records = [
+            StoredGotcha::from_entry(
+                json!({"library": "zod", "gotcha": "no id"})
+                    .as_object()
+                    .cloned()
+                    .unwrap(),
+            ),
+            StoredGotcha::from_entry(
+                json!({"id": "got_1", "library": "zod", "gotcha": "with id"})
+                    .as_object()
+                    .cloned()
+                    .unwrap(),
+            ),
+        ];
+        let drafts = upgrade_drafts(&records, |_| Vec::new());
+        assert_eq!(drafts.len(), 2);
+        assert!(drafts.get(1).is_some_and(|line| line.contains("got_1")));
     }
 }

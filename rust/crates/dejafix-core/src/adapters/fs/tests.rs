@@ -755,3 +755,22 @@ mod containment {
         assert!(MemoryDir::at(&root).is_ok());
     }
 }
+
+#[test]
+fn removing_a_gotcha_keeps_the_version_two_field_order() {
+    let home = tempfile::tempdir().unwrap();
+    let store = super::GlobalStore::new(home.path());
+    store.ensure().unwrap();
+    let kept = "{\"v\": 2, \"id\": \"got_1\", \"library\": \"zod\", \"keywords\": [\"a\", \"b\"], \"versions\": null, \"gotcha\": \"zod strips unknown keys by default.\"}";
+    let legacy = "{\"gotcha\": \"old\", \"id\": \"got_3\", \"library\": \"zod\"}";
+    fs::write(
+        store.path("library_gotchas.jsonl"),
+        format!("{kept}\n{{\"v\": 2, \"id\": \"got_2\", \"library\": \"zod\", \"keywords\": [], \"versions\": null, \"gotcha\": \"x\"}}\n{legacy}\n"),
+    )
+    .unwrap();
+    assert!(store.remove("got_2").unwrap());
+    assert_eq!(
+        fs::read_to_string(store.path("library_gotchas.jsonl")).unwrap(),
+        nl(&format!("{kept}\n{legacy}\n"))
+    );
+}

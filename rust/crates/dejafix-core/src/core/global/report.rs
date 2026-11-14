@@ -501,7 +501,11 @@ pub fn add_reply(outcome: &AddOutcome) -> String {
         }
         AddOutcome::Rejected(report) => {
             let failures: Vec<String> = report.failures.iter().map(ToString::to_string).collect();
-            format!("Not added: {}.", failures.join("; "))
+            let mut reply = format!("Not added: {}.", failures.join("; "));
+            for warning in &report.warnings {
+                let _ = write!(reply, "\nWarning: {warning}.");
+            }
+            reply
         }
     }
 }

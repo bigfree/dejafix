@@ -317,13 +317,23 @@ fn sorted(value: &serde_json::Value) -> serde_json::Value {
     }
 }
 
-const CHANGED_TOOLS: [&str; 5] = [
-    "add_global_gotcha",
-    "add_note",
-    "get_global_gotchas",
-    "global_query",
-    "search_events",
-];
+const NEW_TOOLS: [&str; 2] = ["add_global_gotcha", "global_query"];
+const REWORDED_TOOLS: [&str; 3] = ["add_note", "get_global_gotchas", "search_events"];
+
+fn without_descriptions(value: &serde_json::Value) -> serde_json::Value {
+    match value {
+        serde_json::Value::Object(map) => serde_json::Value::Object(
+            map.iter()
+                .filter(|(key, _)| key.as_str() != "description")
+                .map(|(key, value)| (key.clone(), without_descriptions(value)))
+                .collect(),
+        ),
+        serde_json::Value::Array(items) => {
+            serde_json::Value::Array(items.iter().map(without_descriptions).collect())
+        }
+        other => other.clone(),
+    }
+}
 
 fn exact_search(implementation: Implementation, mut args: Vec<String>) -> Vec<String> {
     let regex = args.iter().any(|arg| arg == "--regex" || arg == "-r");
@@ -357,9 +367,19 @@ fn mcp_transcript(name: &str, response: &serde_json::Value) -> Result<String, Bo
                 .filter(|tool| {
                     tool.get("name")
                         .and_then(serde_json::Value::as_str)
-                        .is_none_or(|name| !CHANGED_TOOLS.contains(&name))
+                        .is_none_or(|name| !NEW_TOOLS.contains(&name))
                 })
-                .map(sorted)
+                .map(|tool| {
+                    let reworded = tool
+                        .get("name")
+                        .and_then(serde_json::Value::as_str)
+                        .is_some_and(|name| REWORDED_TOOLS.contains(&name));
+                    sorted(&if reworded {
+                        without_descriptions(tool)
+                    } else {
+                        tool.clone()
+                    })
+                })
                 .collect();
             format!(
                 "### tools/list\n{}\n",

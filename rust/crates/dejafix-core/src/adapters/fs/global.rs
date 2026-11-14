@@ -9,7 +9,7 @@ use serde_json::{Map, Value};
 use super::store::read_python_text;
 use super::types::{GlobalStore, GotchaWrite, StoreError};
 use super::write::{write_atomic, write_text};
-use crate::core::global::{Entry, Libraries, is_prunable};
+use crate::core::global::{Entry, Libraries, StoredGotcha, is_prunable, stored_line};
 use crate::core::json::{write_canonical, write_python_json_indented};
 use crate::core::text::{platform_newlines, python_lines, python_strip, universal_newlines};
 
@@ -199,34 +199,15 @@ impl GlobalStore {
             source,
         };
         for _ in 0..LOCK_ATTEMPTS {
-            let mut file = match OpenOptions::new().read(true).append(true).open(&path) {
+            let opened = OpenOptions::new()
+                .read(true)
+                .append(true)
+                .create(create)
+                .open(&path);
+            let mut file = match opened {
                 Ok(file) => file,
                 Err(error) if error.kind() == std::io::ErrorKind::NotFound && !create => {
                     return Ok(None);
-                }
-                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-                    let (write, value) = decide(Vec::new());
-                    if matches!(write, GotchaWrite::Keep) {
-                        return Ok(Some(value));
-                    }
-                    let mut file = match OpenOptions::new()
-                        .read(true)
-                        .append(true)
-                        .create_new(true)
-                        .open(&path)
-                    {
-                        Ok(file) => file,
-                        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
-                            continue;
-                        }
-                        Err(error) => return Err(write_error(&path)(error)),
-                    };
-                    file.lock().map_err(lock_error)?;
-                    if !same_file(&file, &path) || file.metadata().map_err(read_error)?.len() > 0 {
-                        continue;
-                    }
-                    self.apply(&path, &mut file, write)?;
-                    return Ok(Some(value));
                 }
                 Err(error) => return Err(read_error(error)),
             };
@@ -239,6 +220,10 @@ impl GlobalStore {
             let entries =
                 parse_entries(&universal_newlines(&text)).ok_or_else(|| invalid_store(&path))?;
             let (write, value) = decide(entries);
+            if create && text.is_empty() && matches!(write, GotchaWrite::Keep) {
+                fs::remove_file(&path).map_err(write_error(&path))?;
+                return Ok(Some(value));
+            }
             self.apply(&path, &mut file, write)?;
             return Ok(Some(value));
         }
@@ -269,11 +254,20 @@ impl GlobalStore {
         let path = self.path(name);
         let mut failure = None;
         let removed = self.change_locked(name, false, |entries| {
-            let kept: Vec<&Entry> = entries.iter().filter(|entry| keep(entry)).collect();
-            let removed = entries.len() - kept.len();
+            let total = entries.len();
+            let kept: Vec<Entry> = entries.into_iter().filter(|entry| keep(entry)).collect();
+            let removed = total - kept.len();
             if removed == 0 {
                 return (GotchaWrite::Keep, 0);
             }
+            if name == GOTCHAS_FILE {
+                let lines = kept
+                    .into_iter()
+                    .map(|entry| stored_line(&StoredGotcha::from_entry(entry)))
+                    .collect();
+                return (GotchaWrite::Replace(lines), removed);
+            }
+            let kept: Vec<&Entry> = kept.iter().collect();
             match Self::canonical_lines(&path, &kept) {
                 Ok(text) => (GotchaWrite::Replace(Self::split_lines(&text)), removed),
                 Err(error) => {

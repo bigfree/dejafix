@@ -89,8 +89,10 @@ pub fn drafts(records: &[StoredGotcha], checks: impl Fn(&Entry) -> Vec<String>) 
     )])));
     std::iter::once(header)
         .chain(records.iter().filter_map(|record| match record {
-            StoredGotcha::V1(entry) => Some(draft_line(entry, checks(entry))),
-            StoredGotcha::V2(_) => None,
+            StoredGotcha::V1(entry) if !record.id().is_empty() => {
+                Some(draft_line(entry, checks(entry)))
+            }
+            StoredGotcha::V1(_) | StoredGotcha::V2(_) => None,
         }))
         .collect()
 }
