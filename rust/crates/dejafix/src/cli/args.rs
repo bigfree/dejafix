@@ -129,15 +129,21 @@ pub enum Commands {
     },
     #[command(about = "Print the current summary.md.")]
     Show,
-    #[command(about = "Substring (default) or regex search across events.")]
+    #[command(about = "Search events by relevance, or by substring or regex.")]
     Search {
         query: String,
         #[arg(
             short,
             long,
+            conflicts_with = "exact",
             help = "Treat query as a case-insensitive Python regex (enables OR-patterns)."
         )]
         regex: bool,
+        #[arg(
+            long,
+            help = "Plain case-insensitive substring match in log order instead of ranking."
+        )]
+        exact: bool,
         #[arg(
             long = "failed-only",
             help = "Only show failed attempts — the project's catalogue of dead ends."

@@ -21,8 +21,8 @@ use clap::Parser;
 use std::time::Duration;
 
 use dejafix_core::{
-    Clock, LEGACY_DIR, MemoryFile, MigrateOptions, Project, SearchQuery, Settings, StoreError,
-    WiringError, latest_version,
+    Clock, LEGACY_DIR, MemoryFile, MigrateOptions, Project, SearchMode, SearchQuery, Settings,
+    StoreError, WiringError, latest_version,
 };
 
 use crate::config::Config;
@@ -194,12 +194,19 @@ fn dispatch(
         Commands::Search {
             query,
             regex,
+            exact,
             failed_only,
         } => read::search(
             &project,
             &SearchQuery {
                 text: &query,
-                regex,
+                mode: if regex {
+                    SearchMode::Regex
+                } else if exact {
+                    SearchMode::Exact
+                } else {
+                    SearchMode::Ranked
+                },
                 failed_only,
             },
             out,

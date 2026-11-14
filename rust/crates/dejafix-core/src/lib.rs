@@ -80,7 +80,8 @@ pub use crate::core::score::{
     score_reply,
 };
 pub use crate::core::search::{
-    SearchQuery, excerpt, match_line, mcp_match_line, no_match_message, search, search_reply,
+    EVENT_FIELDS, EventDoc, SearchMode, SearchQuery, event_index, excerpt, match_line,
+    mcp_match_line, no_match_message, ranked, search, search_reply,
 };
 pub use crate::core::session::{
     MAP_POINTER, SESSION_START_DONE, current_plan, placeholder_map, session_start,

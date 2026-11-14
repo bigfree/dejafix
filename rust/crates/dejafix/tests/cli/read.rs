@@ -68,17 +68,26 @@ fn search_matches_location_and_filters_failed_attempts() -> TestResult {
             .contains("tried contain layout")
     );
     assert_eq!(
-        repo.stdout(&["search", "carousel", "--failed-only"])?,
+        repo.stdout(&["search", "carousel", "--failed-only", "--exact"])?,
         "No matches.\n"
+    );
+    assert_eq!(
+        repo.stdout(&["search", "carousel", "--failed-only"])?,
+        "No matches. (Tip: rerun with --exact for a plain substring match.)\n"
     );
     assert!(
         repo.stdout(&["search", "contain", "--failed-only"])?
             .contains("tried contain layout")
     );
     assert!(
-        repo.stdout(&["search", "carousel|form"])?
-            .starts_with("No matches. (Tip:")
+        repo.stdout(&["search", "carousel|form", "--exact"])?
+            .starts_with("No matches. (Tip: substring")
     );
+    let ranked = repo.stdout(&["search", "form carousel"])?;
+    assert_eq!(ranked.lines().count(), 2, "{ranked}");
+    repo.djf(&["search", "x", "--exact", "--regex"])
+        .assert()
+        .code(2);
     assert_eq!(
         repo.stdout(&["search", "-r", "carousel|form"])?
             .lines()

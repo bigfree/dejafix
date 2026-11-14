@@ -2,8 +2,9 @@ use std::fmt::Write as _;
 
 use regex::{Regex, RegexBuilder};
 
-use super::types::SearchQuery;
-use crate::core::event::{Event, EventKind, Outcome};
+use super::rank::is_failed_attempt;
+use super::types::{SearchMode, SearchQuery};
+use crate::core::event::Event;
 use crate::core::log::EventLog;
 use crate::core::text::casefold;
 
@@ -32,7 +33,7 @@ fn compile(text: &str) -> Option<Regex> {
 
 #[must_use]
 pub fn search<'l, 'a>(log: &'l EventLog<'a>, query: &SearchQuery<'_>) -> Vec<&'l Event<'a>> {
-    let pattern = if query.regex {
+    let pattern = if query.mode == SearchMode::Regex {
         compile(query.text)
     } else {
         None
@@ -44,19 +45,18 @@ pub fn search<'l, 'a>(log: &'l EventLog<'a>, query: &SearchQuery<'_>) -> Vec<&'l
             Some(pattern) => fields(event).any(|field| pattern.is_match(field)),
             None => fields(event).any(|field| casefold(field).contains(needle.as_ref())),
         })
-        .filter(|event| {
-            !query.failed_only
-                || (event.kind == EventKind::Attempt && event.outcome == Some(Outcome::Failed))
-        })
+        .filter(|event| !query.failed_only || is_failed_attempt(event))
         .collect()
 }
 
 #[must_use]
 pub fn no_match_message(query: &SearchQuery<'_>) -> &'static str {
-    if !query.regex && query.text.contains(REGEX_HINT) {
-        "No matches. (Tip: substring match is the default — rerun with `--regex` if you intended an OR/regex pattern.)"
-    } else {
-        "No matches."
+    match query.mode {
+        SearchMode::Ranked => "No matches. (Tip: rerun with --exact for a plain substring match.)",
+        SearchMode::Exact if query.text.contains(REGEX_HINT) => {
+            "No matches. (Tip: substring match is the default — rerun with `--regex` if you intended an OR/regex pattern.)"
+        }
+        SearchMode::Exact | SearchMode::Regex => "No matches.",
     }
 }
 

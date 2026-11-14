@@ -315,17 +315,17 @@
     }
   },
   {
-    "description": "Plain-text search across all logged events.\n\nToken-efficient alternative to get_summary when you only need events\nmatching a keyword. Each match shows its type, issue, event id (what\nadd_decision's `supersedes` takes) and date, and its text clipped to\nRECORD_CHARS around the match; a match found only in notes shows the\nnotes. Retired decisions are marked (superseded). Pass `full=True` for\nwhole texts once the query is narrow.\n\nRead-only. Empty result returns a friendly message, not an error.",
+    "description": "Search all logged events by relevance: the words of the query may\nappear in any order or form (English stemming).\n\nToken-efficient alternative to get_summary when you only need events\nabout one topic. Matches are listed best first. Each match shows its type, issue, event id (what\nadd_decision's `supersedes` takes) and date, and its text clipped to\nRECORD_CHARS around the match; a match found only in notes shows the\nnotes. Retired decisions are marked (superseded). Pass `full=True` for\nwhole texts once the query is narrow.\n\nRead-only. Empty result returns a friendly message, not an error.",
     "inputSchema": {
       "properties": {
         "query": {
-          "description": "Case-insensitive substring matched against each event's summary, notes, location and files. Plain text only — no regex or boolean operators.",
+          "description": "Words to look for in each event's summary, notes, location and files, in English. Ranked by relevance; no regex or boolean operators.",
           "title": "Query",
           "type": "string"
         },
         "limit": {
           "default": 10,
-          "description": "How many of the most recent matches to return, listed oldest first. Defaults to 10. Recommended range: 1-100.",
+          "description": "How many of the best matches to return, best first. Defaults to 10. Recommended range: 1-100.",
           "maximum": 100,
           "minimum": 1,
           "title": "Limit",

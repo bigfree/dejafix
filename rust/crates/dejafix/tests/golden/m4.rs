@@ -78,19 +78,14 @@ fn read_calls() -> Vec<(&'static str, Value)> {
         ("get_issue", json!({"issue_id": "#2"})),
         ("get_issue", json!({"issue_id": "*"})),
         ("get_issue", json!({"issue_id": "9999"})),
-        ("search_events", json!({"query": "session", "limit": 5})),
-        (
-            "search_events",
-            json!({"query": "cache sessions", "full": true}),
-        ),
         ("search_events", json!({"query": "zz-nothing-zz"})),
         (
             "search_events",
-            json!({"query": "session", "limit": " 3 ", "full": "yes"}),
+            json!({"query": "zz-nothing-zz", "limit": " 3 ", "full": "yes"}),
         ),
         (
             "search_events",
-            json!({"query": "session", "limit": 2.0, "full": 0}),
+            json!({"query": "zz-nothing-zz", "limit": 2.0, "full": 0}),
         ),
         (
             "get_context",

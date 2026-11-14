@@ -167,7 +167,13 @@ impl McpState {
             ToolCall::GetIssue(issue) => issue_text(root, &issue),
             ToolCall::SearchEvents { query, limit, full } => {
                 let cached = self.cached_log(root, clock)?;
-                Ok(search_reply(&cached.log, &query, limit, full))
+                Ok(search_reply(
+                    &cached.log,
+                    cached.index(),
+                    &query,
+                    limit,
+                    full,
+                ))
             }
             ToolCall::GetScore => score(root),
             ToolCall::GetContext { tokens, focus } => {

@@ -186,7 +186,7 @@ pub fn run_actions(
             Action::Djf(arguments) => (
                 env!("CARGO_BIN_EXE_djf"),
                 "dejafix.cli",
-                arguments(&project)?,
+                exact_search(implementation, arguments(&project)?),
                 None,
             ),
             Action::EditHook(payload) => (
@@ -314,7 +314,18 @@ fn sorted(value: &serde_json::Value) -> serde_json::Value {
     }
 }
 
-const RUST_ONLY_TOOLS: [&str; 2] = ["add_global_gotcha", "global_query"];
+const CHANGED_TOOLS: [&str; 3] = ["add_global_gotcha", "global_query", "search_events"];
+
+fn exact_search(implementation: Implementation, mut args: Vec<String>) -> Vec<String> {
+    let regex = args.iter().any(|arg| arg == "--regex" || arg == "-r");
+    if matches!(implementation, Implementation::Rust)
+        && args.first().is_some_and(|command| command == "search")
+        && !regex
+    {
+        args.push("--exact".to_owned());
+    }
+    args
+}
 
 fn mcp_transcript(name: &str, response: &serde_json::Value) -> Result<String, Box<dyn Error>> {
     let result = response
@@ -337,7 +348,7 @@ fn mcp_transcript(name: &str, response: &serde_json::Value) -> Result<String, Bo
                 .filter(|tool| {
                     tool.get("name")
                         .and_then(serde_json::Value::as_str)
-                        .is_none_or(|name| !RUST_ONLY_TOOLS.contains(&name))
+                        .is_none_or(|name| !CHANGED_TOOLS.contains(&name))
                 })
                 .map(sorted)
                 .collect();

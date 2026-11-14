@@ -98,6 +98,20 @@ fn mcp(criterion: &mut Criterion) {
     group.bench_function("precheck_file/cold/uncited/3000", |bencher| {
         bencher.iter(|| precheck(&state(&root, &home), UNCITED));
     });
+    let search = || {
+        reply(
+            &warm,
+            ToolCall::SearchEvents {
+                query: "token refresh login loop".to_owned(),
+                limit: 10,
+                full: false,
+            },
+        )
+    };
+    assert!(search().starts_with("Found 10 match(es)"));
+    group.bench_function("search_events/warm/3000", |bencher| {
+        bencher.iter(search);
+    });
     let global = home.join(".dejafix/global");
     fs::create_dir_all(&global).expect("global folder");
     let store = global.join("library_gotchas.jsonl");

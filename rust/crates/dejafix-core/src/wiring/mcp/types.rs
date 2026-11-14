@@ -10,6 +10,7 @@ use crate::core::event::Outcome;
 use crate::core::global::{GlobalIndex, GotchaInput};
 use crate::core::log::EventLog;
 use crate::core::path::PathContext;
+use crate::core::rank::Index;
 
 #[derive(Debug, Clone)]
 pub struct McpSettings {
@@ -78,6 +79,7 @@ pub(super) struct CacheEntry {
 pub struct CachedLog {
     pub log: EventLog<'static>,
     pub context: PathContext,
+    pub(super) index: std::sync::OnceLock<Index>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -4,7 +4,7 @@ use std::path::Path;
 use std::process::{Command, Stdio};
 
 use criterion::{Criterion, criterion_group, criterion_main};
-use dejafix_core::testing::{FIXTURE_SEED, write_project};
+use dejafix_core::testing::{FIXTURE_SEED, gotcha_lines, write_project};
 
 const CITED: &str = "src/app.py";
 
@@ -73,6 +73,35 @@ fn hooks(criterion: &mut Criterion) {
                 .stdout(Stdio::null())
                 .status()
                 .expect("precheck runs")
+        });
+    });
+    group.bench_function("search/3000", |bencher| {
+        bencher.iter(|| {
+            Command::new(env!("CARGO_BIN_EXE_djf"))
+                .args(["search", "token refresh login loop"])
+                .current_dir(&root)
+                .env("DEJAFIX_HOME", dir.path().join("home"))
+                .stdout(Stdio::null())
+                .status()
+                .expect("search runs")
+        });
+    });
+    let global = dir.path().join("home/global");
+    fs::create_dir_all(&global).expect("global folder");
+    let lines: String = gotcha_lines(500, FIXTURE_SEED)
+        .into_iter()
+        .map(|line| line + "\n")
+        .collect();
+    fs::write(global.join("library_gotchas.jsonl"), lines).expect("global store");
+    group.bench_function("global_query/500", |bencher| {
+        bencher.iter(|| {
+            Command::new(env!("CARGO_BIN_EXE_djf"))
+                .args(["global", "query", "worker never exits on shutdown"])
+                .current_dir(&root)
+                .env("DEJAFIX_HOME", dir.path().join("home"))
+                .stdout(Stdio::null())
+                .status()
+                .expect("global query runs")
         });
     });
     group.bench_function("git_diff_cached", |bencher| {

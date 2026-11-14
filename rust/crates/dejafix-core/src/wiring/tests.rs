@@ -11,7 +11,7 @@ use crate::adapters::fs::{ClientPaths, canonical_path};
 use crate::core::event::Outcome;
 use crate::core::registry::RegistryError;
 use crate::core::scaffold::{INSTRUCTIONS_VERSION, ai_instructions, instructions_version};
-use crate::core::search::SearchQuery;
+use crate::core::search::{SearchMode, SearchQuery};
 use crate::core::text::universal_newlines;
 use crate::core::write::{Command, ValidationError, WriteOutcome};
 use crate::testing::{FIXTURE_SEED, SeqIds, fixed_clock, write_project};
@@ -223,7 +223,7 @@ fn search_reports_matches_or_the_python_message() {
     record(&project, note("startup is slow"), &mut SeqIds::default()).unwrap();
     let query = SearchQuery {
         text: "STARTUP",
-        regex: false,
+        mode: SearchMode::Ranked,
         failed_only: false,
     };
     assert_eq!(
@@ -234,11 +234,18 @@ fn search_reports_matches_or_the_python_message() {
     );
     let query = SearchQuery {
         text: "a|b",
-        regex: false,
+        mode: SearchMode::Exact,
         failed_only: false,
     };
     assert!(
         matches!(search_project(&project, &query).unwrap(), SearchOutput::Nothing(message) if message.contains("--regex"))
+    );
+    let ranked = SearchQuery {
+        mode: SearchMode::Ranked,
+        ..query
+    };
+    assert!(
+        matches!(search_project(&project, &ranked).unwrap(), SearchOutput::Nothing(message) if message.contains("--exact"))
     );
 }
 

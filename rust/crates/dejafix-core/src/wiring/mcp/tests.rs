@@ -917,3 +917,38 @@ fn the_global_index_is_reused_until_the_store_or_the_aliases_change() {
         broken.text
     );
 }
+
+#[test]
+fn a_warm_ranked_search_reuses_the_log_index() {
+    let world = World::new();
+    let root = world.project("alpha");
+    let state = world.state(Some(&root), &world.base);
+    text(
+        &state,
+        note("startup is slow because the cache warms twice"),
+        None,
+    );
+    let search = || {
+        text(
+            &state,
+            ToolCall::SearchEvents {
+                query: "slow startup".to_owned(),
+                limit: 10,
+                full: false,
+            },
+            None,
+        )
+    };
+    assert!(search().starts_with("Found 1 match(es) for 'slow startup':\n  [note] evt_"));
+    let clock = fixed_clock();
+    let cached = state.cached_log(&root, &clock).unwrap();
+    let first: *const crate::core::rank::Index = cached.index();
+    search();
+    let again = state.cached_log(&root, &clock).unwrap();
+    assert!(Arc::ptr_eq(&cached, &again));
+    assert!(std::ptr::eq(first, again.index()));
+    text(&state, note("the cache is cold after a deploy"), None);
+    let rebuilt = state.cached_log(&root, &clock).unwrap();
+    assert!(!Arc::ptr_eq(&cached, &rebuilt));
+    assert_eq!(rebuilt.index().len(), 2);
+}
