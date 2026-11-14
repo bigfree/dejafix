@@ -3,7 +3,9 @@ use std::path::Path;
 
 use regex::{Captures, Regex};
 
-use crate::types::Normalizer;
+use crate::types::{Implementation, Normalizer};
+
+const AUTO_CAPTURED: &str = "[dejafix] Auto-captured";
 
 const ID: &str = r"(?P<id>evt_[0-9a-f]{20}|(?:pat|got)_[0-9a-f]{12})";
 const DJF_BIN: &str = r#"(?P<djf>(?m:^DJF_BIN="[^"$`\n]*"$))"#;
@@ -121,4 +123,19 @@ pub fn approved_departures(files: &mut std::collections::BTreeMap<String, String
             .collect();
         kept.trim_end_matches(['\r', '\n']).clone_into(text);
     }
+}
+
+pub fn approved_stdout(implementation: Implementation, text: String) -> String {
+    if !matches!(implementation, Implementation::Python) || !text.contains(AUTO_CAPTURED) {
+        return text;
+    }
+    text.split_inclusive('\n')
+        .map(|line| {
+            if line.starts_with(AUTO_CAPTURED) {
+                dejafix_core::testing::redact(line).text.into_owned()
+            } else {
+                line.to_owned()
+            }
+        })
+        .collect()
 }

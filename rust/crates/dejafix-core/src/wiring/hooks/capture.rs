@@ -8,7 +8,7 @@ use crate::adapters::git::{head_short, last_changes, last_message};
 use crate::core::capture::{capture_event, first_line, merge_event};
 use crate::core::log::EventLog;
 use crate::core::path::is_memory_path;
-use crate::core::redact::{redact_event, redaction_notice};
+use crate::core::redact::{redact, redact_event, redaction_notice};
 use crate::core::write::Ids;
 use crate::wiring::record::commit_events;
 use crate::wiring::types::{Project, Settings};
@@ -87,12 +87,12 @@ fn capture(
         capture_event(message, changes, commit, is_memory, clock, ids)?
     };
     let kind = event.kind;
-    let summary = event.summary.as_str().to_owned();
     let fired = if project.settings.redact {
         redact_event(&mut event)
     } else {
         Vec::new()
     };
+    let summary = event.summary.as_str().to_owned();
     let notices: Vec<String> = redaction_notice(&fired).into_iter().collect();
     let incomplete =
         commit_events(project, &mut locked, &mut log, vec![event], None, true, ids).ok()?;
@@ -101,8 +101,13 @@ fn capture(
         return None;
     }
     Some(if merge {
+        let line = first_line(message);
         CaptureOutcome::Merged {
-            first_line: first_line(message),
+            first_line: if project.settings.redact {
+                redact(&line).text.into_owned()
+            } else {
+                line
+            },
             notices,
         }
     } else {

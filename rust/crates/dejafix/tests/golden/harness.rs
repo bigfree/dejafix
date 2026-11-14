@@ -181,11 +181,7 @@ pub fn run_actions(
     .with_versions(&[&python_version, env!("CARGO_PKG_VERSION")])?;
     let steps = outputs
         .into_iter()
-        .map(|output| StepOutput {
-            code: output.status.code(),
-            stdout: normalizer.apply(&printed(implementation, &output.stdout)),
-            stderr: normalizer.apply(&printed(implementation, &output.stderr)),
-        })
+        .map(|output| step_output(implementation, &mut normalizer, &output))
         .collect();
     let files = files
         .into_iter()
@@ -195,6 +191,21 @@ pub fn run_actions(
         })
         .collect();
     Ok(Run { steps, files })
+}
+
+fn step_output(
+    implementation: Implementation,
+    normalizer: &mut Normalizer,
+    output: &Output,
+) -> StepOutput {
+    StepOutput {
+        code: output.status.code(),
+        stdout: normalizer.apply(&crate::normalize::approved_stdout(
+            implementation,
+            printed(implementation, &output.stdout),
+        )),
+        stderr: normalizer.apply(&printed(implementation, &output.stderr)),
+    }
 }
 
 fn printed(implementation: Implementation, bytes: &[u8]) -> String {
