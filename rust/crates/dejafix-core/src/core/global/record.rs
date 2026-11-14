@@ -150,18 +150,25 @@ pub fn line(record: &GotchaV2) -> String {
 }
 
 impl Libraries {
+    fn find(&self, library: &str) -> Result<usize, usize> {
+        self.0
+            .binary_search_by(|(known, _)| known.as_str().cmp(library))
+    }
+
     #[must_use]
     pub fn from_value(value: &Value) -> Option<Self> {
-        let mut map = std::collections::BTreeMap::new();
+        let mut libraries = Vec::new();
         for (library, aliases) in value.as_object()? {
             let aliases = aliases
                 .as_array()?
                 .iter()
                 .map(|alias| alias.as_str().map(str::to_lowercase))
                 .collect::<Option<Vec<String>>>()?;
-            map.insert(library.to_lowercase(), aliases);
+            libraries.push((library.to_lowercase(), aliases));
         }
-        Some(Self(map))
+        libraries.sort_unstable();
+        libraries.dedup_by(|later, earlier| later.0 == earlier.0);
+        Some(Self(libraries))
     }
 
     #[must_use]
@@ -180,9 +187,14 @@ impl Libraries {
     }
 
     #[must_use]
+    pub fn has_library(&self, library: &str) -> bool {
+        self.find(library).is_ok()
+    }
+
+    #[must_use]
     pub fn canonical(&self, name: &str) -> String {
         let lowered = name.trim().to_lowercase();
-        if self.0.contains_key(&lowered) {
+        if self.has_library(&lowered) {
             return lowered;
         }
         self.0
@@ -193,25 +205,40 @@ impl Libraries {
 
     #[must_use]
     pub fn aliases(&self, library: &str) -> &[String] {
-        self.0.get(library).map_or(&[], Vec::as_slice)
+        self.find(library)
+            .ok()
+            .and_then(|index| self.0.get(index))
+            .map_or(&[], |(_, aliases)| aliases.as_slice())
     }
 
     pub fn add_library(&mut self, library: &str) -> bool {
-        if self.0.contains_key(library) {
-            return false;
+        match self.find(library) {
+            Ok(_) => false,
+            Err(index) => {
+                self.0.insert(index, (library.to_owned(), Vec::new()));
+                true
+            }
         }
-        self.0.insert(library.to_owned(), Vec::new());
-        true
     }
 
     pub fn add_alias(&mut self, library: &str, alias: &str) -> bool {
         let alias = alias.trim().to_lowercase();
-        let aliases = self.0.entry(library.to_owned()).or_default();
-        if alias.is_empty() || alias == library || aliases.contains(&alias) {
+        if alias.is_empty() || alias == library {
+            return false;
+        }
+        self.add_library(library);
+        let Some((_, aliases)) = self
+            .find(library)
+            .ok()
+            .and_then(|index| self.0.get_mut(index))
+        else {
+            return false;
+        };
+        if aliases.contains(&alias) {
             return false;
         }
         aliases.push(alias);
-        aliases.sort();
+        aliases.sort_unstable();
         true
     }
 }

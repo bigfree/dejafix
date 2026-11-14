@@ -1,4 +1,3 @@
-use std::collections::BTreeMap;
 use std::fmt::Write as _;
 
 use serde_json::Value;
@@ -98,15 +97,18 @@ impl GlobalIndex {
             })
         };
         if query.trim().is_empty() {
-            let mut all: Vec<&StoredGotcha> = self
+            let mut all: Vec<(&str, usize)> = self
                 .records
                 .iter()
                 .enumerate()
                 .filter(|(doc, _)| keep(*doc))
-                .map(|(_, record)| record)
+                .map(|(doc, record)| (record.id(), doc))
                 .collect();
-            all.sort_by(|left, right| left.id().cmp(right.id()));
-            return all;
+            all.sort_unstable();
+            return all
+                .into_iter()
+                .filter_map(|(_, doc)| self.records.get(doc))
+                .collect();
         }
         let terms = self.index.query_terms(query);
         let params = RankParams {
@@ -114,20 +116,26 @@ impl GlobalIndex {
             ..RankParams::DEFAULT
         };
         self.index
-            .rank_where(&terms, &params, |doc| usize::try_from(doc).is_ok_and(keep))
+            .rank_where(&terms, &params, &|doc| usize::try_from(doc).is_ok_and(keep))
             .iter()
             .filter_map(|scored| self.records.get(usize::try_from(scored.doc).ok()?))
             .collect()
     }
 
     fn library_counts(&self) -> String {
-        let mut counts: BTreeMap<String, usize> = BTreeMap::new();
-        for library in &self.canonical {
-            *counts.entry(library.to_string()).or_default() += 1;
-        }
-        counts
+        let mut libraries: Vec<(&str, usize)> = self
+            .canonical
             .iter()
-            .map(|(library, count)| format!("{library} ({count})"))
+            .enumerate()
+            .map(|(doc, library)| (&**library, doc))
+            .collect();
+        libraries.sort_unstable();
+        libraries
+            .chunk_by(|left, right| left.0 == right.0)
+            .filter_map(|run| {
+                run.first()
+                    .map(|(library, _)| format!("{library} ({})", run.len()))
+            })
             .collect::<Vec<_>>()
             .join(", ")
     }

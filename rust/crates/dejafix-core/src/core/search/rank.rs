@@ -65,7 +65,7 @@ pub fn ranked<'l, 'a>(
         .rank_where(
             &index.query_terms(query.text),
             &RankParams::DEFAULT,
-            |doc| event(doc).is_some_and(|event| !query.failed_only || is_failed_attempt(event)),
+            &|doc| event(doc).is_some_and(|event| !query.failed_only || is_failed_attempt(event)),
         )
         .iter()
         .filter_map(|scored| event(scored.doc))

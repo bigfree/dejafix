@@ -1362,3 +1362,95 @@ mod upgrade {
         assert_eq!(second.kept.len(), 2);
     }
 }
+
+mod relevance {
+    use serde_json::Value;
+
+    use super::super::{
+        GlobalIndex, GotchaInput, Libraries, StoredGotcha, check_gotcha, global_reply, parse_store,
+    };
+
+    const GOTCHAS: &str = include_str!("../../../tests/data/relevance/gotchas.jsonl");
+    const QUERIES: &str = include_str!("../../../tests/data/relevance/queries.json");
+
+    fn records() -> Vec<StoredGotcha> {
+        parse_store(
+            GOTCHAS
+                .lines()
+                .map(|line| serde_json::from_str::<Value>(line).unwrap())
+                .map(|value| value.as_object().unwrap().clone())
+                .collect(),
+        )
+    }
+
+    fn first_id(reply: &str) -> Option<&str> {
+        reply
+            .lines()
+            .find_map(|line| line.strip_prefix("- "))
+            .and_then(|line| line.split(' ').next())
+    }
+
+    #[test]
+    fn every_fixture_record_passes_the_write_checks() {
+        let records = records();
+        assert_eq!(records.len(), 80);
+        for (index, record) in records.iter().enumerate() {
+            let StoredGotcha::V2(gotcha) = record else {
+                panic!("{} is not version 2", record.id());
+            };
+            let input = GotchaInput {
+                library: gotcha.library.clone(),
+                keywords: gotcha.keywords.clone(),
+                gotcha: gotcha.gotcha.clone(),
+                versions: gotcha.versions.clone(),
+            };
+            let report = check_gotcha(
+                &input,
+                &Libraries::default(),
+                &[
+                    "project-a",
+                    "project-b",
+                    "project-c",
+                    "project-d",
+                    "project-e",
+                ],
+                &records[..index],
+                None,
+            );
+            assert_eq!(report.failures, [], "{}", gotcha.id);
+            assert_eq!(report.warnings, [], "{}", gotcha.id);
+        }
+    }
+
+    #[test]
+    fn queries_find_the_expected_record_first_and_off_topic_ones_nothing() {
+        let index = GlobalIndex::build(records(), Libraries::default());
+        let set: Value = serde_json::from_str(QUERIES).unwrap();
+        let queries = set["queries"].as_array().unwrap();
+        let misses: Vec<String> = queries
+            .iter()
+            .filter_map(|case| {
+                let query = case["query"].as_str().unwrap();
+                let expected = case["first"].as_str().unwrap();
+                let reply = global_reply(&index, query, None, 2_000);
+                (first_id(&reply) != Some(expected))
+                    .then(|| format!("{query}: expected {expected}, got\n{reply}"))
+            })
+            .collect();
+        assert_eq!(queries.len(), 21);
+        assert!(
+            misses.is_empty(),
+            "{} of 21 missed:\n{}",
+            misses.len(),
+            misses.join("\n\n")
+        );
+        for query in set["off_topic"].as_array().unwrap() {
+            let query = query.as_str().unwrap();
+            let reply = global_reply(&index, query, None, 2_000);
+            assert!(
+                reply.starts_with("No global gotcha matches this query."),
+                "{query}:\n{reply}"
+            );
+        }
+    }
+}

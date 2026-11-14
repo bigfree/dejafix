@@ -1,5 +1,3 @@
-use std::collections::{BTreeSet, HashMap, HashSet};
-
 use serde_json::{Map, Value};
 
 use super::checks::normalize_input;
@@ -159,9 +157,8 @@ fn is_header(object: &Entry) -> bool {
 }
 
 pub fn parse_drafts(text: &str) -> Result<Vec<Draft>, Vec<DraftError>> {
-    let mut parsed = Vec::new();
+    let mut parsed: Vec<Draft> = Vec::new();
     let mut errors = Vec::new();
-    let mut seen: HashSet<String> = HashSet::new();
     for (index, raw) in text.lines().enumerate() {
         let line = index + 1;
         if raw.trim().is_empty() {
@@ -185,8 +182,10 @@ pub fn parse_drafts(text: &str) -> Result<Vec<Draft>, Vec<DraftError>> {
             continue;
         }
         match draft_of(&object, line) {
-            Ok(draft) if seen.insert(draft.id.clone()) => parsed.push(draft),
-            Ok(draft) => errors.push(DraftError::DuplicateId { line, id: draft.id }),
+            Ok(draft) if parsed.iter().any(|seen| seen.id == draft.id) => {
+                errors.push(DraftError::DuplicateId { line, id: draft.id });
+            }
+            Ok(draft) => parsed.push(draft),
             Err(error) => errors.push(error),
         }
     }
@@ -197,12 +196,31 @@ pub fn parse_drafts(text: &str) -> Result<Vec<Draft>, Vec<DraftError>> {
     }
 }
 
+fn sorted_ids(records: &[StoredGotcha]) -> Vec<(&str, usize)> {
+    let mut ids: Vec<(&str, usize)> = records
+        .iter()
+        .enumerate()
+        .map(|(index, record)| (record.id(), index))
+        .collect();
+    ids.sort_unstable();
+    ids
+}
+
+fn position(ids: &[(&str, usize)], id: &str) -> Option<usize> {
+    ids.binary_search_by(|(known, _)| (*known).cmp(id))
+        .ok()
+        .and_then(|found| ids.get(found))
+        .map(|(_, index)| *index)
+}
+
 #[must_use]
 pub fn touches_version_one(records: &[StoredGotcha], drafts: &[Draft]) -> bool {
-    let ids: HashSet<&str> = drafts.iter().map(|draft| draft.id.as_str()).collect();
-    records
-        .iter()
-        .any(|record| !record.is_upgraded() && ids.contains(record.id()))
+    let ids = sorted_ids(records);
+    drafts.iter().any(|draft| {
+        position(&ids, &draft.id)
+            .and_then(|index| records.get(index))
+            .is_some_and(|record| !record.is_upgraded())
+    })
 }
 
 fn upgraded(entry: &Entry, input: GotchaInput, today: &str) -> GotchaV2 {
@@ -223,33 +241,31 @@ fn upgraded(entry: &Entry, input: GotchaInput, today: &str) -> GotchaV2 {
     }
 }
 
-fn verdicts<'d>(
+fn verdicts(
     records: &[StoredGotcha],
-    drafts: &'d [Draft],
+    drafts: &[Draft],
     today: &str,
     libraries: &Libraries,
     check: impl Fn(&str, &GotchaInput) -> CheckReport,
     outcome: &mut UpgradeOutcome,
-) -> HashMap<&'d str, Verdict> {
-    let by_id: HashMap<&str, &StoredGotcha> =
-        records.iter().map(|record| (record.id(), record)).collect();
-    let mut verdicts = HashMap::new();
+) -> Vec<Option<Verdict>> {
+    let ids = sorted_ids(records);
+    let mut verdicts: Vec<Option<Verdict>> = records.iter().map(|_| None).collect();
     for draft in drafts {
         let reason = |text: &str| (draft.id.clone(), vec![text.to_owned()]);
-        match by_id.get(draft.id.as_str()) {
-            None => outcome.kept.push(reason(UNKNOWN_ID)),
-            Some(StoredGotcha::V2(_)) => outcome.kept.push(reason(ALREADY_UPGRADED)),
-            Some(StoredGotcha::V1(_)) if draft.drop => {
-                verdicts.insert(draft.id.as_str(), Verdict::Drop);
+        let found = position(&ids, &draft.id);
+        let slot = found.and_then(|index| verdicts.get_mut(index));
+        match (found.and_then(|index| records.get(index)), slot) {
+            (None, _) | (Some(_), None) => outcome.kept.push(reason(UNKNOWN_ID)),
+            (Some(StoredGotcha::V2(_)), _) => outcome.kept.push(reason(ALREADY_UPGRADED)),
+            (Some(StoredGotcha::V1(_)), Some(slot)) if draft.drop => {
+                *slot = Some(Verdict::Drop);
             }
-            Some(StoredGotcha::V1(entry)) => {
+            (Some(StoredGotcha::V1(entry)), Some(slot)) => {
                 let input = normalize_input(draft.input.clone(), libraries);
                 let report = check(&draft.id, &input);
                 if report.failures.is_empty() {
-                    verdicts.insert(
-                        draft.id.as_str(),
-                        Verdict::Replace(Box::new(upgraded(entry, input, today))),
-                    );
+                    *slot = Some(Verdict::Replace(Box::new(upgraded(entry, input, today))));
                 } else {
                     outcome.kept.push((
                         draft.id.clone(),
@@ -272,16 +288,12 @@ pub fn apply(
 ) -> UpgradeOutcome {
     let mut outcome = UpgradeOutcome::default();
     let verdicts = verdicts(records, drafts, today, libraries, check, &mut outcome);
-    let mut new_libraries = BTreeSet::new();
-    for record in records {
-        let verdict = match record {
-            StoredGotcha::V1(_) => verdicts.get(record.id()),
-            StoredGotcha::V2(_) => None,
-        };
+    let mut new_libraries: Vec<String> = Vec::new();
+    for (record, verdict) in records.iter().zip(&verdicts) {
         match (record, verdict) {
             (_, Some(Verdict::Drop)) => outcome.dropped += 1,
             (_, Some(Verdict::Replace(replacement))) => {
-                new_libraries.insert(replacement.library.clone());
+                new_libraries.push(replacement.library.clone());
                 outcome.lines.push(line(replacement));
                 outcome.replaced += 1;
             }
@@ -291,6 +303,8 @@ pub fn apply(
             (StoredGotcha::V2(kept), None) => outcome.lines.push(line(kept)),
         }
     }
-    outcome.libraries = new_libraries.into_iter().collect();
+    new_libraries.sort_unstable();
+    new_libraries.dedup();
+    outcome.libraries = new_libraries;
     outcome
 }

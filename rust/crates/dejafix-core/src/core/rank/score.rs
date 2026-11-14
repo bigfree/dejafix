@@ -5,7 +5,7 @@ impl RankParams {
     pub const DEFAULT: Self = Self {
         k1: 1.2,
         b: 0.75,
-        min_coverage: 0.5,
+        min_coverage: 0.4,
         min_ratio: 0.5,
         limit: usize::MAX,
     };
@@ -34,7 +34,7 @@ impl Index {
 
     #[must_use]
     pub fn rank_terms(&self, query: &QueryTerms, params: &RankParams) -> Vec<Scored> {
-        self.rank_where(query, params, |_| true)
+        self.rank_where(query, params, &|_| true)
     }
 
     #[must_use]
@@ -42,7 +42,7 @@ impl Index {
         &self,
         query: &QueryTerms,
         params: &RankParams,
-        keep: impl Fn(u32) -> bool,
+        keep: &dyn Fn(u32) -> bool,
     ) -> Vec<Scored> {
         if query.distinct == 0 || self.is_empty() || query.ids.is_empty() {
             return Vec::new();
@@ -98,7 +98,7 @@ impl Index {
             .map(|scored| scored.score)
             .fold(0.0_f64, f64::max);
         found.retain(|scored| scored.score >= params.min_ratio * best);
-        found.sort_by(|left, right| {
+        found.sort_unstable_by(|left, right| {
             right.score.total_cmp(&left.score).then_with(|| {
                 let order = |scored: &Scored| self.order.get(slot(scored.doc)).copied();
                 order(left).cmp(&order(right))

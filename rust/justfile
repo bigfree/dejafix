@@ -26,6 +26,28 @@ fixtures dir="target/fixtures":
 bench:
     cargo bench -p dejafix-core --features testing --bench load --bench summary --bench rank
     cargo bench -p dejafix --bench hooks --bench mcp
+    "${DEJAFIX_PYTHON:-python3}" -I tools/bench_budgets.py target/criterion
+
+size base="main" profile="dist":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    work="$(mktemp -d)"
+    trap 'rm -rf "$work"' EXIT
+    git -C .. archive "{{base}}" rust | tar -x -C "$work"
+    (cd "$work/rust" && CARGO_TARGET_DIR="$work/target" cargo build --quiet --locked --profile "{{profile}}" -p dejafix --bins)
+    cargo build --quiet --locked --profile "{{profile}}" -p dejafix --bins
+    status=0
+    printf '%-14s %12s %12s %10s %10s\n' binary "{{base}}" branch growth limit
+    for binary in djf dejafix djf-mcp djf-edit-hook; do
+        before=$(wc -c < "$work/target/{{profile}}/$binary")
+        after=$(wc -c < "target/{{profile}}/$binary")
+        growth=$((after - before))
+        limit=$((150 * 1024))
+        if [ "$binary" = djf-edit-hook ]; then limit=$((16 * 1024)); fi
+        printf '%-14s %12d %12d %+10d %10d\n' "$binary" "$before" "$after" "$growth" "$limit"
+        if [ "$growth" -gt "$limit" ]; then status=1; fi
+    done
+    exit "$status"
 
 smoke:
     #!/usr/bin/env bash

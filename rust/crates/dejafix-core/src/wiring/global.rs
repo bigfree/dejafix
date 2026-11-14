@@ -157,7 +157,7 @@ fn apply_drafts(settings: &Settings, cwd: &Path, file: &str) -> Result<GlobalOut
     if added {
         store.save_libraries(&libraries)?;
     }
-    outcome.kept.sort();
+    outcome.kept.sort_unstable();
     Ok(GlobalOutcome::UpgradeApplied {
         replaced: outcome.replaced,
         dropped: outcome.dropped,
@@ -234,7 +234,7 @@ pub(super) fn gotcha_action(
             library.as_deref(),
             budget,
         )?)),
-        other => Ok(GlobalOutcome::Unknown(format!("{other:?}"))),
+        _ => Ok(GlobalOutcome::Usage(Usage::AddGotcha)),
     }
 }
 
@@ -257,7 +257,7 @@ fn add_aliases(libraries: &mut Libraries, aliases: &[String]) -> Result<Vec<Stri
             refused.push(format!("'{alias}' is already an alias of {owner}"));
             continue;
         }
-        if libraries.0.contains_key(&alias) {
+        if libraries.has_library(&alias) {
             refused.push(format!("'{alias}' is a library, not an alias"));
             continue;
         }

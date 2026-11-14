@@ -18,16 +18,11 @@ struct Entry {
     frequency: u16,
 }
 
-fn postings_table(
-    entries: &mut [Entry],
-    terms: usize,
-    fields: usize,
-) -> (Vec<u32>, Vec<(u32, u16)>) {
-    entries.sort_by_key(|entry| (entry.term, entry.field));
+fn postings_table(entries: &[Entry], terms: usize, fields: usize) -> (Vec<u32>, Vec<(u32, u16)>) {
+    let bucket = |entry: &Entry| slot(entry.term) * fields + slot(entry.field);
     let mut offsets = vec![0_u32; terms * fields + 1];
-    for entry in entries.iter() {
-        let bucket = slot(entry.term) * fields + slot(entry.field) + 1;
-        if let Some(offset) = offsets.get_mut(bucket) {
+    for entry in entries {
+        if let Some(offset) = offsets.get_mut(bucket(entry) + 1) {
             *offset += 1;
         }
     }
@@ -36,10 +31,16 @@ fn postings_table(
         running += *offset;
         *offset = running;
     }
-    let postings = entries
-        .iter()
-        .map(|entry| (entry.doc, entry.frequency))
-        .collect();
+    let mut next = offsets.clone();
+    let mut postings = vec![(0_u32, 0_u16); entries.len()];
+    for entry in entries {
+        if let Some(cursor) = next.get_mut(bucket(entry))
+            && let Some(posting) = postings.get_mut(slot(*cursor))
+        {
+            *posting = (entry.doc, entry.frequency);
+            *cursor += 1;
+        }
+    }
     (offsets, postings)
 }
 
@@ -61,15 +62,16 @@ fn average_lengths(lengths: &[u16], fields: usize, documents: usize) -> Vec<f64>
         .collect()
 }
 
-fn id_order<D: Document>(docs: &[D]) -> Vec<u32> {
-    let mut by_id: Vec<u32> = (0..narrow(docs.len())).collect();
-    by_id.sort_by(|left, right| {
-        let id = |doc: &u32| docs.get(slot(*doc)).map_or("", Document::id);
-        id(left).cmp(id(right))
-    });
+fn id_order(docs: &[&dyn Document]) -> Vec<u32> {
+    let mut by_id: Vec<(&str, usize)> = docs
+        .iter()
+        .enumerate()
+        .map(|(index, doc)| (doc.id(), index))
+        .collect();
+    by_id.sort_unstable();
     let mut order = vec![0_u32; docs.len()];
-    for (rank, doc) in by_id.into_iter().enumerate() {
-        if let Some(target) = order.get_mut(slot(doc)) {
+    for (rank, (_, doc)) in by_id.into_iter().enumerate() {
+        if let Some(target) = order.get_mut(doc) {
             *target = narrow(rank);
         }
     }
@@ -79,6 +81,11 @@ fn id_order<D: Document>(docs: &[D]) -> Vec<u32> {
 impl Index {
     #[must_use]
     pub fn build<D: Document>(fields: &'static [FieldSpec], docs: &[D]) -> Self {
+        let docs: Vec<&dyn Document> = docs.iter().map(|doc| -> &dyn Document { doc }).collect();
+        Self::build_from(fields, &docs)
+    }
+
+    fn build_from(fields: &'static [FieldSpec], docs: &[&dyn Document]) -> Self {
         let documents = docs.len().min(slot(u32::MAX));
         let docs = docs.get(..documents).unwrap_or_default();
         let mut ids: HashMap<Cow<'_, str>, u32> = HashMap::new();
@@ -140,7 +147,7 @@ impl Index {
         for entry in &mut entries {
             entry.term = renumber.get(slot(entry.term)).copied().unwrap_or(0);
         }
-        let (offsets, postings) = postings_table(&mut entries, vocabulary.len(), fields.len());
+        let (offsets, postings) = postings_table(&entries, vocabulary.len(), fields.len());
         let average = average_lengths(&lengths, fields.len(), documents);
         let order = id_order(docs);
         Self {

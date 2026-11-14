@@ -1,5 +1,3 @@
-use std::collections::BTreeMap;
-
 use serde_json::{Map, Value};
 
 use crate::core::rank::Index;
@@ -199,7 +197,7 @@ pub enum StoredGotcha {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct Libraries(pub BTreeMap<String, Vec<String>>);
+pub struct Libraries(pub(super) Vec<(String, Vec<String>)>);
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct GotchaInput {
