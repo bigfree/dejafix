@@ -1,6 +1,5 @@
 use std::fs;
 
-use super::resolve::is_network_path;
 use super::{
     FsResolver, RegistryFiles, StoreError, manifest_info, path_context, read_events_file,
     resolve_path,
@@ -96,20 +95,6 @@ fn a_fixture_loads_without_skips() {
     assert_eq!(log.events().len(), 100);
     assert_eq!(log.skipped(), []);
     assert!(log.indexed_files().count() > 0);
-}
-
-#[test]
-fn unc_spellings_are_network_paths() {
-    for path in [
-        "//server/share/a.py",
-        "\\\\server\\share\\a.py",
-        "/\\server/a",
-    ] {
-        assert!(is_network_path(path), "{path}");
-    }
-    for path in ["/server/a.py", "C:/x", "C:\\x", "rel/a.py", ""] {
-        assert!(!is_network_path(path), "{path}");
-    }
 }
 
 mod store {

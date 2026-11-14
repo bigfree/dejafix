@@ -275,3 +275,96 @@ fn sources_are_named_as_python_names_them() {
         ["pinned", "explicit", "roots", "active", "cwd", "only"]
     );
 }
+
+#[derive(Default)]
+struct Watching {
+    inner: Fake,
+    seen: std::cell::RefCell<Vec<String>>,
+}
+
+impl Watching {
+    fn saw(&self, text: &str) {
+        self.seen.borrow_mut().push(text.to_owned());
+    }
+}
+
+impl Probe for Watching {
+    fn has_memory(&self, path: &Path) -> bool {
+        self.saw(&path.to_string_lossy());
+        self.inner.has_memory(path)
+    }
+
+    fn is_dir(&self, path: &Path) -> bool {
+        self.saw(&path.to_string_lossy());
+        self.inner.is_dir(path)
+    }
+
+    fn expand_user(&self, text: &str) -> PathBuf {
+        self.saw(text);
+        self.inner.expand_user(text)
+    }
+
+    fn resolve(&self, path: &Path) -> Option<PathBuf> {
+        self.saw(&path.to_string_lossy());
+        self.inner.resolve(path)
+    }
+
+    fn lookup(&self, text: &str) -> Option<PathBuf> {
+        self.saw(text);
+        self.inner.lookup(text)
+    }
+
+    fn discover(&self) -> Option<PathBuf> {
+        self.inner.discover()
+    }
+}
+
+#[test]
+fn a_network_path_is_refused_before_any_probe_sees_it() {
+    let registry = registry(&["alpha"], None);
+    for value in [
+        r"\\host\share",
+        "//host/share",
+        r"\\?\UNC\host\share",
+        r" \\host\share",
+        "\t//host/share",
+        "\u{3000}\\\\host\\share",
+        "\u{1f}//host/share ",
+    ] {
+        for pinned in [None, Some(Path::new("/work/alpha"))] {
+            let probe = Watching {
+                inner: Fake::with(&["alpha"]),
+                ..Watching::default()
+            };
+            let result = resolve(&registry, Some(value), pinned, &[], &probe);
+            assert!(
+                matches!(&result, Err(ResolveError::Unknown { explicit, .. }) if explicit == value),
+                "{value}: {result:?}"
+            );
+            assert!(
+                probe
+                    .seen
+                    .borrow()
+                    .iter()
+                    .all(|seen| !seen.contains("host")),
+                "{value}: {:?}",
+                probe.seen.borrow()
+            );
+        }
+    }
+}
+
+#[test]
+fn a_server_pinned_to_a_network_share_accepts_its_own_path() {
+    let pinned = Path::new(r"\\nas\code\app");
+    let mut fake = Fake::default();
+    fake.memory.insert(pinned.to_path_buf());
+    let registry = registry(&[], None);
+    let result = resolve(&registry, Some(r"\\nas\code\app"), Some(pinned), &[], &fake);
+    assert_eq!(root(&result), (r"\\nas\code\app", Some(Source::Pinned)));
+    let other = resolve(&registry, Some(r"\\evil\share"), Some(pinned), &[], &fake);
+    assert!(
+        matches!(other, Err(ResolveError::Unknown { .. })),
+        "{other:?}"
+    );
+}
