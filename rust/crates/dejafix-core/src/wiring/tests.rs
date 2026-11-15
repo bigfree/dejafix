@@ -1062,6 +1062,10 @@ fn a_renamed_issue_file_that_cannot_be_removed_is_reported_and_the_run_succeeds(
     let stale = issues.join(format!("{id}-old-title.md"));
     fs::write(&stale, format!("# #{id} old title\n")).unwrap();
     fs::set_permissions(&issues, fs::Permissions::from_mode(0o555)).unwrap();
+    if fs::write(issues.join("probe"), "").is_ok() {
+        fs::set_permissions(&issues, fs::Permissions::from_mode(0o755)).unwrap();
+        return;
+    }
     let report = regenerate(&project);
     fs::set_permissions(&issues, fs::Permissions::from_mode(0o755)).unwrap();
     let report = report.unwrap();

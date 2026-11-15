@@ -102,10 +102,14 @@ pub(super) fn commit_events<'a>(
             })?;
     }
     locked.append(&lines)?;
-    let touched: Vec<String> = events
-        .iter()
-        .filter_map(|event| event.issue.as_ref().map(|issue| issue.as_str().to_owned()))
-        .collect();
+    let touched: Vec<String> = if regenerate {
+        events
+            .iter()
+            .filter_map(|event| event.issue.as_ref().map(|issue| issue.as_str().to_owned()))
+            .collect()
+    } else {
+        Vec::new()
+    };
     match marker {
         None | Some(MarkerChange::Keep) => {}
         Some(MarkerChange::Set(issue)) => write_marker(dir, issue.as_str()),

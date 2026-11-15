@@ -3,7 +3,7 @@ use std::io::{self, Write};
 use dejafix_core::{Command, OsIds, Outcome, Project, WiringError, WriteOutcome, record};
 
 use super::args::Commands;
-use super::read::report_unreadable;
+use super::output::report_unreadable;
 
 pub fn command(arguments: Commands) -> Option<Command> {
     Some(match arguments {

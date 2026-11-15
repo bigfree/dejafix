@@ -108,22 +108,25 @@ fn file_name(issue: &str, title: &str) -> Option<String> {
 
 #[must_use]
 pub fn issue_files<'l>(log: &'l EventLog<'_>) -> Vec<IssueFile<'l>> {
-    issue_files_where(log, |_| true)
+    issue_files_where(log, |_, _| true)
 }
 
 #[must_use]
 pub fn issue_files_where<'l>(
     log: &'l EventLog<'_>,
-    keep: impl Fn(&str) -> bool,
+    keep: impl Fn(&str, Option<&str>) -> bool,
 ) -> Vec<IssueFile<'l>> {
     groups(log)
         .into_iter()
-        .filter(|group| keep(group.id))
         .filter_map(|group| {
             let issue = group
                 .events
                 .iter()
                 .find(|event| event.kind == EventKind::Issue)?;
+            let name = file_name(group.id, issue.summary.as_str());
+            if !keep(group.id, name.as_deref()) {
+                return None;
+            }
             let mut contents = format!("# #{} {}\n\n", group.id, issue.summary.as_str());
             for event in &group.events {
                 let _ = write!(
@@ -145,26 +148,11 @@ pub fn issue_files_where<'l>(
                 }
                 contents.push('\n');
             }
-            let name = file_name(group.id, issue.summary.as_str());
             Some(IssueFile {
                 issue: group.id,
                 name,
                 contents,
             })
-        })
-        .collect()
-}
-
-#[must_use]
-pub fn issue_file_names<'l>(log: &'l EventLog<'_>) -> Vec<(&'l str, String)> {
-    groups(log)
-        .into_iter()
-        .filter_map(|group| {
-            let issue = group
-                .events
-                .iter()
-                .find(|event| event.kind == EventKind::Issue)?;
-            Some((group.id, file_name(group.id, issue.summary.as_str())?))
         })
         .collect()
 }
@@ -179,7 +167,9 @@ pub fn is_renamed_issue_file<S: BuildHasher>(
     if Path::new(name)
         .extension()
         .is_none_or(|extension| extension != "md")
-        || rendered.contains(name)
+        || rendered
+            .iter()
+            .any(|rendered| rendered.eq_ignore_ascii_case(name))
     {
         return false;
     }

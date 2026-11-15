@@ -3,8 +3,10 @@ use std::path::Path;
 
 use dejafix_core::{
     MemoryFile, Project, SearchOutput, SearchQuery, Searched, WiringError, add_plan_idea,
-    read_memory_file, regenerate, search_project, show, unreadable_notice,
+    read_memory_file, regenerate, search_project, show,
 };
+
+use super::output::{printable_text, report_unreadable};
 
 pub fn show_summary(
     project: &Project,
@@ -37,13 +39,6 @@ pub fn search(
     report_unreadable(unreadable, err).map(Ok)
 }
 
-pub fn report_unreadable(count: usize, err: &mut impl Write) -> Result<(), io::Error> {
-    match unreadable_notice(count) {
-        Some(notice) => writeln!(err, "{notice}"),
-        None => Ok(()),
-    }
-}
-
 pub fn rebuild(
     project: &Project,
     out: &mut impl Write,
@@ -58,7 +53,7 @@ pub fn rebuild(
         writeln!(out, "Removed {} renamed issue file(s).", report.removed)?;
     }
     for line in &report.not_removed {
-        writeln!(err, "{line}")?;
+        writeln!(err, "{}", printable_text(line))?;
     }
     report_unreadable(report.unreadable, err).map(Ok)
 }

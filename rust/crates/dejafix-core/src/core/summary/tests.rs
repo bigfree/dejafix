@@ -551,15 +551,23 @@ fn only_kept_issues_are_rendered_and_names_match_full_rendering() {
     let text = events.text();
     let log = EventLog::parse(text.as_bytes(), &fixed_clock(), &context(), &NoResolve);
     let all = super::issue_files(&log);
-    let kept = super::issue_files_where(&log, |id| id == "0002");
+    let seen = std::cell::RefCell::new(Vec::new());
+    let kept = super::issue_files_where(&log, |id, name| {
+        seen.borrow_mut()
+            .push((id.to_owned(), name.map(str::to_owned)));
+        id == "0002"
+    });
     assert_eq!(kept.len(), 1);
     assert_eq!(kept.first().map(|file| file.issue), Some("0002"));
-    let names: Vec<(&str, String)> = super::issue_file_names(&log);
-    let expected: Vec<(&str, String)> = all
+    assert_eq!(
+        kept.first().map(|file| file.contents.as_str()),
+        all.get(1).map(|file| file.contents.as_str())
+    );
+    let expected: Vec<(String, Option<String>)> = all
         .iter()
-        .filter_map(|file| Some((file.issue, file.name.clone()?)))
+        .map(|file| (file.issue.to_owned(), file.name.clone()))
         .collect();
-    assert_eq!(names, expected);
+    assert_eq!(seen.into_inner(), expected);
 }
 
 #[test]
@@ -571,6 +579,7 @@ fn a_renamed_generated_file_is_recognised_and_nothing_else_is() {
     assert!(renamed("0238-old-title.md", "# #0238 old title\n"));
     assert!(renamed("0238-old-title.md", "# #0238 old title\r\n"));
     assert!(!renamed("0238-new-title.md", "# #0238 new title\n"));
+    assert!(!renamed("0238-New-Title.md", "# #0238 new title\n"));
     assert!(!renamed("0238-b-other.md", "# #0238-b other\n"));
     assert!(!renamed("0238-notes.md", "my own notes\n"));
     assert!(!renamed("0238-old-title.txt", "# #0238 old title\n"));

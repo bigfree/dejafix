@@ -13,8 +13,8 @@ use crate::adapters::fs::{
 };
 use crate::core::log::EventLog;
 use crate::core::summary::{
-    SummaryInput, extract_purpose_from_map, extract_purpose_from_summary, is_renamed_issue_file,
-    issue_file_names, issue_files_where, render_summary,
+    IssueFile, SummaryInput, extract_purpose_from_map, extract_purpose_from_summary,
+    is_renamed_issue_file, issue_files_where, render_summary,
 };
 
 const SUMMARY_FILE: &str = "summary.md";
@@ -94,43 +94,42 @@ pub(super) fn regenerate_locked(
         source,
     })?;
     let present = regular_file_names(&directory)?;
-    let names = issue_file_names(log);
-    let wanted: Option<HashSet<&str>> = match scope {
-        IssueScope::All => None,
-        IssueScope::Touched(touched) => {
-            let listed: HashSet<&str> = present.iter().map(String::as_str).collect();
-            Some(
-                names
-                    .iter()
-                    .filter(|(id, name)| {
-                        !listed.contains(name.as_str()) || touched.iter().any(|issue| issue == id)
-                    })
-                    .map(|(id, _)| *id)
-                    .collect(),
-            )
-        }
-    };
-    let files: Vec<(PathBuf, String)> = issue_files_where(log, |id| {
-        wanted.as_ref().is_none_or(|wanted| wanted.contains(id))
-    })
-    .into_iter()
-    .filter_map(|file| Some((directory.join(file.name?), file.contents)))
-    .collect();
+    let listed: HashSet<&str> = present.iter().map(String::as_str).collect();
+    let rendered = issue_files_where(log, |id, name| {
+        name.is_some_and(|name| match scope {
+            IssueScope::All => true,
+            IssueScope::Touched(touched) => {
+                !listed.contains(name) || touched.iter().any(|issue| issue == id)
+            }
+        })
+    });
+    let files: Vec<(PathBuf, &str)> = rendered
+        .iter()
+        .filter_map(|file| {
+            Some((
+                directory.join(file.name.as_deref()?),
+                file.contents.as_str(),
+            ))
+        })
+        .collect();
     write_issue_files(&files)?;
     if *scope == IssueScope::All {
-        remove_renamed(&directory, &names, &present, &mut report);
+        remove_renamed(&directory, &rendered, &present, &mut report);
     }
     Ok(report)
 }
 
 fn remove_renamed(
     directory: &Path,
-    names: &[(&str, String)],
+    files: &[IssueFile<'_>],
     present: &[String],
     report: &mut Regenerated,
 ) {
-    let rendered: HashSet<&str> = names.iter().map(|(_, name)| name.as_str()).collect();
-    let ids: HashSet<&str> = names.iter().map(|(id, _)| *id).collect();
+    let rendered: HashSet<&str> = files
+        .iter()
+        .filter_map(|file| file.name.as_deref())
+        .collect();
+    let ids: HashSet<&str> = files.iter().map(|file| file.issue).collect();
     for name in present
         .iter()
         .filter(|name| !rendered.contains(name.as_str()))
@@ -149,7 +148,7 @@ fn remove_renamed(
     }
 }
 
-fn write_issue_files(files: &[(PathBuf, String)]) -> Result<(), StoreError> {
+fn write_issue_files(files: &[(PathBuf, &str)]) -> Result<(), StoreError> {
     let workers = thread::available_parallelism()
         .map_or(1, NonZeroUsize::get)
         .min(8);
