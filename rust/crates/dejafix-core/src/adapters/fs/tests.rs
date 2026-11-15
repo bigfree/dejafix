@@ -583,6 +583,32 @@ fn global_removal_replaces_the_file_and_keeps_its_mode() {
 }
 
 #[test]
+fn a_replace_waits_for_a_reader_to_close_the_store_and_locks_a_separate_file() {
+    let home = tempfile::tempdir().unwrap();
+    let store = super::GlobalStore::new(home.path());
+    store.ensure().unwrap();
+    let path = store.path("library_gotchas.jsonl");
+    fs::write(&path, "{\"id\": \"got_old\"}\n").unwrap();
+    let reader = fs::File::open(&path).unwrap();
+    let holder = std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(100));
+        drop(reader);
+    });
+    store
+        .replace_gotchas(&["{\"id\": \"got_new\"}".to_owned()])
+        .unwrap();
+    holder.join().unwrap();
+    assert_eq!(
+        fs::read_to_string(&path).unwrap(),
+        nl("{\"id\": \"got_new\"}\n")
+    );
+    assert_eq!(
+        fs::read(store.path("library_gotchas.jsonl.lock")).unwrap(),
+        Vec::<u8>::new()
+    );
+}
+
+#[test]
 fn an_append_waiting_for_the_lock_lands_in_the_replaced_file() {
     use std::sync::mpsc;
     use std::time::Duration;

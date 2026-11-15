@@ -124,15 +124,23 @@ const LIBRARY_MCP: &str = "  - User mentions a library → call get_global_gotch
 const GLOBAL_HINT: &str = "If this applies beyond this project, also call add_global_gotcha(";
 const PROMOTED_STORE: &str = "home/.dejafix/global/library_gotchas.jsonl";
 const PROMOTION_CACHE: &str = "home/.dejafix/global/.promotable.json";
+const GLOBAL_DIR: &str = "home/.dejafix/global/";
+const LOCK_FILE: &str = ".jsonl.lock";
 
 pub fn without_language_rules(text: &str) -> String {
-    text.replace(LANGUAGE_SECTION, "")
-        .replace(LANGUAGE_BRIDGE, "")
-        .replace(LANGUAGE_MCP, LIBRARY_MCP)
-        .replace(
-            "<!-- dejafix-instructions: 4 -->",
-            "<!-- dejafix-instructions: 3 -->",
-        )
+    let crlf = |lf: &str| lf.replace('\n', "\r\n");
+    let mut text = text.replace(
+        "<!-- dejafix-instructions: 4 -->",
+        "<!-- dejafix-instructions: 3 -->",
+    );
+    for (rule, kept) in [
+        (LANGUAGE_SECTION, ""),
+        (LANGUAGE_BRIDGE, ""),
+        (LANGUAGE_MCP, LIBRARY_MCP),
+    ] {
+        text = text.replace(&crlf(rule), &crlf(kept)).replace(rule, kept);
+    }
+    text
 }
 
 fn without_inherited_block(text: &str) -> String {
@@ -211,6 +219,9 @@ pub fn approved_departures(
         } else if path == PROMOTED_STORE {
             *text = promoted_during(text, since);
         }
+    }
+    if matches!(implementation, Implementation::Rust) {
+        files.retain(|path, _| !(path.starts_with(GLOBAL_DIR) && path.ends_with(LOCK_FILE)));
     }
     if matches!(implementation, Implementation::Python) {
         files.remove(PROMOTION_CACHE);
