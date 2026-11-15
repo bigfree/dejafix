@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use crate::core::event::EventKind;
 use crate::core::hooks::HookKind;
 use crate::core::precheck::{SnoozeError, Warning};
@@ -16,11 +18,16 @@ pub struct HooksReport {
     pub refreshed: Vec<HookKind>,
     pub skipped: Vec<HookKind>,
     pub unreadable: Vec<HookKind>,
+    pub folder: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum HooksOutcome {
     NoHooksDir,
+    Configured {
+        path: PathBuf,
+        snippets: Vec<(HookKind, String)>,
+    },
     Installed(HooksReport),
     Removed(Vec<HookKind>),
     Unknown(String),

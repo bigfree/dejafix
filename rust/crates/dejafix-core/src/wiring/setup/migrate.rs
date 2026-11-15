@@ -11,7 +11,7 @@ use crate::adapters::fs::{
     holds_data, is_symlink, live_watcher, move_entry, points_outside, project_name, read_universal,
     resolve_path, write_atomic,
 };
-use crate::adapters::git::{exclude_file, hooks_dir};
+use crate::adapters::git::{HooksLocation, exclude_file, hooks_location};
 use crate::core::hooks::HookKind;
 use crate::core::migrate::{
     BRIDGE_BLOCK, Block, HOOK_BLOCK, LEGACY_DIR, MigrateStep, convert_block, has_legacy_path,
@@ -19,7 +19,7 @@ use crate::core::migrate::{
 };
 use crate::core::registry::{Loaded, Registry, load, slugify};
 use crate::core::scaffold::{INSTRUCTIONS_VERSION, instructions_version};
-use crate::wiring::hooks::install;
+use crate::wiring::hooks::{configured_snippets, install};
 use crate::wiring::init::{MEMORY_DIR, RULE_FILES, refresh_instructions, write_bridges};
 use crate::wiring::registry::now_text;
 use crate::wiring::types::{Settings, WiringError};
@@ -248,7 +248,10 @@ fn blocked(legacy: &Path, target: &Path) -> Option<ProjectState> {
 fn plan(root: &Path, legacy: &Path, target: &Path) -> Plan {
     let rename = legacy.is_dir();
     let memory = if rename { legacy } else { target };
-    let hooks = hooks_dir(root);
+    let hooks_folder = hooks_location(root);
+    let folder = match &hooks_folder {
+        HooksLocation::Folder(folder) | HooksLocation::Configured(folder) => folder.clone(),
+    };
     Plan {
         rename,
         stale: files_with_legacy_paths(memory),
@@ -267,8 +270,9 @@ fn plan(root: &Path, legacy: &Path, target: &Path) -> Plan {
         hooks: HookKind::ALL
             .into_iter()
             .map(HookKind::file_name)
-            .filter(|name| has_old_block(&hooks.join(name), root, &HOOK_BLOCK))
+            .filter(|name| has_old_block(&folder.join(name), &folder, &HOOK_BLOCK))
             .collect(),
+        hooks_folder,
     }
 }
 
@@ -302,11 +306,21 @@ fn apply_plan(
         }
     }
     if !plan.hooks.is_empty() {
-        let directory = hooks_dir(root);
-        for name in &plan.hooks {
-            convert_file(&directory.join(name), root, &HOOK_BLOCK)?;
+        match &plan.hooks_folder {
+            HooksLocation::Folder(directory) => {
+                for name in &plan.hooks {
+                    convert_file(&directory.join(name), directory, &HOOK_BLOCK)?;
+                }
+                emit(sink, MigrateEvent::Hooks(install(root, directory, djf)?))?;
+            }
+            HooksLocation::Configured(path) => emit(
+                sink,
+                MigrateEvent::HooksConfigured {
+                    path: path.clone(),
+                    snippets: configured_snippets(djf),
+                },
+            )?,
         }
-        emit(sink, MigrateEvent::Hooks(install(&directory, djf)?))?;
     }
     Ok(())
 }

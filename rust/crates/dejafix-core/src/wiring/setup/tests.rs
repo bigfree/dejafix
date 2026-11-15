@@ -711,3 +711,55 @@ fn a_private_checkout_moves_its_exclude_entry_and_gets_no_gitignore() {
     assert!(root.join(".dejafix/AI_INSTRUCTIONS.md.bak").is_file());
     assert!(!root.join(".gitignore").exists());
 }
+
+fn git_in(dir: &Path, args: &[&str]) {
+    let status = std::process::Command::new("git")
+        .args(["-c", "user.email=t@example.invalid", "-c", "user.name=t"])
+        .args(args)
+        .current_dir(dir)
+        .status()
+        .unwrap();
+    assert!(status.success());
+}
+
+#[test]
+fn a_linked_worktree_s_old_hooks_in_the_main_repository_are_converted() {
+    let machine = legacy();
+    let main = machine.base.join("main");
+    fs::create_dir_all(&main).unwrap();
+    git_in(&main, &["init", "-q"]);
+    git_in(&main, &["commit", "-q", "--allow-empty", "-m", "x"]);
+    let kept = machine.base.join("kept");
+    fs::rename(&machine.root, &kept).unwrap();
+    git_in(
+        &main,
+        &["worktree", "add", "-q", machine.root.to_str().unwrap()],
+    );
+    fs::rename(kept.join(".projectmem"), machine.root.join(".projectmem")).unwrap();
+    write(&main.join(".git/hooks/pre-commit"), OLD_HOOK);
+    let events = machine.apply();
+    let hook = read(&main.join(".git/hooks/pre-commit"));
+    assert!(hook.contains("echo user hook"));
+    assert!(!hook.contains("pjm auto-capture"));
+    assert_eq!(hook.matches("# >>> dejafix auto-capture >>>").count(), 1);
+    assert!(events.iter().any(|event| matches!(
+        event,
+        MigrateEvent::Hooks(report) if report.folder == Some(main.join(".git/hooks"))
+    )));
+}
+
+#[test]
+fn hooks_under_core_hooks_path_are_reported_not_written() {
+    let machine = legacy();
+    fs::remove_dir_all(machine.root.join(".git")).unwrap();
+    git_in(&machine.root, &["init", "-q"]);
+    git_in(&machine.root, &["config", "core.hooksPath", ".husky/_"]);
+    write(&machine.root.join(".husky/_/pre-commit"), OLD_HOOK);
+    let events = machine.apply();
+    assert_eq!(read(&machine.root.join(".husky/_/pre-commit")), OLD_HOOK);
+    assert!(events.iter().any(|event| matches!(
+        event,
+        MigrateEvent::HooksConfigured { path, snippets }
+            if *path == machine.root.join(".husky/_") && snippets.len() == 3
+    )));
+}

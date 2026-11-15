@@ -3,12 +3,49 @@ use std::fs::{self, File};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
+use super::git;
+use super::types::HooksLocation;
 use crate::adapters::fs::{StoreError, read_optional_text};
 use crate::core::hooks::shell_path;
 
+pub(crate) fn same_file(left: &Path, right: &Path) -> bool {
+    matches!(
+        (fs::canonicalize(left), fs::canonicalize(right)),
+        (Ok(left), Ok(right)) if left == right
+    )
+}
+
 #[must_use]
-pub fn hooks_dir(root: &Path) -> PathBuf {
-    root.join(".git").join("hooks")
+pub fn hooks_location(root: &Path) -> HooksLocation {
+    let fallback = HooksLocation::Folder(root.join(".git").join("hooks"));
+    let Some(output) = git(
+        root,
+        &[
+            "rev-parse",
+            "--show-toplevel",
+            "--git-common-dir",
+            "--git-path",
+            "hooks",
+        ],
+    ) else {
+        return fallback;
+    };
+    let Ok(text) = String::from_utf8(output) else {
+        return fallback;
+    };
+    let mut lines = text.lines().map(str::trim);
+    let (Some(top), Some(common), Some(hooks)) = (lines.next(), lines.next(), lines.next()) else {
+        return fallback;
+    };
+    if !same_file(Path::new(top), root) {
+        return fallback;
+    }
+    let hooks = root.join(hooks);
+    if hooks == root.join(common).join("hooks") {
+        HooksLocation::Folder(hooks)
+    } else {
+        HooksLocation::Configured(hooks)
+    }
 }
 
 #[cfg(unix)]

@@ -2,7 +2,7 @@ use std::fs::{self, OpenOptions};
 use std::io;
 use std::path::{Path, PathBuf};
 
-use super::hooks::install;
+use super::hooks::{configured_snippets, install};
 use super::registry::{load_registry, now_text};
 use super::types::InitHooks;
 use super::types::{BridgeOutcome, InitOptions, InitReport, Settings, WiringError};
@@ -10,7 +10,7 @@ use crate::adapters::fs::{
     MemoryDir, RegistryFiles, StoreError, detect_stack, manifest_info, project_name,
     read_optional_text, read_text_within, resolve_path, write_text,
 };
-use crate::adapters::git::{hooks_dir, is_ignored};
+use crate::adapters::git::{HooksLocation, hooks_location, is_ignored};
 use crate::core::global::Stack;
 use crate::core::registry::{RegisterResult, Registry, same_path, slugify};
 use crate::core::scaffold::{
@@ -185,14 +185,16 @@ pub fn init_project(
     };
     let hooks = match &options.hooks {
         None => None,
-        Some(djf) => {
-            let directory = hooks_dir(root);
-            Some(if directory.exists() {
-                InitHooks::Installed(install(&directory, djf)?)
-            } else {
-                InitHooks::NoGit
-            })
-        }
+        Some(djf) => Some(match hooks_location(root) {
+            HooksLocation::Configured(path) => InitHooks::Configured {
+                path,
+                snippets: configured_snippets(djf),
+            },
+            HooksLocation::Folder(directory) if directory.exists() => {
+                InitHooks::Installed(install(root, &directory, djf)?)
+            }
+            HooksLocation::Folder(_) => InitHooks::NoGit,
+        }),
     };
     Ok(InitReport {
         mem_dir,

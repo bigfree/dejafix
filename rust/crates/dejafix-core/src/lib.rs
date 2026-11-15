@@ -10,7 +10,9 @@ pub use crate::adapters::fs::{
 };
 pub use crate::adapters::fs::{forget_session, report_is_new, seen_root};
 pub use crate::adapters::git::{GitHistory, recent_changes};
-pub use crate::adapters::git::{hooks_dir, read_hook, remove_hook, resolve_djf_binary, write_hook};
+pub use crate::adapters::git::{
+    HooksLocation, hooks_location, read_hook, remove_hook, resolve_djf_binary, write_hook,
+};
 pub use crate::adapters::git::{
     last_changes, last_message, staged_files, status_files, working_files,
 };

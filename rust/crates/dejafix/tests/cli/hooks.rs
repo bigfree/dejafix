@@ -362,3 +362,40 @@ fn an_unreadable_hook_is_left_alone_with_its_own_warning() -> TestResult {
     assert_eq!(fs::read(&hook)?, b"#!/bin/sh\necho caf\xe9\n");
     Ok(())
 }
+
+#[test]
+fn install_in_a_linked_worktree_writes_the_main_repository_s_hooks() -> TestResult {
+    let repo = Repo::bare()?;
+    let worktree = repo.root.with_file_name("wt");
+    let output = git(
+        &repo,
+        &["worktree", "add", "-q", worktree.to_str().ok_or("path")?],
+    )?;
+    assert!(output.status.success(), "{output:?}");
+    let out = repo.djf_in(&worktree, &["hooks", "install"]).output()?;
+    assert!(out.status.success(), "{out:?}");
+    let stdout = String::from_utf8(out.stdout)?;
+    assert!(stdout.contains("dejafix git hooks installed: post-commit, post-merge, pre-commit"));
+    assert!(stdout.contains("  Hooks folder: "));
+    assert!(hook(&repo, "pre-commit").contains("# >>> dejafix"));
+    Ok(())
+}
+
+#[test]
+fn install_with_core_hooks_path_writes_nothing_and_prints_the_lines() -> TestResult {
+    let repo = Repo::bare()?;
+    let output = git(&repo, &["config", "core.hooksPath", ".husky/_"])?;
+    assert!(output.status.success(), "{output:?}");
+    let stdout = repo.stdout(&["hooks", "install"])?;
+    assert!(
+        stdout.starts_with("core.hooksPath points git at "),
+        "{stdout}"
+    );
+    assert!(stdout.contains(
+        "; dejafix writes no hooks there.\nAdd these lines to the matching hooks of your hook manager:\n"
+    ));
+    assert!(stdout.contains("\npre-commit:\n"));
+    assert!(!repo.root.join(".husky").exists());
+    assert_eq!(hook(&repo, "pre-commit"), "");
+    Ok(())
+}

@@ -5,8 +5,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use super::{
-    git_dirs, head_short, hooks_dir, last_changes, last_message, read_hook, remove_hook,
-    repository_state, resolve_djf_binary, staged_files, status_files, working_files, write_hook,
+    HooksLocation, git_dirs, head_short, hooks_location, last_changes, last_message, read_hook,
+    remove_hook, repository_state, resolve_djf_binary, staged_files, status_files, working_files,
+    write_hook,
 };
 use crate::core::capture::Change;
 use crate::core::hooks::shell_path;
@@ -85,11 +86,78 @@ fn path_of(directory: &Path) -> OsString {
     std::env::join_paths([directory]).unwrap()
 }
 
+fn canonical(path: &Path) -> PathBuf {
+    fs::canonicalize(path).unwrap()
+}
+
+fn committed_repository(root: &Path) {
+    fs::create_dir_all(root).unwrap();
+    git(root, &["init", "-q"]);
+    git(root, &["commit", "-q", "--allow-empty", "-m", "x"]);
+}
+
 #[test]
-fn the_hooks_directory_sits_under_dot_git() {
+fn hooks_go_under_dot_git_in_a_plain_repository() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = canonical(dir.path());
+    committed_repository(&root);
     assert_eq!(
-        hooks_dir(Path::new("/repo")),
-        Path::new("/repo").join(".git").join("hooks")
+        hooks_location(&root),
+        HooksLocation::Folder(root.join(".git").join("hooks"))
+    );
+}
+
+#[test]
+fn a_linked_worktree_uses_the_main_repository_s_hooks() {
+    let dir = tempfile::tempdir().unwrap();
+    let main = canonical(dir.path()).join("main");
+    committed_repository(&main);
+    let worktree = main.with_file_name("wt");
+    git(
+        &main,
+        &["worktree", "add", "-q", worktree.to_str().unwrap()],
+    );
+    let HooksLocation::Folder(folder) = hooks_location(&worktree) else {
+        panic!("not a folder");
+    };
+    assert_eq!(
+        canonical(&folder),
+        canonical(&main.join(".git").join("hooks"))
+    );
+}
+
+#[test]
+fn core_hooks_path_is_reported_relative_or_absolute() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = canonical(dir.path());
+    committed_repository(&root);
+    git(&root, &["config", "core.hooksPath", ".husky/_"]);
+    assert_eq!(
+        hooks_location(&root),
+        HooksLocation::Configured(root.join(".husky/_"))
+    );
+    let shared = root.join("shared-hooks");
+    git(
+        &root,
+        &["config", "core.hooksPath", shared.to_str().unwrap()],
+    );
+    assert_eq!(hooks_location(&root), HooksLocation::Configured(shared));
+}
+
+#[test]
+fn outside_a_repository_or_in_a_subfolder_the_old_folder_is_kept() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = canonical(dir.path());
+    assert_eq!(
+        hooks_location(&root),
+        HooksLocation::Folder(root.join(".git").join("hooks"))
+    );
+    git(&root, &["init", "-q"]);
+    let sub = root.join("sub");
+    fs::create_dir_all(&sub).unwrap();
+    assert_eq!(
+        hooks_location(&sub),
+        HooksLocation::Folder(sub.join(".git").join("hooks"))
     );
 }
 
