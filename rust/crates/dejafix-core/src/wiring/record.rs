@@ -35,6 +35,7 @@ pub(crate) fn record_with(
         &project.context,
         &FsResolver,
     );
+    let unreadable = log.skipped().len();
     let command = command(&log)?;
     let hints: Vec<String> = language_notice(&command)?
         .map(str::to_owned)
@@ -78,6 +79,7 @@ pub(crate) fn record_with(
         notices: plan.notices,
         hints,
         incomplete,
+        unreadable,
     })
 }
 

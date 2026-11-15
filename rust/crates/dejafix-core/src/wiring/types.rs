@@ -30,6 +30,13 @@ pub struct Recorded {
     pub notices: Vec<String>,
     pub hints: Vec<String>,
     pub incomplete: Option<WiringError>,
+    pub unreadable: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Searched {
+    pub output: SearchOutput,
+    pub unreadable: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -1004,3 +1004,22 @@ fn a_secret_in_a_global_gotcha_is_redacted_and_reported() {
         fs::read_to_string(world.home.join(".dejafix/global/library_gotchas.jsonl")).unwrap();
     assert!(!store.contains(&token), "{store}");
 }
+
+#[test]
+fn start_session_and_writes_append_the_unreadable_notice() {
+    let world = World::new();
+    let root = world.project("alpha");
+    let state = world.state(Some(&root), &world.base);
+    let notice = "dejafix: 1 line(s) of events.jsonl could not be read; run djf doctor";
+    assert!(!text(&state, ToolCall::StartSession, None).contains(notice));
+    assert!(!text(&state, note("the cache is cold"), None).contains(notice));
+    fs::write(
+        root.join(".dejafix/events.jsonl"),
+        "{\"id\": \"evt_a\", \"summary\": \"s\", \"timestamp\": \"2026-01-01T00:00:00Z\", \"type\": \"note\"}\n{broken\n",
+    )
+    .unwrap();
+    assert!(text(&state, ToolCall::StartSession, None).ends_with(&format!("\n{notice}")));
+    assert!(
+        text(&state, note("the cache needs a warm-up"), None).ends_with(&format!("\n{notice}"))
+    );
+}

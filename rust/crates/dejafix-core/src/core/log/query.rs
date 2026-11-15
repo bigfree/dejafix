@@ -3,6 +3,13 @@ use crate::core::event::{Event, EventId, EventKind, IssueId};
 use crate::core::path::RelativePath;
 use crate::core::text::python_strip;
 
+#[must_use]
+pub fn unreadable_notice(count: usize) -> Option<String> {
+    (count > 0).then(|| {
+        format!("dejafix: {count} line(s) of events.jsonl could not be read; run djf doctor")
+    })
+}
+
 impl<'a> EventLog<'a> {
     #[must_use]
     pub fn events(&self) -> &[Event<'a>] {

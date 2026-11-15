@@ -31,7 +31,7 @@ pub use setup::{
 pub use types::{
     BridgeOutcome, CorruptLog, DoctorOptions, DoctorReport, FoundProject, InitHooks, InitOptions,
     InitReport, IssueScope, ListedProject, MemoryFile, Project, Recorded, Regenerated, RegistryOp,
-    RegistryReply, ScanReport, SearchOutput, Settings, UpgradeNotice, WiringError,
+    RegistryReply, ScanReport, SearchOutput, Searched, Settings, UpgradeNotice, WiringError,
 };
 
 #[cfg(test)]

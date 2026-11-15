@@ -244,7 +244,7 @@ fn search_reports_matches_or_the_python_message() {
         failed_only: false,
     };
     assert_eq!(
-        search_project(&project, &query).unwrap(),
+        search_project(&project, &query).unwrap().output,
         SearchOutput::Matches(vec![
             "2027-01-15T08:00:00Z [evt_00000000000000000001] note: startup is slow".into()
         ])
@@ -255,14 +255,14 @@ fn search_reports_matches_or_the_python_message() {
         failed_only: false,
     };
     assert!(
-        matches!(search_project(&project, &query).unwrap(), SearchOutput::Nothing(message) if message.contains("--regex"))
+        matches!(search_project(&project, &query).unwrap().output, SearchOutput::Nothing(message) if message.contains("--regex"))
     );
     let ranked = SearchQuery {
         mode: SearchMode::Ranked,
         ..query
     };
     assert!(
-        matches!(search_project(&project, &ranked).unwrap(), SearchOutput::Nothing(message) if message.contains("--exact"))
+        matches!(search_project(&project, &ranked).unwrap().output, SearchOutput::Nothing(message) if message.contains("--exact"))
     );
 }
 

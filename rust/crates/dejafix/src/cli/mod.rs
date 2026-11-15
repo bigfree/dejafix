@@ -210,6 +210,7 @@ fn dispatch(
                 failed_only,
             },
             out,
+            err,
         ),
         Commands::Regenerate => read::rebuild(&project, out, err),
         other => match write::command(other) {

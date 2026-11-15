@@ -2,8 +2,8 @@ use std::io::{self, Write};
 use std::path::Path;
 
 use dejafix_core::{
-    MemoryFile, Project, SearchOutput, SearchQuery, WiringError, add_plan_idea, read_memory_file,
-    regenerate, search_project, show,
+    MemoryFile, Project, SearchOutput, SearchQuery, Searched, WiringError, add_plan_idea,
+    read_memory_file, regenerate, search_project, show, unreadable_notice,
 };
 
 pub fn show_summary(
@@ -20,16 +20,27 @@ pub fn search(
     project: &Project,
     query: &SearchQuery<'_>,
     out: &mut impl Write,
+    err: &mut impl Write,
 ) -> Result<Result<(), WiringError>, io::Error> {
-    match search_project(project, query) {
-        Ok(SearchOutput::Matches(lines)) => {
+    let Searched { output, unreadable } = match search_project(project, query) {
+        Ok(searched) => searched,
+        Err(error) => return Ok(Err(error)),
+    };
+    match output {
+        SearchOutput::Matches(lines) => {
             for line in lines {
                 writeln!(out, "{line}")?;
             }
-            Ok(Ok(()))
         }
-        Ok(SearchOutput::Nothing(message)) => writeln!(out, "{message}").map(Ok),
-        Err(error) => Ok(Err(error)),
+        SearchOutput::Nothing(message) => writeln!(out, "{message}")?,
+    }
+    report_unreadable(unreadable, err).map(Ok)
+}
+
+pub fn report_unreadable(count: usize, err: &mut impl Write) -> Result<(), io::Error> {
+    match unreadable_notice(count) {
+        Some(notice) => writeln!(err, "{notice}"),
+        None => Ok(()),
     }
 }
 
@@ -49,7 +60,7 @@ pub fn rebuild(
     for line in &report.not_removed {
         writeln!(err, "{line}")?;
     }
-    Ok(Ok(()))
+    report_unreadable(report.unreadable, err).map(Ok)
 }
 
 pub fn memory_file(
