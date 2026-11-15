@@ -30,6 +30,27 @@ pub struct Recorded {
     pub notices: Vec<String>,
     pub hints: Vec<String>,
     pub incomplete: Option<WiringError>,
+    pub unreadable: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Searched {
+    pub output: SearchOutput,
+    pub unreadable: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum IssueScope {
+    All,
+    Touched(Vec<String>),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Regenerated {
+    pub path: PathBuf,
+    pub removed: usize,
+    pub not_removed: Vec<String>,
+    pub unreadable: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

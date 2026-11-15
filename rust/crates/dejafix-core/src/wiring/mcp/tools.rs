@@ -13,6 +13,7 @@ use crate::adapters::git::{GitHistory, status_files};
 use crate::core::context::{ContextInput, generate_context};
 use crate::core::event::IssueId;
 use crate::core::global::{DEFAULT_BUDGET, GotchaInput, add_reply, global_reply};
+use crate::core::log::unreadable_notice;
 use crate::core::registry::Registry;
 use crate::core::reply::{current_reply, precheck_report, projects_reply};
 use crate::core::resolve::{Probe, Resolution, resolve};
@@ -161,7 +162,7 @@ impl McpState {
         let target = self.resolution(project, clock)?;
         let root = target.root.as_path();
         match call {
-            ToolCall::StartSession => start(root),
+            ToolCall::StartSession => self.start(root, clock),
             ToolCall::GetInstructions => Ok(memory_text(root, "AI_INSTRUCTIONS.md")?
                 .unwrap_or_else(|| "No instructions found. Run `djf init` first.".to_owned())),
             ToolCall::GetSummary => Ok(memory_text(root, "summary.md")?
@@ -208,6 +209,23 @@ impl McpState {
             | ToolCall::AddGlobalGotcha(_)
             | ToolCall::Write(_) => Ok(String::new()),
         }
+    }
+
+    fn start(&self, root: &Path, clock: &Clock) -> Result<String, ToolError> {
+        let mut reply = session_start(
+            &stripped(root, "AI_INSTRUCTIONS.md")?,
+            &stripped(root, "summary.md")?,
+            &stripped(root, "plan.md")?,
+            &stripped(root, "PROJECT_MAP.md")?,
+        );
+        let unreadable = self
+            .cached_log(root, clock)
+            .map_or(0, |cached| cached.log.skipped().len());
+        if let Some(notice) = unreadable_notice(unreadable) {
+            reply.push('\n');
+            reply.push_str(&notice);
+        }
+        Ok(reply)
     }
 
     fn precheck(&self, root: &Path, paths: &[String], clock: &Clock) -> Result<String, ToolError> {
@@ -284,15 +302,6 @@ fn stripped(root: &Path, name: &str) -> Result<String, ToolError> {
     Ok(memory_text(root, name)?
         .map(|text| python_strip(&text).to_owned())
         .unwrap_or_default())
-}
-
-fn start(root: &Path) -> Result<String, ToolError> {
-    Ok(session_start(
-        &stripped(root, "AI_INSTRUCTIONS.md")?,
-        &stripped(root, "summary.md")?,
-        &stripped(root, "plan.md")?,
-        &stripped(root, "PROJECT_MAP.md")?,
-    ))
 }
 
 fn issue_text(root: &Path, requested: &str) -> Result<String, ToolError> {

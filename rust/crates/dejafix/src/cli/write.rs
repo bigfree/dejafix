@@ -3,6 +3,7 @@ use std::io::{self, Write};
 use dejafix_core::{Command, OsIds, Outcome, Project, WiringError, WriteOutcome, record};
 
 use super::args::Commands;
+use super::output::report_unreadable;
 
 pub fn command(arguments: Commands) -> Option<Command> {
     Some(match arguments {
@@ -61,6 +62,7 @@ pub fn run(
     for notice in recorded.notices.iter().chain(&recorded.hints) {
         writeln!(err, "{notice}")?;
     }
+    report_unreadable(recorded.unreadable, err)?;
     match recorded.outcome {
         WriteOutcome::Logged(issue) => writeln!(out, "Logged issue #{}", issue.as_str())?,
         WriteOutcome::Attempted { outcome, issue } => writeln!(

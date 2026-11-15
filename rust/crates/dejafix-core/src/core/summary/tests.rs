@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use serde_json::{Value, json};
 
 use super::{
@@ -538,4 +540,58 @@ fn slugs_follow_python() {
         slugify_title(&"ab ".repeat(30)),
         "ab-ab-ab-ab-ab-ab-ab-ab-ab-ab-ab-ab-ab-ab-ab-ab"
     );
+}
+
+#[test]
+fn only_kept_issues_are_rendered_and_names_match_full_rendering() {
+    let events = Events::new()
+        .add("issue", "first bug", &json!({"issue_id": "0001"}))
+        .add("issue", "second bug", &json!({"issue_id": "0002"}))
+        .add("attempt", "tried a thing", &json!({"issue_id": "0002"}));
+    let text = events.text();
+    let log = EventLog::parse(text.as_bytes(), &fixed_clock(), &context(), &NoResolve);
+    let all = super::issue_files(&log);
+    let seen = std::cell::RefCell::new(Vec::new());
+    let kept = super::issue_files_where(&log, |id, name| {
+        seen.borrow_mut()
+            .push((id.to_owned(), name.map(str::to_owned)));
+        id == "0002"
+    });
+    assert_eq!(kept.len(), 1);
+    assert_eq!(kept.first().map(|file| file.issue), Some("0002"));
+    assert_eq!(
+        kept.first().map(|file| file.contents.as_str()),
+        all.get(1).map(|file| file.contents.as_str())
+    );
+    let expected: Vec<(String, Option<String>)> = all
+        .iter()
+        .map(|file| (file.issue.to_owned(), file.name.clone()))
+        .collect();
+    assert_eq!(seen.into_inner(), expected);
+}
+
+#[test]
+fn a_renamed_generated_file_is_recognised_and_nothing_else_is() {
+    let rendered: HashSet<String> =
+        ["0238-new-title.md".to_owned(), "0238-b-other.md".to_owned()].into();
+    let ids: HashSet<&str> = ["0238", "0238-b"].into();
+    let renamed = |name: &str, head: &str| {
+        super::is_renamed_issue_file(name, &rendered, &ids, || Some(head.to_owned()))
+    };
+    let unread =
+        |name: &str| super::is_renamed_issue_file(name, &rendered, &ids, || panic!("{name}"));
+    assert!(!unread("0238-new-title.md"));
+    assert!(!unread("0238-New-Title.md"));
+    assert!(!unread("0999-gone.md"));
+    assert!(!unread("notes.txt"));
+    assert!(!renamed("0238-old-title.md", "no header"));
+    assert!(renamed("0238-old-title.md", "# #0238 old title\n"));
+    assert!(renamed("0238-old-title.md", "# #0238 old title\r\n"));
+    assert!(!renamed("0238-new-title.md", "# #0238 new title\n"));
+    assert!(!renamed("0238-New-Title.md", "# #0238 new title\n"));
+    assert!(!renamed("0238-b-other.md", "# #0238-b other\n"));
+    assert!(!renamed("0238-notes.md", "my own notes\n"));
+    assert!(!renamed("0238-old-title.txt", "# #0238 old title\n"));
+    assert!(!renamed("0999-gone.md", "# #0999 gone\n"));
+    assert!(!renamed("0238-b-old.md", "# #0238 wrong id\n"));
 }

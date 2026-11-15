@@ -1,6 +1,8 @@
 use std::cmp::Ordering;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt::Write as _;
+use std::hash::BuildHasher;
+use std::path::Path;
 
 use super::types::{Group, IssueFile, Listed};
 use crate::core::event::{EventKind, IssueId, Outcome};
@@ -100,8 +102,20 @@ fn safe_file_stem(issue: &str) -> bool {
     !issue.contains(['/', '\\', '\0']) && (!cfg!(windows) || !issue.contains(':'))
 }
 
+fn file_name(issue: &str, title: &str) -> Option<String> {
+    safe_file_stem(issue).then(|| format!("{issue}-{}.md", slugify_title(title)))
+}
+
 #[must_use]
 pub fn issue_files<'l>(log: &'l EventLog<'_>) -> Vec<IssueFile<'l>> {
+    issue_files_where(log, |_, _| true)
+}
+
+#[must_use]
+pub fn issue_files_where<'l>(
+    log: &'l EventLog<'_>,
+    keep: impl Fn(&str, Option<&str>) -> bool,
+) -> Vec<IssueFile<'l>> {
     groups(log)
         .into_iter()
         .filter_map(|group| {
@@ -109,6 +123,10 @@ pub fn issue_files<'l>(log: &'l EventLog<'_>) -> Vec<IssueFile<'l>> {
                 .events
                 .iter()
                 .find(|event| event.kind == EventKind::Issue)?;
+            let name = file_name(group.id, issue.summary.as_str());
+            if !keep(group.id, name.as_deref()) {
+                return None;
+            }
             let mut contents = format!("# #{} {}\n\n", group.id, issue.summary.as_str());
             for event in &group.events {
                 let _ = write!(
@@ -130,8 +148,6 @@ pub fn issue_files<'l>(log: &'l EventLog<'_>) -> Vec<IssueFile<'l>> {
                 }
                 contents.push('\n');
             }
-            let name = safe_file_stem(group.id)
-                .then(|| format!("{}-{}.md", group.id, slugify_title(issue.summary.as_str())));
             Some(IssueFile {
                 issue: group.id,
                 name,
@@ -139,4 +155,35 @@ pub fn issue_files<'l>(log: &'l EventLog<'_>) -> Vec<IssueFile<'l>> {
             })
         })
         .collect()
+}
+
+#[must_use]
+pub fn is_renamed_issue_file<S: BuildHasher, T: BuildHasher>(
+    name: &str,
+    folded_rendered: &HashSet<String, S>,
+    ids: &HashSet<&str, T>,
+    head: impl FnOnce() -> Option<String>,
+) -> bool {
+    if Path::new(name)
+        .extension()
+        .is_none_or(|extension| extension != "md")
+        || folded_rendered.contains(&name.to_ascii_lowercase())
+    {
+        return false;
+    }
+    let Some(owner) = ids
+        .iter()
+        .filter(|id| {
+            name.strip_prefix(**id)
+                .is_some_and(|rest| rest.starts_with('-'))
+        })
+        .max_by_key(|id| id.len())
+    else {
+        return false;
+    };
+    head().is_some_and(|head| {
+        head.strip_prefix("# #")
+            .and_then(|rest| rest.strip_prefix(*owner))
+            .is_some_and(|rest| rest.starts_with(' '))
+    })
 }

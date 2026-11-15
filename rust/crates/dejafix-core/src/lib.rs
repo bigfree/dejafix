@@ -41,7 +41,7 @@ pub use crate::core::lessons::{
     LessonKind, Memory, Record, crc32, edited_paths, hook_output, is_skipped, main_checkout,
     marker_name, mention, python_json, records, session_key,
 };
-pub use crate::core::log::{EventLog, EventRefError, Skipped, skipped_lines};
+pub use crate::core::log::{EventLog, EventRefError, Skipped, skipped_lines, unreadable_notice};
 pub use crate::core::migrate::{
     BRIDGE_BLOCK, Block, HOOK_BLOCK, LEGACY_DIR, MigrateStep, convert_block, has_legacy_path,
     is_stale_config, rewrite_legacy_paths,
@@ -89,8 +89,8 @@ pub use crate::core::stale::{
 };
 pub use crate::core::summary::{
     IssueFile, RECORD_CHARS, SummaryInput, clip_record, extract_purpose_from_map,
-    extract_purpose_from_summary, issue_files, key_files, looks_like_placeholder, render_summary,
-    slugify_title,
+    extract_purpose_from_summary, is_renamed_issue_file, issue_files, issue_files_where, key_files,
+    looks_like_placeholder, render_summary, slugify_title,
 };
 pub use crate::core::text::{casefold, python_strip};
 pub use crate::core::time::{Clock, Timestamp, TimestampOverflow, iso_micros, normalize_timestamp};
@@ -102,11 +102,11 @@ pub use crate::core::write::{
 pub use crate::wiring::{
     BridgeOutcome, CaptureOutcome, CorruptLog, DoctorOptions, DoctorReport, EditHookRun,
     FoundProject, HooksAction, HooksOutcome, HooksReport, InitHooks, InitOptions, InitReport,
-    ListedProject, MemoryFile, PrecheckOutcome, PrecheckRequest, Project, Recorded, RegistryOp,
-    RegistryReply, ScanReport, SearchOutput, Settings, UpgradeNotice, WiringError, add_gotcha,
-    add_plan_idea, auto_capture, brief, doctor, edit_hook, global, hooks_action, init_project,
-    other_projects, precheck, read_memory_file, record, regenerate, register_project, registry_op,
-    scan_projects, search_project, show, upgrade_notice,
+    IssueScope, ListedProject, MemoryFile, PrecheckOutcome, PrecheckRequest, Project, Recorded,
+    Regenerated, RegistryOp, RegistryReply, ScanReport, SearchOutput, Searched, Settings,
+    UpgradeNotice, WiringError, add_gotcha, add_plan_idea, auto_capture, brief, doctor, edit_hook,
+    global, hooks_action, init_project, other_projects, precheck, read_memory_file, record,
+    regenerate, register_project, registry_op, scan_projects, search_project, show, upgrade_notice,
 };
 pub use crate::wiring::{CachedLog, McpSettings, McpState, ToolCall, ToolReply, WriteCall};
 pub use crate::wiring::{

@@ -1,4 +1,4 @@
-use super::types::{Project, SearchOutput, WiringError};
+use super::types::{Project, SearchOutput, Searched, WiringError};
 use crate::adapters::fs::{FsResolver, read_events_file, read_text_inside};
 use crate::core::log::EventLog;
 use crate::core::search::{
@@ -12,10 +12,7 @@ pub fn show(project: &Project) -> Result<String, WiringError> {
     )?)
 }
 
-pub fn search_project(
-    project: &Project,
-    query: &SearchQuery<'_>,
-) -> Result<SearchOutput, WiringError> {
+pub fn search_project(project: &Project, query: &SearchQuery<'_>) -> Result<Searched, WiringError> {
     let bytes = read_events_file(&project.memory.dir)?;
     let log = EventLog::parse(
         &bytes,
@@ -28,13 +25,18 @@ pub fn search_project(
     } else {
         search(&log, query)
     };
-    if found.is_empty() {
-        return Ok(SearchOutput::Nothing(no_match_message(query)));
-    }
-    Ok(SearchOutput::Matches(
-        found
-            .into_iter()
-            .map(|event| match_line(event, log.is_retired(&event.id)))
-            .collect(),
-    ))
+    let output = if found.is_empty() {
+        SearchOutput::Nothing(no_match_message(query))
+    } else {
+        SearchOutput::Matches(
+            found
+                .into_iter()
+                .map(|event| match_line(event, log.is_retired(&event.id)))
+                .collect(),
+        )
+    };
+    Ok(Searched {
+        output,
+        unreadable: log.skipped().len(),
+    })
 }

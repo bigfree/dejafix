@@ -5,6 +5,7 @@ mod query;
 mod types;
 
 pub use build::skipped_lines;
+pub use query::unreadable_notice;
 pub use types::{EventLog, EventRefError, Skipped};
 
 #[cfg(test)]

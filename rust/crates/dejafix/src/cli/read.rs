@@ -2,9 +2,11 @@ use std::io::{self, Write};
 use std::path::Path;
 
 use dejafix_core::{
-    MemoryFile, Project, SearchOutput, SearchQuery, WiringError, add_plan_idea, read_memory_file,
-    regenerate, search_project, show,
+    MemoryFile, Project, SearchOutput, SearchQuery, Searched, WiringError, add_plan_idea,
+    read_memory_file, regenerate, search_project, show,
 };
+
+use super::output::{printable_text, report_unreadable};
 
 pub fn show_summary(
     project: &Project,
@@ -20,27 +22,40 @@ pub fn search(
     project: &Project,
     query: &SearchQuery<'_>,
     out: &mut impl Write,
+    err: &mut impl Write,
 ) -> Result<Result<(), WiringError>, io::Error> {
-    match search_project(project, query) {
-        Ok(SearchOutput::Matches(lines)) => {
+    let Searched { output, unreadable } = match search_project(project, query) {
+        Ok(searched) => searched,
+        Err(error) => return Ok(Err(error)),
+    };
+    match output {
+        SearchOutput::Matches(lines) => {
             for line in lines {
                 writeln!(out, "{line}")?;
             }
-            Ok(Ok(()))
         }
-        Ok(SearchOutput::Nothing(message)) => writeln!(out, "{message}").map(Ok),
-        Err(error) => Ok(Err(error)),
+        SearchOutput::Nothing(message) => writeln!(out, "{message}")?,
     }
+    report_unreadable(unreadable, err).map(Ok)
 }
 
 pub fn rebuild(
     project: &Project,
     out: &mut impl Write,
+    err: &mut impl Write,
 ) -> Result<Result<(), WiringError>, io::Error> {
-    match regenerate(project) {
-        Ok(path) => writeln!(out, "Regenerated {}", path.display()).map(Ok),
-        Err(error) => Ok(Err(error)),
+    let report = match regenerate(project) {
+        Ok(report) => report,
+        Err(error) => return Ok(Err(error)),
+    };
+    writeln!(out, "Regenerated {}", report.path.display())?;
+    if report.removed > 0 {
+        writeln!(out, "Removed {} renamed issue file(s).", report.removed)?;
     }
+    for line in &report.not_removed {
+        writeln!(err, "{}", printable_text(line))?;
+    }
+    report_unreadable(report.unreadable, err).map(Ok)
 }
 
 pub fn memory_file(

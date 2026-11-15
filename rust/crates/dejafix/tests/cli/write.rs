@@ -481,3 +481,25 @@ fn init_snooze_and_auto_capture_never_write_into_an_outside_memory_folder() -> T
     assert_eq!(names, ["config.toml"]);
     Ok(())
 }
+
+#[test]
+fn a_write_reports_unreadable_log_lines_on_stderr() -> TestResult {
+    let repo = Repo::new()?;
+    let notice = "dejafix: 1 line(s) of events.jsonl could not be read; run djf doctor";
+    let clean = repo.djf(&["note", "the cache needs a warm-up"]).output()?;
+    assert!(!String::from_utf8_lossy(&clean.stderr).contains(notice));
+    let log = repo.mem().join("events.jsonl");
+    let mut text = fs::read_to_string(&log)?;
+    text.push_str("not json\n");
+    fs::write(&log, text)?;
+    let noted = repo.djf(&["note", "the cache stays warm"]).output()?;
+    assert!(noted.status.success());
+    assert!(String::from_utf8_lossy(&noted.stderr).contains(notice));
+    let searched = repo.djf(&["search", "cache"]).output()?;
+    assert!(searched.status.success());
+    assert!(String::from_utf8_lossy(&searched.stderr).contains(notice));
+    let rebuilt = repo.djf(&["regenerate"]).output()?;
+    assert!(rebuilt.status.success());
+    assert!(String::from_utf8_lossy(&rebuilt.stderr).contains(notice));
+    Ok(())
+}

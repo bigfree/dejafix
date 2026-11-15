@@ -210,8 +210,9 @@ fn dispatch(
                 failed_only,
             },
             out,
+            err,
         ),
-        Commands::Regenerate => read::rebuild(&project, out),
+        Commands::Regenerate => read::rebuild(&project, out, err),
         other => match write::command(other) {
             Some(command) => write::run(&project, command, out, err),
             None => Ok(Ok(())),

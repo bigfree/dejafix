@@ -1,7 +1,5 @@
-use std::path::PathBuf;
-
 use super::project::regenerate_locked;
-use super::types::{Project, Recorded, WiringError};
+use super::types::{IssueScope, Project, Recorded, Regenerated, WiringError};
 use crate::adapters::fs::{
     FsResolver, LockedLog, StoreError, clear_marker, detect_stack, lock_events, read_marker,
     write_marker,
@@ -37,6 +35,7 @@ pub(crate) fn record_with(
         &project.context,
         &FsResolver,
     );
+    let unreadable = log.skipped().len();
     let command = command(&log)?;
     let hints: Vec<String> = language_notice(&command)?
         .map(str::to_owned)
@@ -80,6 +79,7 @@ pub(crate) fn record_with(
         notices: plan.notices,
         hints,
         incomplete,
+        unreadable,
     })
 }
 
@@ -102,6 +102,14 @@ pub(super) fn commit_events<'a>(
             })?;
     }
     locked.append(&lines)?;
+    let touched: Vec<String> = if regenerate {
+        events
+            .iter()
+            .filter_map(|event| event.issue.as_ref().map(|issue| issue.as_str().to_owned()))
+            .collect()
+    } else {
+        Vec::new()
+    };
     match marker {
         None | Some(MarkerChange::Keep) => {}
         Some(MarkerChange::Set(issue)) => write_marker(dir, issue.as_str()),
@@ -111,7 +119,7 @@ pub(super) fn commit_events<'a>(
         log.push(event, &project.context, &FsResolver);
     }
     Ok(if regenerate {
-        regenerate_locked(project, log).err()
+        regenerate_locked(project, log, &IssueScope::Touched(touched)).err()
     } else {
         None
     })
@@ -127,7 +135,7 @@ fn hint(project: &Project, event: &Event<'_>) -> Option<String> {
     global_hint(summary, candidate, &stack.libraries)
 }
 
-pub fn regenerate(project: &Project) -> Result<PathBuf, WiringError> {
+pub fn regenerate(project: &Project) -> Result<Regenerated, WiringError> {
     let (locked, bytes) = lock_events(&project.memory.dir)?;
     let log = EventLog::parse(
         &bytes,
@@ -135,7 +143,7 @@ pub fn regenerate(project: &Project) -> Result<PathBuf, WiringError> {
         &project.context,
         &FsResolver,
     );
-    let path = regenerate_locked(project, &log)?;
+    let report = regenerate_locked(project, &log, &IssueScope::All)?;
     drop(locked);
-    Ok(path)
+    Ok(report)
 }

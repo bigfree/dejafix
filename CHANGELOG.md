@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- **`djf regenerate` removes issue files left behind by a renamed issue.** An issue file is named after the issue's title, so rewriting the log, for example with `djf migrate`, used to leave the old file next to the new one. `djf regenerate` now removes a file in `.dejafix/issues/` only when it is a regular `.md` file that starts with an issue id and that issue's generated header, and when that issue is now written under another name. It prints `Removed <n> renamed issue file(s).` Hand-written notes, symlinks and folders are kept. A file that cannot be removed is reported, and the command still succeeds.
+- **Unreadable log lines are reported.** When `events.jsonl` has lines dejafix cannot read, the write commands (`log`, `attempt`, `fix`, `decision`, `note`), `djf regenerate` and `djf search` print `dejafix: <n> line(s) of events.jsonl could not be read; run djf doctor` on stderr. `start_session` and the MCP write tools end their reply with the same line. Exit codes do not change.
+
+### Changed
+
+- **Writes rewrite only the issue files they touch.** A write renders the files of the issues its events belong to, plus any issue file that is missing. `summary.md` is still rebuilt on every write. A hand-edited file of another issue is restored by `djf regenerate`, not by the next write. At 3 000 events, one `djf note` takes about 18 ms instead of 29 ms.
+- **`djf init` leaves `.gitignore` alone when git already ignores `.dejafix/`**, for example through `.git/info/exclude` or your global excludes file. In that case `.gitignore` is neither changed nor created, so dejafix can stay private to one clone. The instructions refresh in `djf migrate` follows the same rule.
+- **`djf migrate` also updates `.git/info/exclude`**, rewriting `.projectmem` entries to `.dejafix`, so a checkout that was private before the rename stays private.
+
 ## 1.0.0-rc.3
 
 **Third release candidate of the Rust rewrite.** Project memory and global memory share one ranked search. Global memory is written only on purpose, and every write is checked before it is stored. Memory is kept in English.

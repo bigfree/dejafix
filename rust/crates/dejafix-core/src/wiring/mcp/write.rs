@@ -1,5 +1,6 @@
 use super::types::{McpState, ToolError, WriteCall};
 use crate::core::event::Outcome;
+use crate::core::log::unreadable_notice;
 use crate::core::time::Clock;
 use crate::core::write::{Command, Ids, WriteOutcome, sole_open_issue};
 use crate::wiring::record::record_with;
@@ -96,7 +97,12 @@ impl McpState {
             }
             WriteOutcome::Noted => format!("Recorded note {last} → {name}"),
         };
-        for notice in &recorded.hints {
+        for notice in recorded
+            .hints
+            .iter()
+            .map(String::as_str)
+            .chain(unreadable_notice(recorded.unreadable).as_deref())
+        {
             reply.push('\n');
             reply.push_str(notice);
         }

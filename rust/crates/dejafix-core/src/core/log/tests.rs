@@ -359,3 +359,12 @@ fn an_owned_event_keeps_unknown_fields() {
     assert!(line.contains(r#""zeta": {"a": [1, 2.5]}"#), "{line}");
     assert!(line.contains(r#""alpha": null"#), "{line}");
 }
+
+#[test]
+fn the_unreadable_notice_names_the_count_and_is_absent_for_a_clean_log() {
+    assert_eq!(super::unreadable_notice(0), None);
+    assert_eq!(
+        super::unreadable_notice(2).as_deref(),
+        Some("dejafix: 2 line(s) of events.jsonl could not be read; run djf doctor")
+    );
+}

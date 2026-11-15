@@ -195,7 +195,7 @@ fn regenerate_writes_each_issue_file_once() {
     let home = tempfile::tempdir().unwrap();
     write_project(dir.path(), 300, FIXTURE_SEED).unwrap();
     let project = Project::open(dir.path(), settings(home.path())).unwrap();
-    let path = regenerate(&project).unwrap();
+    let path = regenerate(&project).unwrap().path;
     assert_eq!(path, dir.path().join(".dejafix/summary.md"));
     let issues = dir.path().join(".dejafix/issues");
     let first: Vec<_> = fs::read_dir(&issues)
@@ -244,7 +244,7 @@ fn search_reports_matches_or_the_python_message() {
         failed_only: false,
     };
     assert_eq!(
-        search_project(&project, &query).unwrap(),
+        search_project(&project, &query).unwrap().output,
         SearchOutput::Matches(vec![
             "2027-01-15T08:00:00Z [evt_00000000000000000001] note: startup is slow".into()
         ])
@@ -255,14 +255,14 @@ fn search_reports_matches_or_the_python_message() {
         failed_only: false,
     };
     assert!(
-        matches!(search_project(&project, &query).unwrap(), SearchOutput::Nothing(message) if message.contains("--regex"))
+        matches!(search_project(&project, &query).unwrap().output, SearchOutput::Nothing(message) if message.contains("--regex"))
     );
     let ranked = SearchQuery {
         mode: SearchMode::Ranked,
         ..query
     };
     assert!(
-        matches!(search_project(&project, &ranked).unwrap(), SearchOutput::Nothing(message) if message.contains("--exact"))
+        matches!(search_project(&project, &ranked).unwrap().output, SearchOutput::Nothing(message) if message.contains("--exact"))
     );
 }
 
@@ -302,6 +302,11 @@ fn a_symlinked_issues_directory_is_never_written_through() {
     assert!(recorded.incomplete.is_none());
     assert_eq!(fs::read_dir(outside.path()).unwrap().count(), 0);
     assert!(show(&project).unwrap().contains("#0001 review"));
+    let stale = outside.path().join("0001-old-title.md");
+    fs::write(&stale, "# #0001 old title\n").unwrap();
+    let report = regenerate(&project).unwrap();
+    assert_eq!(report.removed, 0);
+    assert!(stale.exists());
 }
 
 fn options() -> InitOptions {
@@ -996,4 +1001,144 @@ fn summary_regeneration_never_copies_an_outside_map_or_summary() {
         read(&leak),
         "# Map\n\n## Project purpose\n\nLEAKED-PURPOSE\n"
     );
+}
+
+fn issue_names(issues: &Path) -> Vec<String> {
+    let mut names: Vec<String> = fs::read_dir(issues)
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().into_string().unwrap())
+        .collect();
+    names.sort();
+    names
+}
+
+#[test]
+fn regenerate_removes_renamed_issue_files_and_keeps_everything_else() {
+    let dir = tempfile::tempdir().unwrap();
+    let home = tempfile::tempdir().unwrap();
+    write_project(dir.path(), 300, FIXTURE_SEED).unwrap();
+    let project = Project::open(dir.path(), settings(home.path())).unwrap();
+    regenerate(&project).unwrap();
+    let issues = dir.path().join(".dejafix/issues");
+    let current = issue_names(&issues).into_iter().next().unwrap();
+    let id = current.split('-').next().unwrap().to_owned();
+    let stale = issues.join(format!("{id}-old-title.md"));
+    fs::write(&stale, format!("# #{id} old title\r\nolder text\r\n")).unwrap();
+    let note = issues.join(format!("{id}-my-notes.md"));
+    fs::write(&note, "my own notes\n").unwrap();
+    let other = issues.join("9999-old-title.md");
+    fs::write(&other, "# #9999 old title\n").unwrap();
+    fs::create_dir(issues.join(format!("{id}-folder.md"))).unwrap();
+    let outside = tempfile::tempdir().unwrap();
+    let target = outside.path().join("target.md");
+    fs::write(&target, format!("# #{id} linked\n")).unwrap();
+    #[cfg(unix)]
+    std::os::unix::fs::symlink(&target, issues.join(format!("{id}-link.md"))).unwrap();
+    let report = regenerate(&project).unwrap();
+    assert_eq!(report.removed, 1);
+    assert!(target.exists());
+    #[cfg(unix)]
+    assert!(issues.join(format!("{id}-link.md")).is_symlink());
+    assert_eq!(report.not_removed, Vec::<String>::new());
+    assert!(!stale.exists());
+    assert!(note.exists());
+    assert!(other.exists());
+    assert!(issues.join(&current).exists());
+    assert!(issues.join(format!("{id}-folder.md")).is_dir());
+}
+
+#[cfg(unix)]
+#[test]
+fn a_renamed_issue_file_that_cannot_be_removed_is_reported_and_the_run_succeeds() {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = tempfile::tempdir().unwrap();
+    let home = tempfile::tempdir().unwrap();
+    write_project(dir.path(), 300, FIXTURE_SEED).unwrap();
+    let project = Project::open(dir.path(), settings(home.path())).unwrap();
+    regenerate(&project).unwrap();
+    let issues = dir.path().join(".dejafix/issues");
+    let current = issue_names(&issues).into_iter().next().unwrap();
+    let id = current.split('-').next().unwrap().to_owned();
+    let stale = issues.join(format!("{id}-old-title.md"));
+    fs::write(&stale, format!("# #{id} old title\n")).unwrap();
+    fs::set_permissions(&issues, fs::Permissions::from_mode(0o555)).unwrap();
+    if fs::write(issues.join("probe"), "").is_ok() {
+        fs::set_permissions(&issues, fs::Permissions::from_mode(0o755)).unwrap();
+        return;
+    }
+    let report = regenerate(&project);
+    fs::set_permissions(&issues, fs::Permissions::from_mode(0o755)).unwrap();
+    let report = report.unwrap();
+    assert_eq!(report.removed, 0);
+    assert_eq!(report.not_removed.len(), 1);
+    assert!(
+        report
+            .not_removed
+            .first()
+            .unwrap()
+            .starts_with(&format!("Could not remove {id}-old-title.md: "))
+    );
+    assert!(stale.exists());
+}
+
+#[test]
+fn a_write_rewrites_only_the_touched_issue_file_and_restores_missing_ones() {
+    let dir = tempfile::tempdir().unwrap();
+    let home = tempfile::tempdir().unwrap();
+    write_project(dir.path(), 300, FIXTURE_SEED).unwrap();
+    let project = Project::open(dir.path(), settings(home.path())).unwrap();
+    regenerate(&project).unwrap();
+    let issues = dir.path().join(".dejafix/issues");
+    let names = issue_names(&issues);
+    let edited = issues.join(names.first().unwrap());
+    fs::write(&edited, "hand edit\n").unwrap();
+    let missing = issues.join(names.last().unwrap());
+    fs::remove_file(&missing).unwrap();
+    let untouched = issues.join(names.get(1).unwrap());
+    let modified = fs::metadata(&untouched).unwrap().modified().unwrap();
+    std::thread::sleep(std::time::Duration::from_millis(20));
+    record(&project, note("unrelated note"), &mut SeqIds::default()).unwrap();
+    assert_eq!(read(&edited), "hand edit\n");
+    assert!(missing.exists());
+    assert_eq!(
+        fs::metadata(&untouched).unwrap().modified().unwrap(),
+        modified
+    );
+    regenerate(&project).unwrap();
+    assert_ne!(read(&edited), "hand edit\n");
+}
+
+#[test]
+fn a_fix_rewrites_the_file_of_the_issue_it_closes() {
+    let dir = tempfile::tempdir().unwrap();
+    let home = tempfile::tempdir().unwrap();
+    empty_project(dir.path());
+    let project = Project::open(dir.path(), settings(home.path())).unwrap();
+    let mut ids = SeqIds::default();
+    for text in ["first bug", "second bug"] {
+        record(
+            &project,
+            Command::Log {
+                text: text.into(),
+                location: None,
+            },
+            &mut ids,
+        )
+        .unwrap();
+    }
+    let issues = dir.path().join(".dejafix/issues");
+    let first = issues.join("0001-first-bug.md");
+    fs::write(&first, "hand edit\n").unwrap();
+    record(
+        &project,
+        Command::Fix {
+            text: "guarded the input".into(),
+            location: None,
+            issue: Some("0002".into()),
+        },
+        &mut ids,
+    )
+    .unwrap();
+    assert!(read(issues.join("0002-second-bug.md")).contains("`fix`: guarded the input"));
+    assert_eq!(read(&first), "hand edit\n");
 }

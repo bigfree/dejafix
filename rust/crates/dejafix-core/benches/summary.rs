@@ -1,11 +1,12 @@
+use std::fs;
 use std::hint::black_box;
 use std::time::Instant;
 
-use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
-use dejafix_core::testing::{FIXTURE_SEED, write_project};
+use criterion::{BatchSize, BenchmarkId, Criterion, criterion_group, criterion_main};
+use dejafix_core::testing::{FIXTURE_SEED, SeqIds, write_project};
 use dejafix_core::{
-    Clock, EventLog, FsResolver, Project, Settings, SummaryInput, path_context, read_events_file,
-    regenerate, render_summary,
+    Clock, Command, EventLog, FsResolver, Project, Settings, SummaryInput, path_context,
+    read_events_file, record, regenerate, render_summary,
 };
 use jiff::tz::TimeZone;
 
@@ -58,6 +59,31 @@ fn summary(criterion: &mut Criterion) {
                 .len()
             });
         });
+        if size == 3_000 {
+            let events = dir.path().join(".dejafix/events.jsonl");
+            let mut ids = SeqIds::default();
+            group.bench_with_input(
+                BenchmarkId::new("note", size),
+                &project,
+                |bencher, project| {
+                    bencher.iter_batched(
+                        || fs::write(&events, &bytes).expect("fixture log reset"),
+                        |()| {
+                            record(
+                                black_box(project),
+                                Command::Note {
+                                    text: "the cache needs a warm-up".to_owned(),
+                                    location: None,
+                                },
+                                &mut ids,
+                            )
+                            .expect("note")
+                        },
+                        BatchSize::PerIteration,
+                    );
+                },
+            );
+        }
     }
     group.finish();
 }

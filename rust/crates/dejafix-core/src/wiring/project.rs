@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::fs;
 use std::num::NonZeroUsize;
 use std::path::{Path, PathBuf};
@@ -5,19 +6,20 @@ use std::thread;
 
 use jiff::tz::TimeZone;
 
-use super::types::{Project, Settings, WiringError};
+use super::types::{IssueScope, Project, Regenerated, Settings, WiringError};
 use crate::adapters::fs::{
-    MemoryDir, StoreError, find_memory_dir, issues_dir, path_context, project_name,
-    read_text_within, write_text, write_text_if_changed,
+    MemoryDir, StoreError, file_head, find_memory_dir, issues_dir, path_context, project_name,
+    read_text_within, regular_file_names, remove_if_present, write_text, write_text_if_changed,
 };
 use crate::core::log::EventLog;
 use crate::core::summary::{
-    SummaryInput, extract_purpose_from_map, extract_purpose_from_summary, issue_files,
-    render_summary,
+    IssueFile, SummaryInput, extract_purpose_from_map, extract_purpose_from_summary,
+    is_renamed_issue_file, issue_files_where, render_summary,
 };
 
 const SUMMARY_FILE: &str = "summary.md";
 const PROJECT_MAP_FILE: &str = "PROJECT_MAP.md";
+const HEAD_LIMIT: usize = 256;
 
 impl Project {
     pub fn open(cwd: &Path, settings: Settings) -> Result<Self, WiringError> {
@@ -54,7 +56,8 @@ impl Project {
 pub(super) fn regenerate_locked(
     project: &Project,
     log: &EventLog<'_>,
-) -> Result<PathBuf, WiringError> {
+    scope: &IssueScope,
+) -> Result<Regenerated, WiringError> {
     let root = &project.memory.root;
     let map = read_text_within(&project.memory.dir.join(PROJECT_MAP_FILE), root)
         .ok()
@@ -76,23 +79,74 @@ pub(super) fn regenerate_locked(
         },
     );
     write_text(&path, &summary)?;
+    let mut report = Regenerated {
+        path,
+        removed: 0,
+        not_removed: Vec::new(),
+        unreadable: log.skipped().len(),
+    };
     let directory = issues_dir(&project.memory);
     if fs::symlink_metadata(&directory).is_ok_and(|metadata| metadata.file_type().is_symlink()) {
-        return Ok(path);
+        return Ok(report);
     }
     fs::create_dir_all(&directory).map_err(|source| StoreError::Write {
         path: directory.clone(),
         source,
     })?;
-    let files: Vec<(PathBuf, String)> = issue_files(log)
-        .into_iter()
-        .filter_map(|file| Some((directory.join(file.name?), file.contents)))
+    let present = regular_file_names(&directory)?;
+    let rendered = match scope {
+        IssueScope::All => issue_files_where(log, |_, name| name.is_some()),
+        IssueScope::Touched(touched) => {
+            let listed: HashSet<&str> = present.iter().map(String::as_str).collect();
+            issue_files_where(log, |id, name| {
+                name.is_some_and(|name| {
+                    !listed.contains(name) || touched.iter().any(|issue| issue == id)
+                })
+            })
+        }
+    };
+    let files: Vec<(PathBuf, &str)> = rendered
+        .iter()
+        .filter_map(|file| {
+            Some((
+                directory.join(file.name.as_deref()?),
+                file.contents.as_str(),
+            ))
+        })
         .collect();
     write_issue_files(&files)?;
-    Ok(path)
+    if *scope == IssueScope::All {
+        remove_renamed(&directory, &rendered, &present, &mut report);
+    }
+    Ok(report)
 }
 
-fn write_issue_files(files: &[(PathBuf, String)]) -> Result<(), StoreError> {
+fn remove_renamed(
+    directory: &Path,
+    files: &[IssueFile<'_>],
+    present: &[String],
+    report: &mut Regenerated,
+) {
+    let folded: HashSet<String> = files
+        .iter()
+        .filter_map(|file| file.name.as_deref().map(str::to_ascii_lowercase))
+        .collect();
+    let ids: HashSet<&str> = files.iter().map(|file| file.issue).collect();
+    for name in present {
+        let path = directory.join(name);
+        if !is_renamed_issue_file(name, &folded, &ids, || file_head(&path, HEAD_LIMIT)) {
+            continue;
+        }
+        match remove_if_present(&path) {
+            Ok(()) => report.removed += 1,
+            Err(error) => report
+                .not_removed
+                .push(format!("Could not remove {name}: {error}")),
+        }
+    }
+}
+
+fn write_issue_files(files: &[(PathBuf, &str)]) -> Result<(), StoreError> {
     let workers = thread::available_parallelism()
         .map_or(1, NonZeroUsize::get)
         .min(8);

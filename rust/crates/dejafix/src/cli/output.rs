@@ -3,7 +3,7 @@ use std::fmt::Write as _;
 use std::io::{self, Write};
 use std::path::Path;
 
-use dejafix_core::WiringError;
+use dejafix_core::{WiringError, unreadable_notice};
 
 use super::types::{Outcome, Style};
 
@@ -91,4 +91,11 @@ pub fn json_escaped(text: &str) -> String {
         }
     }
     escaped
+}
+
+pub fn report_unreadable(count: usize, err: &mut impl Write) -> io::Result<()> {
+    match unreadable_notice(count) {
+        Some(notice) => writeln!(err, "{notice}"),
+        None => Ok(()),
+    }
 }
