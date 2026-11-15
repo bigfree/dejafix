@@ -207,13 +207,19 @@ pub fn scan_projects(
     let files = RegistryFiles::new(&settings.dejafix_home);
     let now = now_text(settings);
     let mut registry = files.load(&now)?;
+    let known_ids: HashSet<_> = registry
+        .projects
+        .iter()
+        .filter_map(|record| identity(&record.path))
+        .collect();
     let found: Vec<FoundProject> = projects
         .into_iter()
         .map(|path| FoundProject {
-            known: registry
-                .projects
-                .iter()
-                .any(|record| same_path(&record.path, &path)),
+            known: identity(&path).is_some_and(|key| known_ids.contains(&key))
+                || registry
+                    .projects
+                    .iter()
+                    .any(|record| same_path(&record.path, &path)),
             path,
         })
         .collect();

@@ -888,6 +888,29 @@ fn scan_registers_fresh_projects_once() {
     );
 }
 
+#[cfg(unix)]
+#[test]
+fn scan_knows_a_folder_registered_under_another_spelling() {
+    let machine = machine();
+    let work = machine.root.join("work");
+    empty_project(&work.join("one"));
+    let alias = machine.root.join("alias");
+    std::os::unix::fs::symlink(&work, &alias).unwrap();
+    let spelled = alias.join("one");
+    fs::create_dir_all(&machine.settings.dejafix_home).unwrap();
+    fs::write(
+        machine.settings.dejafix_home.join("projects.json"),
+        serde_json::json!([spelled.display().to_string()]).to_string(),
+    )
+    .unwrap();
+    let paths = [work.display().to_string()];
+    let report = scan_projects(&machine.settings, &machine.root, None, &paths, 4, false).unwrap();
+    assert!(
+        matches!(report, ScanReport::Scanned { found, .. } if found.len() == 1 && found.iter().all(|project| project.known))
+    );
+    assert_eq!(registered(&machine), [spelled]);
+}
+
 #[test]
 fn scan_refuses_a_root_that_is_not_a_directory() {
     let machine = machine();
