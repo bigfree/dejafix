@@ -763,3 +763,22 @@ fn hooks_under_core_hooks_path_are_reported_not_written() {
             if *path == machine.root.join(".husky/_") && snippets.len() == 3
     )));
 }
+
+#[test]
+fn rewritten_files_keep_their_line_endings() {
+    let machine = legacy();
+    let memory = machine.root.join(".projectmem");
+    fs::write(
+        memory.join("events.jsonl"),
+        "{\"location\": \".projectmem/a.md\"}\r\n{\"location\": \".projectmem/b.md\"}\r\n",
+    )
+    .unwrap();
+    machine.apply();
+    assert_eq!(
+        fs::read(machine.root.join(".dejafix/events.jsonl")).unwrap(),
+        b"{\"location\": \".dejafix/a.md\"}\r\n{\"location\": \".dejafix/b.md\"}\r\n"
+    );
+    assert!(
+        read(&machine.root.join(".gitignore")).contains("node_modules/\n.dejafix/events.jsonl\n")
+    );
+}

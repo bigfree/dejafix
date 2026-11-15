@@ -199,7 +199,16 @@ fn convert_file(path: &Path, root: &Path, block: &Block) -> Result<(), StoreErro
 }
 
 fn rewrite_paths(path: &Path, root: &Path) -> Result<(), StoreError> {
-    match read_inside(path, root).and_then(|text| rewrite_legacy_paths(&text)) {
+    if points_outside(path, root) {
+        return Ok(());
+    }
+    let Some(text) = fs::read(path)
+        .ok()
+        .and_then(|bytes| String::from_utf8(bytes).ok())
+    else {
+        return Ok(());
+    };
+    match rewrite_legacy_paths(&text) {
         Some(updated) => write_atomic(path, updated.as_bytes()),
         None => Ok(()),
     }
