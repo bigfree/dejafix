@@ -161,7 +161,7 @@ pub fn list_payload(registry: &Registry) -> Value {
 }
 
 #[must_use]
-pub fn meta_payload(registry: &Registry) -> Value {
+pub fn meta_payload(registry: &Registry, existing: &Map<String, Value>) -> Value {
     let mut by_path = Map::new();
     for record in &registry.projects {
         by_path.insert(
@@ -176,9 +176,14 @@ pub fn meta_payload(registry: &Registry) -> Value {
             }),
         );
     }
-    json!({
-        "schema_version": SCHEMA_VERSION,
-        "active_project": registry.active_project,
-        "by_path": by_path,
-    })
+    let mut meta = Map::new();
+    meta.insert("schema_version".to_owned(), json!(SCHEMA_VERSION));
+    meta.insert("active_project".to_owned(), json!(registry.active_project));
+    meta.insert("by_path".to_owned(), Value::Object(by_path));
+    for (key, value) in existing {
+        if !meta.contains_key(key) {
+            meta.insert(key.clone(), value.clone());
+        }
+    }
+    Value::Object(meta)
 }

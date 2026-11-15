@@ -951,3 +951,12 @@ fn file_head_reads_at_most_the_limit_and_removal_tolerates_a_missing_file() {
     assert!(!path.exists());
     super::remove_if_present(&path).unwrap();
 }
+
+#[test]
+fn saving_the_registry_keeps_the_version_stamp() {
+    let (_dir, files) = registry_home();
+    files.record_version("1.0.0rc3");
+    let registry = files.load("2026-11-15T00:00:00Z").unwrap();
+    files.save(&registry).unwrap();
+    assert_eq!(files.seen_version(), Some(serde_json::json!("1.0.0rc3")));
+}

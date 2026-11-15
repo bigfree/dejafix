@@ -82,7 +82,7 @@ impl RegistryFiles {
 
     pub fn save(&self, registry: &Registry) -> Result<(), StoreError> {
         write_json_atomic(&self.list, &list_payload(registry))?;
-        write_json_atomic(&self.meta, &meta_payload(registry))
+        write_json_atomic(&self.meta, &meta_payload(registry, &self.read_meta()))
     }
 
     fn backup_once(&self) {
