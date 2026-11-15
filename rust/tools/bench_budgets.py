@@ -10,6 +10,7 @@ BUDGETS = [
     ("mcp/precheck_file_warm_cited_3000", 5 * MS, "precheck_file warm, cited file"),
     ("mcp/precheck_file_warm_uncited_3000", 5 * MS, "precheck_file warm, uncited file"),
     ("summary/regenerate/3000", 30 * MS, "summary.md regeneration, 3 000 events"),
+    ("summary/note/3000", 20 * MS, "djf note, one write, 3 000 events"),
     ("mcp/global_query_warm_500", 1 * MS, "global_query warm, 500 records"),
     ("mcp/global_query_cold_500", 5 * MS, "global_query cold, 500 records"),
     ("mcp/search_events_warm_3000", 5 * MS, "search_events warm, 3 000 events"),

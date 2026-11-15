@@ -58,6 +58,26 @@ fn summary(criterion: &mut Criterion) {
                 .len()
             });
         });
+        if size == 3_000 {
+            let mut ids = dejafix_core::testing::SeqIds::default();
+            group.bench_with_input(
+                BenchmarkId::new("note", size),
+                &project,
+                |bencher, project| {
+                    bencher.iter(|| {
+                        dejafix_core::record(
+                            black_box(project),
+                            dejafix_core::Command::Note {
+                                text: "the cache needs a warm-up".to_owned(),
+                                location: None,
+                            },
+                            &mut ids,
+                        )
+                        .expect("note")
+                    });
+                },
+            );
+        }
     }
     group.finish();
 }
