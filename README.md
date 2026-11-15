@@ -145,6 +145,11 @@ To log every hook call, set `DJF_EDIT_HOOK_LOG=/path/to/calls.jsonl`.
 
 Run `djf <command> --help` for options.
 
+Each write rebuilds `summary.md` and the issue files it touched.
+`djf regenerate` rebuilds all of them and removes issue files left behind by an
+issue whose title changed. When `events.jsonl` has lines that cannot be read,
+dejafix says how many and points to `djf doctor`.
+
 ## Privacy
 
 Everything stays on your machine: there is no cloud service and no telemetry.
