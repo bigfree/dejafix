@@ -1,0 +1,90 @@
+name: Bug report
+description: Something in dejafix does not work as documented.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a problem. Please search the
+        [existing issues](https://github.com/bigfree/dejafix/issues) first.
+        Report security vulnerabilities privately, as described in
+        [SECURITY.md](https://github.com/bigfree/dejafix/blob/main/SECURITY.md).
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened
+      description: A short description of the problem.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: The smallest set of commands or tool calls that shows the problem.
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: dejafix version
+      description: For example from `pip show dejafix`, `brew list --versions dejafix` or the release you downloaded.
+      placeholder: 1.0.0-rc.2
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install
+    attributes:
+      label: Installation method
+      options:
+        - Homebrew
+        - pip or pipx (PyPI)
+        - Installer script from GitHub Releases
+        - Built from source
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: macOS 15.4, Ubuntu 24.04, Windows 11
+    validations:
+      required: true
+
+  - type: dropdown
+    id: client
+    attributes:
+      label: AI client
+      description: The client that talks to dejafix, if the problem involves one.
+      multiple: true
+      options:
+        - Not applicable (CLI only)
+        - Claude Code
+        - Claude Desktop
+        - Codex
+        - Cursor
+        - Antigravity
+        - Other
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Output or logs
+      description: Error messages or relevant output. Remove secrets and private paths before posting.
+      render: text
