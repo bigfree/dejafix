@@ -921,3 +921,33 @@ fn an_import_without_libraries_leaves_libraries_json_alone() {
         );
     }
 }
+
+#[test]
+fn regular_file_names_skip_links_and_folders_and_are_sorted() {
+    let dir = tempfile::tempdir().unwrap();
+    fs::write(dir.path().join("b.md"), "b").unwrap();
+    fs::write(dir.path().join("a.md"), "a").unwrap();
+    fs::create_dir(dir.path().join("sub")).unwrap();
+    #[cfg(unix)]
+    std::os::unix::fs::symlink(dir.path().join("a.md"), dir.path().join("link.md")).unwrap();
+    assert_eq!(
+        super::regular_file_names(dir.path()).unwrap(),
+        ["a.md", "b.md"]
+    );
+    assert_eq!(
+        super::regular_file_names(&dir.path().join("missing")).unwrap(),
+        Vec::<String>::new()
+    );
+}
+
+#[test]
+fn file_head_reads_at_most_the_limit_and_removal_tolerates_a_missing_file() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("x.md");
+    fs::write(&path, "# #0001 title\nrest of the file").unwrap();
+    assert_eq!(super::file_head(&path, 8).as_deref(), Some("# #0001 "));
+    assert_eq!(super::file_head(&dir.path().join("none.md"), 8), None);
+    super::remove_if_present(&path).unwrap();
+    assert!(!path.exists());
+    super::remove_if_present(&path).unwrap();
+}

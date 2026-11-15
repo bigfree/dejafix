@@ -1,5 +1,5 @@
 use std::fs;
-use std::io;
+use std::io::{self, Read as _};
 use std::path::{Path, PathBuf};
 
 use super::registry::canonical_path;
@@ -116,4 +116,41 @@ pub fn project_name(root: &Path) -> String {
 #[must_use]
 pub fn issues_dir(memory: &MemoryDir) -> PathBuf {
     memory.dir.join("issues")
+}
+
+pub fn regular_file_names(dir: &Path) -> Result<Vec<String>, StoreError> {
+    let entries = match fs::read_dir(dir) {
+        Ok(entries) => entries,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(source) => {
+            return Err(StoreError::Read {
+                path: dir.to_path_buf(),
+                source,
+            });
+        }
+    };
+    let mut names: Vec<String> = entries
+        .filter_map(Result::ok)
+        .filter(|entry| entry.file_type().is_ok_and(|kind| kind.is_file()))
+        .filter_map(|entry| entry.file_name().into_string().ok())
+        .collect();
+    names.sort_unstable();
+    Ok(names)
+}
+
+#[must_use]
+pub fn file_head(path: &Path, limit: usize) -> Option<String> {
+    let file = fs::File::open(path).ok()?;
+    let mut bytes = Vec::with_capacity(limit);
+    file.take(u64::try_from(limit).ok()?)
+        .read_to_end(&mut bytes)
+        .ok()?;
+    Some(String::from_utf8_lossy(&bytes).into_owned())
+}
+
+pub fn remove_if_present(path: &Path) -> Result<(), io::Error> {
+    match fs::remove_file(path) {
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
+        other => other,
+    }
 }

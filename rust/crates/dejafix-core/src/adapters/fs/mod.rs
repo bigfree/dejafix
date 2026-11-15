@@ -34,8 +34,8 @@ pub use seen::{forget_session, report_is_new, seen_root};
 pub use stack::detect_stack;
 pub(crate) use store::{MEMORY_DIR, points_outside};
 pub use store::{
-    find_memory_dir, issues_dir, project_name, read_optional_text, read_text_inside,
-    read_text_within,
+    file_head, find_memory_dir, issues_dir, project_name, read_optional_text, read_text_inside,
+    read_text_within, regular_file_names, remove_if_present,
 };
 pub(crate) use types::LockedLog;
 pub use types::{FsResolver, GlobalStore, GotchaWrite, MemoryDir, RegistryFiles, StoreError};
