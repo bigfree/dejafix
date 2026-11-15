@@ -70,13 +70,15 @@ pub fn read_optional_text(path: &Path) -> Result<Option<String>, StoreError> {
     }
 }
 
+fn is_absent(path: &Path) -> bool {
+    matches!(fs::symlink_metadata(path), Err(error) if error.kind() == io::ErrorKind::NotFound)
+}
+
 fn existing_target(path: &Path) -> Option<PathBuf> {
-    for candidate in path.ancestors() {
+    for candidate in path.ancestors().filter(|candidate| !is_absent(candidate)) {
         match fs::canonicalize(candidate) {
             Ok(target) => return Some(target),
-            Err(error)
-                if error.kind() == io::ErrorKind::NotFound
-                    && fs::symlink_metadata(candidate).is_err() => {}
+            Err(error) if error.kind() == io::ErrorKind::NotFound && is_absent(candidate) => {}
             Err(_) => return None,
         }
     }
