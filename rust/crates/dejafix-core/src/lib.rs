@@ -89,8 +89,8 @@ pub use crate::core::stale::{
 };
 pub use crate::core::summary::{
     IssueFile, RECORD_CHARS, SummaryInput, clip_record, extract_purpose_from_map,
-    extract_purpose_from_summary, issue_files, key_files, looks_like_placeholder, render_summary,
-    slugify_title,
+    extract_purpose_from_summary, is_renamed_issue_file, issue_file_names, issue_files,
+    issue_files_where, key_files, looks_like_placeholder, render_summary, slugify_title,
 };
 pub use crate::core::text::{casefold, python_strip};
 pub use crate::core::time::{Clock, Timestamp, TimestampOverflow, iso_micros, normalize_timestamp};

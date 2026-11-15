@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use serde_json::{Value, json};
 
 use super::{
@@ -538,4 +540,40 @@ fn slugs_follow_python() {
         slugify_title(&"ab ".repeat(30)),
         "ab-ab-ab-ab-ab-ab-ab-ab-ab-ab-ab-ab-ab-ab-ab-ab"
     );
+}
+
+#[test]
+fn only_kept_issues_are_rendered_and_names_match_full_rendering() {
+    let events = Events::new()
+        .add("issue", "first bug", &json!({"issue_id": "0001"}))
+        .add("issue", "second bug", &json!({"issue_id": "0002"}))
+        .add("attempt", "tried a thing", &json!({"issue_id": "0002"}));
+    let text = events.text();
+    let log = EventLog::parse(text.as_bytes(), &fixed_clock(), &context(), &NoResolve);
+    let all = super::issue_files(&log);
+    let kept = super::issue_files_where(&log, |id| id == "0002");
+    assert_eq!(kept.len(), 1);
+    assert_eq!(kept.first().map(|file| file.issue), Some("0002"));
+    let names: Vec<(&str, String)> = super::issue_file_names(&log);
+    let expected: Vec<(&str, String)> = all
+        .iter()
+        .filter_map(|file| Some((file.issue, file.name.clone()?)))
+        .collect();
+    assert_eq!(names, expected);
+}
+
+#[test]
+fn a_renamed_generated_file_is_recognised_and_nothing_else_is() {
+    let rendered: HashSet<&str> = ["0238-new-title.md", "0238-b-other.md"].into();
+    let ids: HashSet<&str> = ["0238", "0238-b"].into();
+    let renamed =
+        |name: &str, head: &str| super::is_renamed_issue_file(name, head, &rendered, &ids);
+    assert!(renamed("0238-old-title.md", "# #0238 old title\n"));
+    assert!(renamed("0238-old-title.md", "# #0238 old title\r\n"));
+    assert!(!renamed("0238-new-title.md", "# #0238 new title\n"));
+    assert!(!renamed("0238-b-other.md", "# #0238-b other\n"));
+    assert!(!renamed("0238-notes.md", "my own notes\n"));
+    assert!(!renamed("0238-old-title.txt", "# #0238 old title\n"));
+    assert!(!renamed("0999-gone.md", "# #0999 gone\n"));
+    assert!(!renamed("0238-b-old.md", "# #0238 wrong id\n"));
 }

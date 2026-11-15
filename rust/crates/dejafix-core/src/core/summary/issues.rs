@@ -1,6 +1,8 @@
 use std::cmp::Ordering;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt::Write as _;
+use std::hash::BuildHasher;
+use std::path::Path;
 
 use super::types::{Group, IssueFile, Listed};
 use crate::core::event::{EventKind, IssueId, Outcome};
@@ -100,10 +102,23 @@ fn safe_file_stem(issue: &str) -> bool {
     !issue.contains(['/', '\\', '\0']) && (!cfg!(windows) || !issue.contains(':'))
 }
 
+fn file_name(issue: &str, title: &str) -> Option<String> {
+    safe_file_stem(issue).then(|| format!("{issue}-{}.md", slugify_title(title)))
+}
+
 #[must_use]
 pub fn issue_files<'l>(log: &'l EventLog<'_>) -> Vec<IssueFile<'l>> {
+    issue_files_where(log, |_| true)
+}
+
+#[must_use]
+pub fn issue_files_where<'l>(
+    log: &'l EventLog<'_>,
+    keep: impl Fn(&str) -> bool,
+) -> Vec<IssueFile<'l>> {
     groups(log)
         .into_iter()
+        .filter(|group| keep(group.id))
         .filter_map(|group| {
             let issue = group
                 .events
@@ -130,8 +145,7 @@ pub fn issue_files<'l>(log: &'l EventLog<'_>) -> Vec<IssueFile<'l>> {
                 }
                 contents.push('\n');
             }
-            let name = safe_file_stem(group.id)
-                .then(|| format!("{}-{}.md", group.id, slugify_title(issue.summary.as_str())));
+            let name = file_name(group.id, issue.summary.as_str());
             Some(IssueFile {
                 issue: group.id,
                 name,
@@ -139,4 +153,45 @@ pub fn issue_files<'l>(log: &'l EventLog<'_>) -> Vec<IssueFile<'l>> {
             })
         })
         .collect()
+}
+
+#[must_use]
+pub fn issue_file_names<'l>(log: &'l EventLog<'_>) -> Vec<(&'l str, String)> {
+    groups(log)
+        .into_iter()
+        .filter_map(|group| {
+            let issue = group
+                .events
+                .iter()
+                .find(|event| event.kind == EventKind::Issue)?;
+            Some((group.id, file_name(group.id, issue.summary.as_str())?))
+        })
+        .collect()
+}
+
+#[must_use]
+pub fn is_renamed_issue_file<S: BuildHasher>(
+    name: &str,
+    head: &str,
+    rendered: &HashSet<&str, S>,
+    ids: &HashSet<&str, S>,
+) -> bool {
+    if Path::new(name)
+        .extension()
+        .is_none_or(|extension| extension != "md")
+        || rendered.contains(name)
+    {
+        return false;
+    }
+    ids.iter()
+        .filter(|id| {
+            name.strip_prefix(**id)
+                .is_some_and(|rest| rest.starts_with('-'))
+        })
+        .max_by_key(|id| id.len())
+        .is_some_and(|id| {
+            head.strip_prefix("# #")
+                .and_then(|rest| rest.strip_prefix(*id))
+                .is_some_and(|rest| rest.starts_with(' '))
+        })
 }
