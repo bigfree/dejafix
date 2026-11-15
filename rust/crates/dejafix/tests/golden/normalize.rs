@@ -128,16 +128,19 @@ const GLOBAL_DIR: &str = "home/.dejafix/global/";
 const LOCK_FILE: &str = ".jsonl.lock";
 
 pub fn without_language_rules(text: &str) -> String {
-    if text.contains("\r\n") {
-        return without_language_rules(&text.replace("\r\n", "\n")).replace('\n', "\r\n");
+    let crlf = |lf: &str| lf.replace('\n', "\r\n");
+    let mut text = text.replace(
+        "<!-- dejafix-instructions: 4 -->",
+        "<!-- dejafix-instructions: 3 -->",
+    );
+    for (rule, kept) in [
+        (LANGUAGE_SECTION, ""),
+        (LANGUAGE_BRIDGE, ""),
+        (LANGUAGE_MCP, LIBRARY_MCP),
+    ] {
+        text = text.replace(&crlf(rule), &crlf(kept)).replace(rule, kept);
     }
-    text.replace(LANGUAGE_SECTION, "")
-        .replace(LANGUAGE_BRIDGE, "")
-        .replace(LANGUAGE_MCP, LIBRARY_MCP)
-        .replace(
-            "<!-- dejafix-instructions: 4 -->",
-            "<!-- dejafix-instructions: 3 -->",
-        )
+    text
 }
 
 fn without_inherited_block(text: &str) -> String {
