@@ -630,9 +630,9 @@ fn status_files_lists_staged_and_untracked_files() {
 }
 
 #[test]
-fn status_files_cut_the_first_line_after_the_trimmed_output_like_python() {
+fn status_files_keep_the_first_letter_of_a_working_tree_change() {
     let dir = repository_with_changes();
-    assert_eq!(status_files(dir.path()), ["racked.txt", "new.txt"]);
+    assert_eq!(status_files(dir.path()), ["tracked.txt", "new.txt"]);
 }
 
 #[test]
