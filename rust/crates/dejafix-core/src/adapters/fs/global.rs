@@ -404,13 +404,36 @@ impl GlobalStore {
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => String::new(),
             Err(source) => return Err(StoreError::Read { path, source }),
         };
-        Ok(serde_json::json!({
+        let libraries = self.libraries()?;
+        let mut export = serde_json::json!({
             "version": "1.0",
             "exported_at": exported_at,
             "patterns": self.load_patterns()?,
             "gotchas": self.load_gotchas()?,
             "preferences": preferences,
-        }))
+        });
+        if let Value::Object(map) = &mut export
+            && !libraries.is_empty()
+        {
+            map.insert("libraries".to_owned(), libraries.to_value());
+        }
+        Ok(export)
+    }
+
+    fn merge_libraries(&self, imported: &Libraries) -> Result<(), StoreError> {
+        let mut failure = None;
+        self.edit_gotchas(|_| {
+            let saved = self.libraries().and_then(|mut libraries| {
+                if libraries.merge(imported) {
+                    self.save_libraries(&libraries)
+                } else {
+                    Ok(())
+                }
+            });
+            failure = saved.err();
+            (GotchaWrite::Keep, ())
+        })?;
+        failure.map_or(Ok(()), Err)
     }
 
     fn import_entries(&self, name: &str, items: &[Value]) -> Result<usize, StoreError> {
@@ -460,6 +483,9 @@ impl GlobalStore {
             && !self.has_preferences()
         {
             write_text(&self.path(PREFERENCES_FILE), preferences)?;
+        }
+        if let Some(imported) = data.get("libraries").and_then(Libraries::from_value) {
+            self.merge_libraries(&imported)?;
         }
         let [patterns, gotchas] = added;
         Ok((patterns, gotchas))

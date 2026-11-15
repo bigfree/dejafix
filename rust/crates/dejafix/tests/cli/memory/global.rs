@@ -613,6 +613,33 @@ fn export_then_import_into_a_fresh_home_restores_everything() -> TestResult {
 }
 
 #[test]
+fn export_then_import_restores_library_aliases() -> TestResult {
+    let source = seeded()?;
+    fs::write(
+        global_dir(&source).join("libraries.json"),
+        "{\n  \"next\": [\n    \"nextjs\"\n  ]\n}\n",
+    )?;
+    let exported = run(&source, &["export"])?;
+    assert!(
+        exported.ends_with(
+            "  \"preferences\": \"# prefs\\nuse uv\\n\",\n  \"libraries\": {\n    \"next\": [\n      \"nextjs\"\n    ]\n  }\n}\n"
+        ),
+        "{exported}"
+    );
+    let target = Repo::new()?;
+    write_json(&target, "all.json", exported.as_bytes())?;
+    assert_eq!(
+        run(&target, &["import", "all.json"])?,
+        "[global] Imported: 3 patterns, 5 gotchas\n"
+    );
+    assert_eq!(
+        read(&target, "libraries.json")?,
+        "{\n  \"next\": [\n    \"nextjs\"\n  ]\n}\n"
+    );
+    Ok(())
+}
+
+#[test]
 fn detect_matches_python() -> TestResult {
     let repo = seeded()?;
     with_stack(&repo)?;

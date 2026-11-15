@@ -1,5 +1,6 @@
 use serde_json::{Map, Value};
 
+use super::checks::is_package_name;
 use super::types::{Entry, GotchaV2, Libraries, StoredGotcha};
 use crate::core::json::{write_canonical, write_python_json};
 
@@ -229,6 +230,32 @@ impl Libraries {
                 true
             }
         }
+    }
+
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    pub fn merge(&mut self, other: &Self) -> bool {
+        let mut changed = false;
+        for (library, aliases) in &other.0 {
+            if !is_package_name(library) {
+                continue;
+            }
+            let target = self.canonical(library);
+            changed |= self.add_library(&target);
+            for alias in aliases {
+                let alias = alias.trim().to_lowercase();
+                if is_package_name(&alias)
+                    && !self.has_library(&alias)
+                    && self.canonical(&alias) == alias
+                {
+                    changed |= self.add_alias(&target, &alias);
+                }
+            }
+        }
+        changed
     }
 
     pub fn add_alias(&mut self, library: &str, alias: &str) -> bool {

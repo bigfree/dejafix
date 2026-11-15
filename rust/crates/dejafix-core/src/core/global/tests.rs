@@ -1088,7 +1088,10 @@ mod checks {
 mod query {
     use serde_json::{Value, json};
 
-    use super::super::{GlobalIndex, Libraries, StoredGotcha, global_reply, parse_store};
+    use super::super::{
+        GlobalDoc, GlobalIndex, Libraries, StoredGotcha, global_reply, parse_store,
+    };
+    use crate::core::rank::Document;
 
     fn store() -> GlobalIndex {
         let lines = [
@@ -1161,6 +1164,53 @@ mod query {
             global_reply(&GlobalIndex::default(), "anything", None, 2_000),
             "Global memory is empty. Add a lesson with add_global_gotcha."
         );
+    }
+
+    #[test]
+    fn the_canonical_name_finds_a_record_stored_under_an_alias() {
+        let entries = vec![
+            json!({"id": "got_000000000005", "library": "nextjs", "gotcha": "The dev server ignores the custom server file when started with turbo."})
+                .as_object()
+                .cloned()
+                .unwrap(),
+        ];
+        let libraries = Libraries::from_value(&json!({"next": ["nextjs"]})).unwrap();
+        let index = GlobalIndex::build(parse_store(entries), libraries);
+        let reply = global_reply(&index, "next", None, 2_000);
+        assert!(
+            reply.starts_with(
+                "Global gotchas for \"next\" (1 of 1 shown):\n- got_000000000005 · nextjs"
+            ),
+            "{reply}"
+        );
+    }
+
+    #[test]
+    fn the_library_field_names_each_library_once() {
+        let texts = |library: &str, canonical: &str, aliases: &[String]| {
+            let record = StoredGotcha::from_entry(
+                json!({"id": "got_x", "library": library, "gotcha": "text"})
+                    .as_object()
+                    .cloned()
+                    .unwrap(),
+            );
+            let doc = GlobalDoc {
+                record: &record,
+                canonical,
+                aliases,
+            };
+            let mut seen = Vec::new();
+            doc.texts(0, &mut |text| seen.push(text.to_owned()));
+            seen
+        };
+        let aliases = ["nextjs".to_owned()];
+        assert_eq!(texts("next", "next", &aliases), ["next", "nextjs"]);
+        assert_eq!(texts("nextjs", "next", &aliases), ["next", "nextjs"]);
+        assert_eq!(
+            texts("NextJs", "next", &aliases),
+            ["NextJs", "next", "nextjs"]
+        );
+        assert_eq!(texts("zod", "zod", &[]), ["zod"]);
     }
 
     #[test]

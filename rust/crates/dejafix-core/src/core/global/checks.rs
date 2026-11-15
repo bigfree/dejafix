@@ -1,4 +1,4 @@
-use super::query::{GLOBAL_FIELDS, global_docs};
+use super::query::{GLOBAL_FIELDS, library_docs};
 use super::types::{CheckFailure, CheckReport, CheckWarning, GotchaInput, Libraries, StoredGotcha};
 use crate::core::rank::Index;
 use crate::core::redact::{redact, redaction_notice};
@@ -464,7 +464,7 @@ fn duplicate(
     if same.is_empty() {
         return None;
     }
-    let docs = global_docs(same.iter().copied(), libraries);
+    let docs = library_docs(same.iter().copied(), &input.library, libraries);
     let index = Index::build(GLOBAL_FIELDS, &docs);
     let text = format!("{} {}", input.gotcha, input.keywords.join(" "));
     let terms = index.query_terms(&text);

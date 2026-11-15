@@ -259,6 +259,7 @@ pub struct CheckReport {
 #[derive(Debug, Clone, Copy)]
 pub struct GlobalDoc<'r> {
     pub record: &'r StoredGotcha,
+    pub canonical: &'r str,
     pub aliases: &'r [String],
 }
 

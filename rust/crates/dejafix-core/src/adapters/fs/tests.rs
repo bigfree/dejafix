@@ -786,3 +786,112 @@ fn an_existing_empty_store_is_kept_when_nothing_is_written() {
         .unwrap();
     assert!(store.path("library_gotchas.jsonl").exists());
 }
+
+fn libraries_of(value: &serde_json::Value) -> crate::core::global::Libraries {
+    crate::core::global::Libraries::from_value(value).unwrap()
+}
+
+#[test]
+fn an_export_carries_libraries_and_an_import_into_a_fresh_home_restores_them() {
+    let source_home = tempfile::tempdir().unwrap();
+    let source = super::GlobalStore::new(source_home.path());
+    let empty = source.export("2026-11-15T00:00:00Z").unwrap();
+    assert!(empty.get("libraries").is_none());
+    let libraries = libraries_of(&serde_json::json!({
+        "next": ["next.js", "nextjs"],
+        "nx": ["@nx/js"],
+        "prisma": []
+    }));
+    source.save_libraries(&libraries).unwrap();
+    let exported = source.export("2026-11-15T00:00:00Z").unwrap();
+    assert_eq!(
+        exported.get("libraries"),
+        Some(&serde_json::json!({"next": ["next.js", "nextjs"], "nx": ["@nx/js"], "prisma": []}))
+    );
+    let keys: Vec<&str> = exported
+        .as_object()
+        .unwrap()
+        .keys()
+        .map(String::as_str)
+        .collect();
+    assert_eq!(
+        keys,
+        [
+            "version",
+            "exported_at",
+            "patterns",
+            "gotchas",
+            "preferences",
+            "libraries"
+        ]
+    );
+    let target_home = tempfile::tempdir().unwrap();
+    let target = super::GlobalStore::new(target_home.path());
+    assert_eq!(
+        target.import(exported.as_object().unwrap()).unwrap(),
+        (0, 0)
+    );
+    assert_eq!(target.libraries().unwrap(), libraries);
+    assert!(!target.path("library_gotchas.jsonl").exists());
+}
+
+#[test]
+fn an_import_merges_aliases_and_keeps_existing_mappings_on_conflict() {
+    let home = tempfile::tempdir().unwrap();
+    let store = super::GlobalStore::new(home.path());
+    store
+        .save_libraries(&libraries_of(&serde_json::json!({
+            "next": ["nextjs"],
+            "vue": []
+        })))
+        .unwrap();
+    let data = serde_json::json!({
+        "libraries": {
+            "next": ["next.js"],
+            "nuxt": ["nextjs", "nuxtjs"],
+            "vue": ["vuejs"],
+            "nextjs": ["next-js"],
+            "react": ["vue"],
+            "bad name": ["x"]
+        }
+    });
+    assert_eq!(store.import(data.as_object().unwrap()).unwrap(), (0, 0));
+    assert_eq!(
+        store.libraries().unwrap(),
+        libraries_of(&serde_json::json!({
+            "next": ["next-js", "next.js", "nextjs"],
+            "nuxt": ["nuxtjs"],
+            "react": [],
+            "vue": ["vuejs"]
+        }))
+    );
+}
+
+#[test]
+fn an_import_without_libraries_leaves_libraries_json_alone() {
+    let home = tempfile::tempdir().unwrap();
+    let store = super::GlobalStore::new(home.path());
+    let legacy = serde_json::json!({
+        "version": "1.0",
+        "patterns": [],
+        "gotchas": [{"id": "got_legacy000001", "library": "zod", "gotcha": "legacy"}],
+        "preferences": ""
+    });
+    assert_eq!(store.import(legacy.as_object().unwrap()).unwrap(), (0, 1));
+    assert!(!store.path("libraries.json").exists());
+    store
+        .save_libraries(&libraries_of(&serde_json::json!({"next": ["nextjs"]})))
+        .unwrap();
+    let before = fs::read_to_string(store.path("libraries.json")).unwrap();
+    for data in [
+        legacy.clone(),
+        serde_json::json!({"libraries": {"next": ["nextjs"]}}),
+        serde_json::json!({"libraries": ["not", "an", "object"]}),
+    ] {
+        store.import(data.as_object().unwrap()).unwrap();
+        assert_eq!(
+            fs::read_to_string(store.path("libraries.json")).unwrap(),
+            before
+        );
+    }
+}

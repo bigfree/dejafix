@@ -29,7 +29,11 @@ impl Document for GlobalDoc<'_> {
     fn texts<'d>(&'d self, field: usize, visit: &mut dyn FnMut(&'d str)) {
         match field {
             0 => {
-                visit(self.record.library());
+                let stored = self.record.library();
+                if stored != self.canonical && !self.aliases.iter().any(|alias| alias == stored) {
+                    visit(stored);
+                }
+                visit(self.canonical);
                 self.aliases.iter().for_each(|alias| visit(alias));
             }
             1 => {
@@ -42,14 +46,17 @@ impl Document for GlobalDoc<'_> {
     }
 }
 
-pub(super) fn global_docs<'r>(
+pub(super) fn library_docs<'r>(
     records: impl Iterator<Item = &'r StoredGotcha>,
+    canonical: &'r str,
     libraries: &'r Libraries,
 ) -> Vec<GlobalDoc<'r>> {
+    let aliases = libraries.aliases(canonical);
     records
         .map(|record| GlobalDoc {
             record,
-            aliases: libraries.aliases(&libraries.canonical(record.library())),
+            canonical,
+            aliases,
         })
         .collect()
 }
@@ -70,6 +77,7 @@ impl GlobalIndex {
             .zip(&canonical)
             .map(|(record, library)| GlobalDoc {
                 record,
+                canonical: library,
                 aliases: libraries.aliases(library),
             })
             .collect();
