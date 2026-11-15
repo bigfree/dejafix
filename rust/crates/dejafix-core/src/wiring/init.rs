@@ -10,7 +10,7 @@ use crate::adapters::fs::{
     MemoryDir, RegistryFiles, StoreError, detect_stack, manifest_info, project_name,
     read_optional_text, read_text_within, resolve_path, write_text,
 };
-use crate::adapters::git::hooks_dir;
+use crate::adapters::git::{hooks_dir, is_ignored};
 use crate::core::global::Stack;
 use crate::core::registry::{RegisterResult, Registry, same_path, slugify};
 use crate::core::scaffold::{
@@ -50,8 +50,10 @@ fn ensure_gitignore(root: &Path, extra: &[&str]) -> Result<(), StoreError> {
     let path = root.join(".gitignore");
     let existing = read_text_within(&path, root)?.unwrap_or_default();
     match gitignore_with(&existing, extra) {
-        Some(updated) => write_text(&path, &updated),
-        None => Ok(()),
+        Some(updated) if !is_ignored(root, &format!("{MEMORY_DIR}/")) => {
+            write_text(&path, &updated)
+        }
+        _ => Ok(()),
     }
 }
 

@@ -680,3 +680,34 @@ fn rule_files_linked_from_outside_the_project_are_left_alone() {
     assert_eq!(read(&ignore), ".projectmem/secret\n");
     assert_eq!(read(&outside), OLD_BRIDGE);
 }
+
+#[test]
+fn a_private_checkout_moves_its_exclude_entry_and_gets_no_gitignore() {
+    let machine = legacy();
+    let root = &machine.root;
+    fs::remove_file(root.join(".gitignore")).unwrap();
+    let status = std::process::Command::new("git")
+        .args(["init", "-q"])
+        .current_dir(root)
+        .status()
+        .unwrap();
+    assert!(status.success());
+    let exclude = root.join(".git/info/exclude");
+    write(&exclude, "# private\n/.projectmem/\n");
+    let events = machine.run(&machine.options(false, &[])).unwrap();
+    assert_eq!(
+        states(&events),
+        [&ProjectState::Steps(vec![
+            MigrateStep::Rename,
+            MigrateStep::Paths(1),
+            MigrateStep::Instructions,
+            MigrateStep::Exclude,
+            MigrateStep::Bridges(vec!["CLAUDE.md"]),
+            MigrateStep::Hooks(vec!["pre-commit"]),
+        ])]
+    );
+    machine.apply();
+    assert_eq!(read(&exclude), "# private\n/.dejafix/\n");
+    assert!(root.join(".dejafix/AI_INSTRUCTIONS.md.bak").is_file());
+    assert!(!root.join(".gitignore").exists());
+}

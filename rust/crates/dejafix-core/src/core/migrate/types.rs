@@ -12,6 +12,7 @@ pub enum MigrateStep {
     Paths(usize),
     Instructions,
     Gitignore,
+    Exclude,
     Bridges(Vec<&'static str>),
     Hooks(Vec<&'static str>),
 }

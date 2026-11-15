@@ -19,15 +19,39 @@ pub(super) const HARDENING: [&str; 6] = [
 ];
 pub(super) const LITERAL: &str = "--literal-pathspecs";
 pub(super) const NO_OPTIONAL_LOCKS: &str = "--no-optional-locks";
+const PATHSPEC_VARIABLES: [&str; 4] = [
+    "GIT_LITERAL_PATHSPECS",
+    "GIT_GLOB_PATHSPECS",
+    "GIT_NOGLOB_PATHSPECS",
+    "GIT_ICASE_PATHSPECS",
+];
 
 pub(crate) fn git<S: AsRef<OsStr>>(root: &Path, args: &[S]) -> Option<Vec<u8>> {
     git_status(root, args).ok()
 }
 
 pub(crate) fn git_status<S: AsRef<OsStr>>(root: &Path, args: &[S]) -> Result<Vec<u8>, GitFailure> {
-    let mut child = Command::new("git")
-        .args(HARDENING)
-        .arg(LITERAL)
+    run(root, true, args)
+}
+
+pub(super) fn git_status_with_pathspec_magic<S: AsRef<OsStr>>(
+    root: &Path,
+    args: &[S],
+) -> Result<Vec<u8>, GitFailure> {
+    run(root, false, args)
+}
+
+fn run<S: AsRef<OsStr>>(root: &Path, literal: bool, args: &[S]) -> Result<Vec<u8>, GitFailure> {
+    let mut command = Command::new("git");
+    command.args(HARDENING);
+    if literal {
+        command.arg(LITERAL);
+    } else {
+        for variable in PATHSPEC_VARIABLES {
+            command.env_remove(variable);
+        }
+    }
+    let mut child = command
         .arg(NO_OPTIONAL_LOCKS)
         .args(args)
         .current_dir(root)

@@ -505,3 +505,67 @@ fn init_ignores_atomic_write_temporaries_once() -> TestResult {
     );
     Ok(())
 }
+
+#[test]
+fn init_leaves_the_gitignore_alone_when_info_exclude_hides_the_memory_dir() -> TestResult {
+    let repo = Repo::bare()?;
+    fs::write(repo.root.join(".git/info/exclude"), ".dejafix/\n")?;
+    fs::write(repo.root.join(".gitignore"), "node_modules/\n")?;
+    fs::create_dir_all(repo.mem())?;
+    fs::write(repo.mem().join("AI_INSTRUCTIONS.md"), STALE)?;
+    let out = init_stdout(&repo, &["--no-global"])?;
+    assert!(out.contains("Refreshed .dejafix/AI_INSTRUCTIONS.md"));
+    assert!(repo.mem().join("AI_INSTRUCTIONS.md.bak").is_file());
+    assert_eq!(
+        fs::read_to_string(repo.root.join(".gitignore"))?,
+        "node_modules/\n"
+    );
+    Ok(())
+}
+
+#[test]
+fn init_creates_no_gitignore_when_the_global_excludes_file_hides_the_memory_dir() -> TestResult {
+    let repo = Repo::bare()?;
+    let excludes = repo.home.join(".config/git/ignore");
+    fs::create_dir_all(excludes.parent().ok_or("no parent")?)?;
+    fs::write(&excludes, ".dejafix/\n")?;
+    repo.djf(&["init", "--no-mcp-config"]).assert().success();
+    assert!(repo.mem().join("events.jsonl").is_file());
+    assert!(!repo.root.join(".gitignore").exists());
+    Ok(())
+}
+
+#[test]
+fn init_still_gitignores_the_log_when_only_one_entry_is_excluded() -> TestResult {
+    let repo = Repo::bare()?;
+    fs::write(
+        repo.root.join(".git/info/exclude"),
+        ".dejafix/events.jsonl\n",
+    )?;
+    repo.djf(&["init", "--no-mcp-config"]).assert().success();
+    let text = repo.read(".gitignore")?;
+    assert!(
+        text.contains(".dejafix/events.jsonl") && text.contains(".djf-*"),
+        "{text}"
+    );
+    Ok(())
+}
+
+#[test]
+fn an_inherited_pathspec_variable_does_not_hide_the_exclude_rule() -> TestResult {
+    let repo = Repo::bare()?;
+    fs::write(repo.root.join(".git/info/exclude"), ".dejafix/\n")?;
+    for variable in [
+        "GIT_LITERAL_PATHSPECS",
+        "GIT_GLOB_PATHSPECS",
+        "GIT_NOGLOB_PATHSPECS",
+        "GIT_ICASE_PATHSPECS",
+    ] {
+        repo.djf(&["init", "--no-mcp-config"])
+            .env(variable, "1")
+            .assert()
+            .success();
+        assert!(!repo.root.join(".gitignore").exists(), "{variable}");
+    }
+    Ok(())
+}
