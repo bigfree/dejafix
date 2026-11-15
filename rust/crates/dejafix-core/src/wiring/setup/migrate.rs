@@ -28,6 +28,16 @@ const LIST_FILE: &str = "projects.json";
 const STAMP_ONLY: &str = "projects.meta.json";
 const INSTRUCTIONS_FILE: &str = "AI_INSTRUCTIONS.md";
 const GITIGNORE: &str = ".gitignore";
+const PROJECT_CONFIGS: [(&str, &str); 5] = [
+    ("Project MCP config", ".mcp.json"),
+    ("Project Cursor MCP config", ".cursor/mcp.json"),
+    ("Project Claude Code settings", ".claude/settings.json"),
+    (
+        "Project Claude Code local settings",
+        ".claude/settings.local.json",
+    ),
+    ("Project Codex config", ".codex/config.toml"),
+];
 
 fn emit(
     sink: &mut impl FnMut(MigrateEvent) -> ControlFlow<()>,
@@ -372,8 +382,23 @@ fn migrate_project(
     Ok(())
 }
 
+fn project_configs(projects: &[LegacyProject]) -> Vec<(&'static str, PathBuf)> {
+    projects
+        .iter()
+        .flat_map(|project| {
+            PROJECT_CONFIGS
+                .into_iter()
+                .map(|(label, relative)| (label, project.root.join(relative)))
+                .filter(|(_, path)| {
+                    read_inside(path, &project.root).is_some_and(|text| is_stale_config(&text))
+                })
+        })
+        .collect()
+}
+
 fn leftovers(
     options: &MigrateOptions,
+    projects: &[LegacyProject],
     sink: &mut impl FnMut(MigrateEvent) -> ControlFlow<()>,
 ) -> Result<(), Halt> {
     let home = &options.clients.home;
@@ -383,10 +408,11 @@ fn leftovers(
         home.join(".claude").join("settings.json"),
     ));
     files.push(("Codex hooks", home.join(".codex").join("hooks.json")));
-    let configs: Vec<(&'static str, PathBuf)> = files
+    let mut configs: Vec<(&'static str, PathBuf)> = files
         .into_iter()
         .filter(|(_, path)| read_universal(path).is_some_and(|text| is_stale_config(&text)))
         .collect();
+    configs.extend(project_configs(projects));
     if configs.is_empty() && options.legacy_env.is_empty() {
         return Ok(());
     }
@@ -416,7 +442,7 @@ fn run(
     for project in &projects {
         migrate_project(project, options, sink)?;
     }
-    leftovers(options, sink)?;
+    leftovers(options, &projects, sink)?;
     if options.apply {
         emit(sink, MigrateEvent::Done)?;
     }

@@ -782,3 +782,47 @@ fn rewritten_files_keep_their_line_endings() {
         read(&machine.root.join(".gitignore")).contains("node_modules/\n.dejafix/events.jsonl\n")
     );
 }
+
+#[test]
+fn project_configs_still_pointing_at_projectmem_are_reported() {
+    let machine = legacy();
+    let root = &machine.root;
+    write(
+        &root.join(".mcp.json"),
+        "{\"mcpServers\": {\"projectmem\": {}}}",
+    );
+    write(
+        &root.join(".claude/settings.local.json"),
+        "{\"hooks\": {\"SessionStart\": [{\"command\": \"pjm brief\"}]}}",
+    );
+    write(&root.join(".codex/config.toml"), "[mcp_servers.dejafix]\n");
+    let events = machine.run(&machine.options(false, &[])).unwrap();
+    assert_eq!(
+        events.last(),
+        Some(&MigrateEvent::Leftovers {
+            configs: vec![
+                ("Project MCP config", root.join(".mcp.json")),
+                (
+                    "Project Claude Code local settings",
+                    root.join(".claude/settings.local.json")
+                ),
+            ],
+            env: Vec::new(),
+        })
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn a_project_config_linked_out_of_the_project_is_not_read() {
+    let machine = legacy();
+    let outside = machine.base.join("outside.json");
+    write(&outside, "{\"projectmem\": 1}");
+    std::os::unix::fs::symlink(&outside, machine.root.join(".mcp.json")).unwrap();
+    let events = machine.run(&machine.options(false, &[])).unwrap();
+    assert!(
+        !events
+            .iter()
+            .any(|event| matches!(event, MigrateEvent::Leftovers { .. }))
+    );
+}
