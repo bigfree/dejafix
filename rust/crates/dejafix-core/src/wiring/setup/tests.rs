@@ -757,6 +757,10 @@ fn hooks_under_core_hooks_path_are_reported_not_written() {
     write(&machine.root.join(".husky/_/pre-commit"), OLD_HOOK);
     let events = machine.apply();
     assert_eq!(read(&machine.root.join(".husky/_/pre-commit")), OLD_HOOK);
+    assert!(states(&events).iter().any(|state| matches!(
+        state,
+        ProjectState::Steps(steps) if steps.contains(&MigrateStep::ManagedHooks(vec!["pre-commit"]))
+    )));
     assert!(events.iter().any(|event| matches!(
         event,
         MigrateEvent::HooksConfigured { path, snippets }
@@ -824,5 +828,39 @@ fn a_project_config_linked_out_of_the_project_is_not_read() {
         !events
             .iter()
             .any(|event| matches!(event, MigrateEvent::Leftovers { .. }))
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn a_hook_linked_to_a_script_in_the_project_is_converted() {
+    let machine = legacy();
+    let hook = machine.root.join(".git/hooks/pre-commit");
+    let script = machine.root.join("scripts/pre-commit");
+    write(&script, OLD_HOOK);
+    fs::remove_file(&hook).unwrap();
+    std::os::unix::fs::symlink(&script, &hook).unwrap();
+    machine.apply();
+    let text = read(&hook);
+    assert!(text.contains("echo user hook"));
+    assert!(!text.contains("pjm auto-capture"));
+    assert_eq!(text.matches("# >>> dejafix auto-capture >>>").count(), 1);
+}
+
+#[test]
+fn a_project_config_is_reported_once_when_the_project_is_given_twice() {
+    let machine = legacy();
+    write(
+        &machine.root.join(".mcp.json"),
+        "{\"mcpServers\": {\"projectmem\": {}}}",
+    );
+    let root = machine.root.display().to_string();
+    let events = machine.run(&machine.options(false, &[&root])).unwrap();
+    assert_eq!(
+        events.last(),
+        Some(&MigrateEvent::Leftovers {
+            configs: vec![("Project MCP config", machine.root.join(".mcp.json"))],
+            env: Vec::new(),
+        })
     );
 }

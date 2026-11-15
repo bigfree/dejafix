@@ -23,6 +23,11 @@ impl fmt::Display for MigrateStep {
                 )
             }
             Self::Hooks(names) => write!(formatter, "reinstall git hooks: {}", names.join(", ")),
+            Self::ManagedHooks(names) => write!(
+                formatter,
+                "remove the projectmem block from hooks your hook manager owns: {}",
+                names.join(", ")
+            ),
         }
     }
 }

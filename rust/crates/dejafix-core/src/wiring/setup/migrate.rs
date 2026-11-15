@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::fs;
 use std::io;
 use std::ops::ControlFlow;
@@ -194,12 +195,19 @@ impl IgnoreFile {
     }
 }
 
-fn has_old_block(path: &Path, root: &Path, block: &Block) -> bool {
-    read_inside(path, root).is_some_and(|text| text.contains(block.old_start))
+fn read_inside_any(path: &Path, roots: &[&Path]) -> Option<String> {
+    if roots.iter().all(|root| points_outside(path, root)) {
+        return None;
+    }
+    read_universal(path)
 }
 
-fn convert_file(path: &Path, root: &Path, block: &Block) -> Result<(), StoreError> {
-    let Some(text) = read_inside(path, root) else {
+fn has_old_block(path: &Path, roots: &[&Path], block: &Block) -> bool {
+    read_inside_any(path, roots).is_some_and(|text| text.contains(block.old_start))
+}
+
+fn convert_file(path: &Path, roots: &[&Path], block: &Block) -> Result<(), StoreError> {
+    let Some(text) = read_inside_any(path, roots) else {
         return Ok(());
     };
     match convert_block(&text, block) {
@@ -241,7 +249,10 @@ impl Plan {
             steps.push(MigrateStep::Bridges(self.bridges.clone()));
         }
         if !self.hooks.is_empty() {
-            steps.push(MigrateStep::Hooks(self.hooks.clone()));
+            steps.push(match self.hooks_folder {
+                HooksLocation::Folder(_) => MigrateStep::Hooks(self.hooks.clone()),
+                HooksLocation::Configured(_) => MigrateStep::ManagedHooks(self.hooks.clone()),
+            });
         }
         steps
     }
@@ -284,12 +295,12 @@ fn plan(root: &Path, legacy: &Path, target: &Path) -> Plan {
             .collect(),
         bridges: RULE_FILES
             .into_iter()
-            .filter(|file| has_old_block(&root.join(file), root, &BRIDGE_BLOCK))
+            .filter(|file| has_old_block(&root.join(file), &[root], &BRIDGE_BLOCK))
             .collect(),
         hooks: HookKind::ALL
             .into_iter()
             .map(HookKind::file_name)
-            .filter(|name| has_old_block(&folder.join(name), &folder, &HOOK_BLOCK))
+            .filter(|name| has_old_block(&folder.join(name), &[&folder, root], &HOOK_BLOCK))
             .collect(),
         hooks_folder,
     }
@@ -318,7 +329,7 @@ fn apply_plan(
     }
     if !plan.bridges.is_empty() {
         for file in &plan.bridges {
-            convert_file(&root.join(file), root, &BRIDGE_BLOCK)?;
+            convert_file(&root.join(file), &[root], &BRIDGE_BLOCK)?;
         }
         for (file, outcome) in write_bridges(root, &project.name)? {
             emit(sink, MigrateEvent::Bridge(file, outcome))?;
@@ -328,7 +339,7 @@ fn apply_plan(
         match &plan.hooks_folder {
             HooksLocation::Folder(directory) => {
                 for name in &plan.hooks {
-                    convert_file(&directory.join(name), directory, &HOOK_BLOCK)?;
+                    convert_file(&directory.join(name), &[directory, root], &HOOK_BLOCK)?;
                 }
                 emit(sink, MigrateEvent::Hooks(install(root, directory, djf)?))?;
             }
@@ -413,6 +424,8 @@ fn leftovers(
         .filter(|(_, path)| read_universal(path).is_some_and(|text| is_stale_config(&text)))
         .collect();
     configs.extend(project_configs(projects));
+    let mut seen = HashSet::new();
+    configs.retain(|(_, path)| seen.insert(path.clone()));
     if configs.is_empty() && options.legacy_env.is_empty() {
         return Ok(());
     }

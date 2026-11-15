@@ -15,4 +15,5 @@ pub enum MigrateStep {
     Exclude,
     Bridges(Vec<&'static str>),
     Hooks(Vec<&'static str>),
+    ManagedHooks(Vec<&'static str>),
 }
