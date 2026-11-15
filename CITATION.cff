@@ -1,21 +1,17 @@
 cff-version: 1.2.0
 message: >-
-  dejafix is a fork of projectmem. If you use it in research or writing, please
-  cite the original projectmem paper below.
+  If you use dejafix in research or writing, please cite it as below.
 title: "dejafix"
 type: software
 abstract: >-
-  dejafix is a local-first memory and judgment layer for AI coding agents,
-  forked from projectmem 0.3.5. It records issues, attempts, fixes, decisions
-  and notes as typed events in plain text, serves them to agents through a
-  native MCP server, and warns before an approach that already failed is
-  repeated.
+  dejafix is a local-first memory and judgment layer for AI coding agents. It
+  records issues, attempts, fixes, decisions and notes as typed events in plain
+  text, serves them to agents through a native MCP server, warns before an
+  approach that already failed is repeated, and keeps library lessons in a
+  global memory that agents query by relevance.
 authors:
   - name: dejafix contributors
-  - family-names: Malo
-    given-names: Ripon Chandra
-    affiliation: University of Utah
-version: 0.4.0
+version: 1.0.0-rc.3
 license: MIT
 repository-code: "https://github.com/bigfree/dejafix"
 url: "https://github.com/bigfree/dejafix"
@@ -34,24 +30,19 @@ references:
     version: 0.3.5
     repository-code: "https://github.com/riponcm/projectmem"
     license: MIT
-preferred-citation:
-  type: article
-  title: >-
-    PROJECTMEM: A Local-First, Event-Sourced Memory and Judgment Layer for AI
-    Coding Agents
-  authors:
-    - family-names: Malo
-      given-names: Ripon Chandra
-      affiliation: University of Utah
-    - family-names: Qiu
-      given-names: Tong
-      affiliation: University of Utah
-  year: 2026
-  month: 6
-  journal: arXiv preprint
-  doi: 10.48550/arXiv.2606.12329
-  url: "https://arxiv.org/abs/2606.12329"
-  identifiers:
-    - type: other
-      value: "arXiv:2606.12329"
-      description: arXiv identifier (primary category cs.AI)
+  - type: article
+    title: >-
+      PROJECTMEM: A Local-First, Event-Sourced Memory and Judgment Layer for AI
+      Coding Agents
+    authors:
+      - family-names: Malo
+        given-names: Ripon Chandra
+        affiliation: University of Utah
+      - family-names: Qiu
+        given-names: Tong
+        affiliation: University of Utah
+    year: 2026
+    month: 6
+    journal: arXiv preprint
+    doi: 10.48550/arXiv.2606.12329
+    url: "https://arxiv.org/abs/2606.12329"
