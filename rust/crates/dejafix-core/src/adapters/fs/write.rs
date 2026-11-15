@@ -47,7 +47,7 @@ pub fn write_atomic(path: &Path, contents: &[u8]) -> Result<(), StoreError> {
 }
 
 #[cfg(not(windows))]
-fn persist(temporary: tempfile::NamedTempFile, path: &Path) -> io::Result<()> {
+pub(super) fn persist(temporary: tempfile::NamedTempFile, path: &Path) -> io::Result<()> {
     temporary
         .persist(path)
         .map(drop)
@@ -55,7 +55,7 @@ fn persist(temporary: tempfile::NamedTempFile, path: &Path) -> io::Result<()> {
 }
 
 #[cfg(windows)]
-fn persist(mut temporary: tempfile::NamedTempFile, path: &Path) -> io::Result<()> {
+pub(super) fn persist(mut temporary: tempfile::NamedTempFile, path: &Path) -> io::Result<()> {
     for _ in 1..REPLACE_ATTEMPTS {
         match temporary.persist(path) {
             Ok(_) => return Ok(()),

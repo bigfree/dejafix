@@ -5,7 +5,7 @@ use std::path::{Component, Path, PathBuf};
 use serde_json::{Map, Value};
 
 use super::types::{RegistryFiles, StoreError};
-use super::write::write_text;
+use super::write::{persist, write_text};
 use crate::core::json::write_python_json_indented;
 use crate::core::registry::{Loaded, Registry, list_payload, load, meta_payload};
 use crate::core::text::platform_newlines;
@@ -44,10 +44,7 @@ fn write_json_atomic(path: &Path, value: &Value) -> Result<(), StoreError> {
     temporary
         .write_all(platform_newlines(&text).as_bytes())
         .map_err(failed)?;
-    temporary
-        .persist(path)
-        .map(drop)
-        .map_err(|error| failed(error.error))
+    persist(temporary, path).map_err(failed)
 }
 
 impl RegistryFiles {
