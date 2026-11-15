@@ -6,6 +6,18 @@
 
 - **`djf regenerate` removes issue files left behind by a renamed issue.** An issue file is named after the issue's title, so rewriting the log, for example with `djf migrate`, used to leave the old file next to the new one. `djf regenerate` now removes a file in `.dejafix/issues/` only when it is a regular `.md` file that starts with an issue id and that issue's generated header, and when that issue is now written under another name. It prints `Removed <n> renamed issue file(s).` Hand-written notes, symlinks and folders are kept. A file that cannot be removed is reported, and the command still succeeds.
 - **Unreadable log lines are reported.** When `events.jsonl` has lines dejafix cannot read, the write commands (`log`, `attempt`, `fix`, `decision`, `note`), `djf regenerate` and `djf search` print `dejafix: <n> line(s) of events.jsonl could not be read; run djf doctor` on stderr. `start_session` and the MCP write tools end their reply with the same line. Exit codes do not change.
+- **`djf migrate` reports project configs that still point at projectmem.** In every migrated project it checks `.mcp.json`, `.cursor/mcp.json`, `.claude/settings.json`, `.claude/settings.local.json` and `.codex/config.toml`, and lists the ones that still start the projectmem server or a `pjm` hook under "Still pointing at projectmem". A file linked from outside the project is not read.
+
+### Fixed
+
+- **Release candidates learn about the final release.** `djf doctor --online` now orders versions as Python packaging does, so `1.0.0-rc.3` is older than `1.0.0`. Before, it treated both as the same version and reported the latest version.
+- **Hooks work in linked worktrees.** `djf init` and `djf hooks install` ask git where hooks go. In a linked worktree they install into the main repository's hooks folder, which git runs, and the report names that folder.
+- **dejafix leaves hook managers alone.** When `core.hooksPath` is set, for example by husky or a shared hooks folder, `djf init`, `djf hooks` and `djf migrate` write no hooks. They print the configured folder and the lines to add to your hook manager, and `djf migrate` asks you to remove the old projectmem block from those hooks. A `.git` file that points at a git folder that is not this project's own, or one of its linked worktrees, is not followed.
+- **Hooks survive package upgrades.** When the `djf` on your `PATH` is the binary that installs the hooks, the hooks call it through that path. On Linux with Homebrew they no longer point into a versioned folder that disappears on the next upgrade.
+- **`get_context` keeps the first letter of the first changed file.** A file changed only in the working tree lost the first letter of its path when it came first in `git status`, so it was not ranked as a file being edited.
+- **The registry keeps settings it does not own.** Registering a project no longer drops the version stamp or the remembered update check from `~/.dejafix/projects.meta.json`.
+- **`djf project scan` no longer registers a project twice.** A folder that is registered under another spelling, for example through a symlink or with different letter case, is recognised as already registered.
+- **`djf migrate` keeps line endings.** Files with CRLF line endings keep them when `.projectmem` paths are rewritten, so the migration changes only the paths.
 
 ### Changed
 

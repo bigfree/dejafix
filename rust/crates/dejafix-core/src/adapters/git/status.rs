@@ -12,8 +12,7 @@ pub fn status_files(root: &Path) -> Vec<String> {
     };
     let text = String::from_utf8_lossy(&output);
     let text = universal_newlines(&text);
-    python_strip(&text)
-        .split('\n')
+    text.split('\n')
         .filter(|line| !python_strip(line).is_empty())
         .map(|line| python_strip(after_status(line)).to_owned())
         .collect()

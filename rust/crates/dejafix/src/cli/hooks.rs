@@ -1,4 +1,5 @@
 use std::io::{self, Write};
+use std::path::Path;
 
 use dejafix_core::{
     CaptureOutcome, EventKind, HookKind, HooksAction, HooksOutcome, HooksReport, OsIds,
@@ -15,7 +16,7 @@ const RESET: &str = "\x1b[0m";
 
 pub fn djf_binary(config: &Config) -> String {
     resolve_djf_binary(
-        config.exe_dir.as_deref(),
+        config.exe.as_deref(),
         config.path_var.as_deref(),
         cfg!(windows),
     )
@@ -34,17 +35,21 @@ pub fn print_report(
     out: &mut impl Write,
     err: &mut impl Write,
 ) -> io::Result<()> {
+    let folder = report.folder.as_ref().map_or_else(
+        || ".git/hooks".to_owned(),
+        |path| path.display().to_string(),
+    );
     for kind in &report.skipped {
         writeln!(
             err,
-            "Warning: .git/hooks/{} has a dejafix start marker but no end marker, so it was left alone. Fix or delete that block, then re-run `djf hooks install`.",
+            "Warning: {folder}/{} has a dejafix start marker but no end marker, so it was left alone. Fix or delete that block, then re-run `djf hooks install`.",
             kind.file_name()
         )?;
     }
     for kind in &report.unreadable {
         writeln!(
             err,
-            "Warning: .git/hooks/{} could not be read as text, so it was left alone.",
+            "Warning: {folder}/{} could not be read as text, so it was left alone.",
             kind.file_name()
         )?;
     }
@@ -69,6 +74,35 @@ pub fn print_report(
     {
         writeln!(out, "dejafix git hooks already installed.")?;
     }
+    if let Some(path) = &report.folder {
+        writeln!(out, "  Hooks folder: {}", path.display())?;
+    }
+    Ok(())
+}
+
+pub fn print_configured(
+    path: &Path,
+    snippets: &[(HookKind, String)],
+    out: &mut impl Write,
+) -> io::Result<()> {
+    writeln!(
+        out,
+        "core.hooksPath points git at {}; dejafix writes no hooks there.",
+        path.display()
+    )?;
+    if snippets.is_empty() {
+        return writeln!(
+            out,
+            "Remove the dejafix blocks from the hooks there by hand."
+        );
+    }
+    writeln!(
+        out,
+        "Add these lines to the matching hooks of your hook manager:"
+    )?;
+    for (kind, snippet) in snippets {
+        writeln!(out, "\n{}:\n{}", kind.file_name(), snippet.trim_end())?;
+    }
     Ok(())
 }
 
@@ -90,6 +124,9 @@ pub fn run_hooks(
             err,
             "Error: .git/hooks directory not found. Is this a git repository?"
         )?,
+        Ok(HooksOutcome::Configured { path, snippets }) => {
+            print_configured(&path, &snippets, out)?;
+        }
         Ok(HooksOutcome::Installed(report)) => print_report(&report, out, err)?,
         Ok(HooksOutcome::Removed(removed)) if removed.is_empty() => {
             writeln!(out, "No dejafix hooks found to remove.")?;

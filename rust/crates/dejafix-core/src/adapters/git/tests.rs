@@ -5,8 +5,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use super::{
-    git_dirs, head_short, hooks_dir, last_changes, last_message, read_hook, remove_hook,
-    repository_state, resolve_djf_binary, staged_files, status_files, working_files, write_hook,
+    HooksLocation, git_dirs, head_short, hooks_location, last_changes, last_message, read_hook,
+    remove_hook, repository_state, resolve_djf_binary, staged_files, status_files, working_files,
+    write_hook,
 };
 use crate::core::capture::Change;
 use crate::core::hooks::shell_path;
@@ -85,11 +86,120 @@ fn path_of(directory: &Path) -> OsString {
     std::env::join_paths([directory]).unwrap()
 }
 
+fn canonical(path: &Path) -> PathBuf {
+    crate::canonical_path(path).unwrap()
+}
+
+fn committed_repository(root: &Path) {
+    fs::create_dir_all(root).unwrap();
+    git(root, &["init", "-q"]);
+    git(root, &["commit", "-q", "--allow-empty", "-m", "x"]);
+}
+
 #[test]
-fn the_hooks_directory_sits_under_dot_git() {
+fn hooks_go_under_dot_git_in_a_plain_repository() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = canonical(dir.path());
+    committed_repository(&root);
     assert_eq!(
-        hooks_dir(Path::new("/repo")),
-        Path::new("/repo").join(".git").join("hooks")
+        hooks_location(&root),
+        HooksLocation::Folder(root.join(".git").join("hooks"))
+    );
+}
+
+#[test]
+fn a_linked_worktree_uses_the_main_repository_s_hooks() {
+    let dir = tempfile::tempdir().unwrap();
+    let main = canonical(dir.path()).join("main");
+    committed_repository(&main);
+    let worktree = main.with_file_name("wt");
+    git(
+        &main,
+        &["worktree", "add", "-q", worktree.to_str().unwrap()],
+    );
+    let HooksLocation::Folder(folder) = hooks_location(&worktree) else {
+        panic!("not a folder");
+    };
+    assert_eq!(
+        canonical(&folder),
+        canonical(&main.join(".git").join("hooks"))
+    );
+}
+
+#[test]
+fn core_hooks_path_is_reported_relative_or_absolute() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = canonical(dir.path());
+    committed_repository(&root);
+    git(&root, &["config", "core.hooksPath", ".husky/_"]);
+    assert_eq!(
+        hooks_location(&root),
+        HooksLocation::Configured(root.join(".husky/_"))
+    );
+    let shared = root.join("shared-hooks");
+    git(
+        &root,
+        &["config", "core.hooksPath", shared.to_str().unwrap()],
+    );
+    assert_eq!(hooks_location(&root), HooksLocation::Configured(shared));
+}
+
+#[test]
+fn a_git_file_pointing_at_another_repository_keeps_the_old_folder() {
+    let dir = tempfile::tempdir().unwrap();
+    let base = canonical(dir.path());
+    let other = base.join("other");
+    committed_repository(&other);
+    let root = base.join("unpacked");
+    fs::create_dir_all(&root).unwrap();
+    fs::write(
+        root.join(".git"),
+        format!("gitdir: {}\n", other.join(".git").display()),
+    )
+    .unwrap();
+    assert_eq!(
+        hooks_location(&root),
+        HooksLocation::Folder(root.join(".git").join("hooks"))
+    );
+}
+
+#[test]
+fn a_fake_worktree_folder_inside_the_project_keeps_the_old_folder() {
+    let dir = tempfile::tempdir().unwrap();
+    let base = canonical(dir.path());
+    let other = base.join("other");
+    committed_repository(&other);
+    let root = base.join("unpacked");
+    let fake = root.join(".fake");
+    fs::create_dir_all(&fake).unwrap();
+    fs::write(root.join(".git"), "gitdir: .fake\n").unwrap();
+    fs::write(fake.join("HEAD"), "ref: refs/heads/main\n").unwrap();
+    fs::write(fake.join("commondir"), "../../other/.git\n").unwrap();
+    fs::write(
+        fake.join("gitdir"),
+        format!("{}\n", root.join(".git").display()),
+    )
+    .unwrap();
+    assert_eq!(
+        hooks_location(&root),
+        HooksLocation::Folder(root.join(".git").join("hooks"))
+    );
+}
+
+#[test]
+fn outside_a_repository_or_in_a_subfolder_the_old_folder_is_kept() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = canonical(dir.path());
+    assert_eq!(
+        hooks_location(&root),
+        HooksLocation::Folder(root.join(".git").join("hooks"))
+    );
+    git(&root, &["init", "-q"]);
+    let sub = root.join("sub");
+    fs::create_dir_all(&sub).unwrap();
+    assert_eq!(
+        hooks_location(&sub),
+        HooksLocation::Folder(sub.join(".git").join("hooks"))
     );
 }
 
@@ -99,7 +209,7 @@ fn the_djf_next_to_the_executable_beats_path() {
     let adjacent = fake_binary(&dir.path().join("venv").join("bin"), "djf", 0o755);
     fake_binary(&dir.path().join("other"), "djf", 0o755);
     let path_var = path_of(&dir.path().join("other"));
-    let resolved = resolve_djf_binary(adjacent.parent(), Some(&path_var), false);
+    let resolved = resolve_djf_binary(Some(&adjacent), Some(&path_var), false);
     assert_eq!(resolved, shell_path(&adjacent.to_string_lossy()));
 }
 
@@ -107,7 +217,7 @@ fn the_djf_next_to_the_executable_beats_path() {
 fn the_dejafix_alias_is_the_second_choice_next_to_the_executable() {
     let dir = tempfile::tempdir().unwrap();
     let alias = fake_binary(dir.path(), "dejafix", 0o755);
-    let resolved = resolve_djf_binary(Some(dir.path()), None, false);
+    let resolved = resolve_djf_binary(Some(&alias), None, false);
     assert_eq!(resolved, shell_path(&alias.to_string_lossy()));
 }
 
@@ -118,7 +228,7 @@ fn a_djf_that_is_not_executable_is_skipped() {
     let adjacent = fake_binary(&dir.path().join("venv"), "djf", 0o644);
     let on_path = fake_binary(&dir.path().join("local"), "djf", 0o755);
     let path_var = path_of(on_path.parent().unwrap());
-    let resolved = resolve_djf_binary(adjacent.parent(), Some(&path_var), false);
+    let resolved = resolve_djf_binary(Some(&adjacent), Some(&path_var), false);
     assert_eq!(resolved, shell_path(&on_path.to_string_lossy()));
 }
 
@@ -128,7 +238,11 @@ fn path_answers_when_nothing_is_adjacent() {
     fs::create_dir_all(dir.path().join("venv")).unwrap();
     let on_path = fake_binary(&dir.path().join("local"), "djf", 0o755);
     let path_var = path_of(on_path.parent().unwrap());
-    let resolved = resolve_djf_binary(Some(&dir.path().join("venv")), Some(&path_var), false);
+    let resolved = resolve_djf_binary(
+        Some(&dir.path().join("venv").join("running")),
+        Some(&path_var),
+        false,
+    );
     assert_eq!(resolved, shell_path(&on_path.to_string_lossy()));
 }
 
@@ -150,7 +264,7 @@ fn nothing_found_is_the_bare_name() {
     let dir = tempfile::tempdir().unwrap();
     let path_var = path_of(dir.path());
     assert_eq!(
-        resolve_djf_binary(Some(dir.path()), Some(&path_var), false),
+        resolve_djf_binary(Some(&dir.path().join("running")), Some(&path_var), false),
         "djf"
     );
     assert_eq!(resolve_djf_binary(None, None, false), "djf");
@@ -160,14 +274,17 @@ fn nothing_found_is_the_bare_name() {
 fn a_directory_named_djf_is_not_a_binary() {
     let dir = tempfile::tempdir().unwrap();
     fs::create_dir_all(dir.path().join("djf")).unwrap();
-    assert_eq!(resolve_djf_binary(Some(dir.path()), None, false), "djf");
+    assert_eq!(
+        resolve_djf_binary(Some(&dir.path().join("running")), None, false),
+        "djf"
+    );
 }
 
 #[test]
 fn windows_finds_scripts_djf_exe_with_forward_slashes() {
     let dir = tempfile::tempdir().unwrap();
     let binary = fake_binary(&dir.path().join("venv").join("Scripts"), "djf.exe", 0o644);
-    let resolved = resolve_djf_binary(binary.parent(), None, true);
+    let resolved = resolve_djf_binary(Some(&binary), None, true);
     assert!(resolved.ends_with("/Scripts/djf.exe"));
     assert!(!resolved.contains('\\'));
     assert_eq!(resolved, binary.to_string_lossy().replace('\\', "/"));
@@ -555,9 +672,9 @@ fn status_files_lists_staged_and_untracked_files() {
 }
 
 #[test]
-fn status_files_cut_the_first_line_after_the_trimmed_output_like_python() {
+fn status_files_keep_the_first_letter_of_a_working_tree_change() {
     let dir = repository_with_changes();
-    assert_eq!(status_files(dir.path()), ["racked.txt", "new.txt"]);
+    assert_eq!(status_files(dir.path()), ["tracked.txt", "new.txt"]);
 }
 
 #[test]
@@ -835,4 +952,41 @@ fn nothing_is_ignored_outside_a_repository() {
     let dir = tempfile::tempdir().unwrap();
     fs::create_dir(dir.path().join(".dejafix")).unwrap();
     assert!(!super::is_ignored(dir.path(), ".dejafix/"));
+}
+
+#[cfg(unix)]
+#[test]
+fn a_path_entry_linked_to_the_running_binary_is_baked_by_its_path_spelling() {
+    let dir = tempfile::tempdir().unwrap();
+    let real = fake_binary(&dir.path().join("Cellar/dejafix/1.0.0/bin"), "djf", 0o755);
+    let bin = dir.path().join("bin");
+    fs::create_dir_all(&bin).unwrap();
+    std::os::unix::fs::symlink(&real, bin.join("djf")).unwrap();
+    let resolved = resolve_djf_binary(Some(&real), Some(&path_of(&bin)), false);
+    assert_eq!(resolved, shell_path(&bin.join("djf").to_string_lossy()));
+}
+
+#[test]
+fn an_unrelated_djf_on_path_does_not_beat_the_running_binary() {
+    let dir = tempfile::tempdir().unwrap();
+    let real = fake_binary(&dir.path().join("venv/bin"), "djf", 0o755);
+    let other = fake_binary(&dir.path().join("other"), "djf", 0o755);
+    let resolved = resolve_djf_binary(Some(&real), Some(&path_of(other.parent().unwrap())), false);
+    assert_eq!(resolved, shell_path(&real.to_string_lossy()));
+}
+
+#[cfg(unix)]
+#[test]
+fn a_relative_path_entry_to_the_running_binary_is_not_baked() {
+    let dir = tempfile::tempdir().unwrap();
+    let real = fake_binary(&dir.path().join("venv/bin"), "djf", 0o755);
+    let bin = dir.path().join("bin");
+    fs::create_dir_all(&bin).unwrap();
+    std::os::unix::fs::symlink(&real, bin.join("djf")).unwrap();
+    let cwd = std::env::current_dir().unwrap();
+    let up = "../".repeat(cwd.components().count() - 1);
+    let relative = PathBuf::from(up).join(bin.strip_prefix("/").unwrap());
+    assert!(relative.is_relative() && relative.join("djf").is_file());
+    let resolved = resolve_djf_binary(Some(&real), Some(&path_of(&relative)), false);
+    assert_eq!(resolved, shell_path(&real.to_string_lossy()));
 }

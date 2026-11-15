@@ -1,6 +1,8 @@
 use std::path::PathBuf;
 
 use crate::adapters::fs::{ClientPaths, StoreError};
+use crate::adapters::git::HooksLocation;
+use crate::core::hooks::HookKind;
 use crate::core::migrate::MigrateStep;
 use crate::wiring::hooks::HooksReport;
 use crate::wiring::types::BridgeOutcome;
@@ -47,6 +49,10 @@ pub enum MigrateEvent {
     },
     Bridge(&'static str, BridgeOutcome),
     Hooks(HooksReport),
+    HooksConfigured {
+        path: PathBuf,
+        snippets: Vec<(HookKind, String)>,
+    },
     Leftovers {
         configs: Vec<(&'static str, PathBuf)>,
         env: Vec<String>,
@@ -76,6 +82,7 @@ pub(super) struct Plan {
     pub ignores: Vec<IgnoreFile>,
     pub bridges: Vec<&'static str>,
     pub hooks: Vec<&'static str>,
+    pub hooks_folder: HooksLocation,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

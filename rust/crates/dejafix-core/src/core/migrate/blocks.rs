@@ -10,7 +10,7 @@ use crate::core::scaffold::{BRIDGE_END, BRIDGE_START};
 
 pub const LEGACY_DIR: &str = ".projectmem";
 
-const LEGACY_CONFIG_TOKENS: [&str; 7] = [
+const LEGACY_CONFIG_TOKENS: [&str; 8] = [
     "projectmem.mcp_server",
     "mcp_servers.projectmem",
     "\"projectmem\":",
@@ -18,6 +18,7 @@ const LEGACY_CONFIG_TOKENS: [&str; 7] = [
     "pjm-edit-hook",
     "PJM_EDIT_HOOK_LOG",
     "PROJECTMEM_",
+    "pjm brief",
 ];
 
 pub const HOOK_BLOCK: Block = Block {

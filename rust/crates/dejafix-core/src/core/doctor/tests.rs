@@ -1,6 +1,6 @@
 use serde_json::{Map, Value, json};
 
-use super::{Reverted, SeenConfig, is_newer, track_pins, version_key};
+use super::{Reverted, SeenConfig, is_newer, track_pins};
 
 fn seen(client: &'static str, key: &str, pinned: bool) -> SeenConfig<'static> {
     SeenConfig {
@@ -143,35 +143,68 @@ fn a_higher_release_is_newer() {
 }
 
 #[test]
-fn a_suffix_does_not_make_a_release_newer() {
-    assert_eq!(version_key("1.0.0rc1"), version_key("1.0.0"));
-    assert_eq!(version_key("1.0.0-rc.1"), version_key("1.0.0"));
-    assert!(!is_newer("1.0.0rc1", "1.0.0"));
-    assert!(!is_newer("1.0.0", "1.0.0-rc.1"));
+fn versions_follow_the_pep_440_order() {
+    let ordered = [
+        "1.dev0",
+        "1.0.dev456",
+        "1.0a1",
+        "1.0a2.dev456",
+        "1.0a12.dev456",
+        "1.0a12",
+        "1.0b1.dev456",
+        "1.0b2",
+        "1.0b2.post345.dev456",
+        "1.0b2.post345",
+        "1.0rc1.dev456",
+        "1.0rc1",
+        "1.0",
+        "1.0.post456.dev34",
+        "1.0.post456",
+        "1.0.15",
+        "1.1.dev1",
+    ];
+    for pair in ordered.windows(2) {
+        assert!(is_newer(pair[1], pair[0]), "{} > {}", pair[1], pair[0]);
+        assert!(!is_newer(pair[0], pair[1]), "{} < {}", pair[0], pair[1]);
+    }
 }
 
 #[test]
-fn a_shorter_version_sorts_below_the_longer_one_as_python_tuples_do() {
-    assert_eq!(version_key("1.0"), vec![1, 0]);
+fn cargo_and_pep_440_spellings_of_a_candidate_are_equal() {
+    assert!(!is_newer("1.0.0-rc.3", "1.0.0rc3"));
+    assert!(!is_newer("1.0.0rc3", "1.0.0-rc.3"));
+    assert!(!is_newer("1.0.0RC3", "1.0.0rc3"));
+    assert!(!is_newer("1.0.0c3", "1.0.0rc3"));
+    assert!(!is_newer("v1.0.0", "1.0.0"));
+}
+
+#[test]
+fn a_final_release_is_newer_than_its_candidates() {
+    assert!(is_newer("1.0.0", "1.0.0-rc.3"));
+    assert!(!is_newer("1.0.0rc3", "1.0.0"));
+    assert!(is_newer("1.0.0rc4", "1.0.0-rc.3"));
+    assert!(is_newer("1.0.0-beta.1", "1.0.0-alpha.2"));
+}
+
+#[test]
+fn trailing_zeros_do_not_change_a_version() {
+    assert!(!is_newer("1.0.0", "1.0"));
     assert!(!is_newer("1.0", "1.0.0"));
-    assert!(is_newer("1.0.0", "1.0"));
+    assert!(is_newer("1.0.1", "1.0"));
 }
 
 #[test]
-fn only_three_chunks_count() {
-    assert_eq!(version_key("1.2.3.4.5"), vec![1, 2, 3]);
-}
-
-#[test]
-fn an_empty_or_garbage_version_is_zero() {
-    assert_eq!(version_key(""), vec![0]);
-    assert_eq!(version_key("abc"), vec![0]);
-    assert_eq!(version_key("x.y.z"), vec![0, 0, 0]);
-    assert!(is_newer("0.0.1", ""));
-    assert!(!is_newer("garbage", ""));
-}
-
-#[test]
-fn a_chunk_too_large_for_u64_saturates() {
-    assert_eq!(version_key("99999999999999999999999.1"), vec![u64::MAX, 1]);
+fn an_unreadable_version_is_never_newer_and_nothing_is_newer_than_it() {
+    for unreadable in [
+        "",
+        "abc",
+        "x.y.z",
+        "1.0+local",
+        "1!1.0",
+        "1.0.0-beta-two",
+        "99999999999999999999999.1",
+    ] {
+        assert!(!is_newer(unreadable, "1.0.0"), "{unreadable}");
+        assert!(!is_newer("9.0.0", unreadable), "{unreadable}");
+    }
 }

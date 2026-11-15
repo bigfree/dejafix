@@ -10,7 +10,9 @@ pub use crate::adapters::fs::{
 };
 pub use crate::adapters::fs::{forget_session, report_is_new, seen_root};
 pub use crate::adapters::git::{GitHistory, recent_changes};
-pub use crate::adapters::git::{hooks_dir, read_hook, remove_hook, resolve_djf_binary, write_hook};
+pub use crate::adapters::git::{
+    HooksLocation, hooks_location, read_hook, remove_hook, resolve_djf_binary, write_hook,
+};
 pub use crate::adapters::git::{
     last_changes, last_message, staged_files, status_files, working_files,
 };
@@ -21,7 +23,7 @@ pub use crate::core::capture::{
     meets_threshold, merge_event, parse_name_status, pick_location,
 };
 pub use crate::core::context::{ContextInput, generate_context};
-pub use crate::core::doctor::{Reverted, SeenConfig, is_newer, track_pins, version_key};
+pub use crate::core::doctor::{Reverted, SeenConfig, is_newer, track_pins};
 pub use crate::core::event::{
     CaptureSource, Confidence, Event, EventId, EventKind, Extra, IssueId, LineError, Origin,
     Outcome, Summary,

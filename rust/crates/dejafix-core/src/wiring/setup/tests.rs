@@ -711,3 +711,158 @@ fn a_private_checkout_moves_its_exclude_entry_and_gets_no_gitignore() {
     assert!(root.join(".dejafix/AI_INSTRUCTIONS.md.bak").is_file());
     assert!(!root.join(".gitignore").exists());
 }
+
+fn git_in(dir: &Path, args: &[&str]) {
+    let status = std::process::Command::new("git")
+        .args(["-c", "user.email=t@example.invalid", "-c", "user.name=t"])
+        .args(args)
+        .current_dir(dir)
+        .status()
+        .unwrap();
+    assert!(status.success());
+}
+
+#[test]
+fn a_linked_worktree_s_old_hooks_in_the_main_repository_are_converted() {
+    let machine = legacy();
+    let main = machine.base.join("main");
+    fs::create_dir_all(&main).unwrap();
+    git_in(&main, &["init", "-q"]);
+    git_in(&main, &["commit", "-q", "--allow-empty", "-m", "x"]);
+    let kept = machine.base.join("kept");
+    fs::rename(&machine.root, &kept).unwrap();
+    git_in(
+        &main,
+        &["worktree", "add", "-q", machine.root.to_str().unwrap()],
+    );
+    fs::rename(kept.join(".projectmem"), machine.root.join(".projectmem")).unwrap();
+    write(&main.join(".git/hooks/pre-commit"), OLD_HOOK);
+    let events = machine.apply();
+    let hook = read(&main.join(".git/hooks/pre-commit"));
+    assert!(hook.contains("echo user hook"));
+    assert!(!hook.contains("pjm auto-capture"));
+    assert_eq!(hook.matches("# >>> dejafix auto-capture >>>").count(), 1);
+    assert!(events.iter().any(|event| matches!(
+        event,
+        MigrateEvent::Hooks(report) if report.folder == Some(main.join(".git/hooks"))
+    )));
+}
+
+#[test]
+fn hooks_under_core_hooks_path_are_reported_not_written() {
+    let machine = legacy();
+    fs::remove_dir_all(machine.root.join(".git")).unwrap();
+    git_in(&machine.root, &["init", "-q"]);
+    git_in(&machine.root, &["config", "core.hooksPath", ".husky/_"]);
+    write(&machine.root.join(".husky/_/pre-commit"), OLD_HOOK);
+    let events = machine.apply();
+    assert_eq!(read(&machine.root.join(".husky/_/pre-commit")), OLD_HOOK);
+    assert!(states(&events).iter().any(|state| matches!(
+        state,
+        ProjectState::Steps(steps) if steps.contains(&MigrateStep::ManagedHooks(vec!["pre-commit"]))
+    )));
+    assert!(events.iter().any(|event| matches!(
+        event,
+        MigrateEvent::HooksConfigured { path, snippets }
+            if *path == machine.root.join(".husky/_") && snippets.len() == 3
+    )));
+}
+
+#[test]
+fn rewritten_files_keep_their_line_endings() {
+    let machine = legacy();
+    let memory = machine.root.join(".projectmem");
+    fs::write(
+        memory.join("events.jsonl"),
+        "{\"location\": \".projectmem/a.md\"}\r\n{\"location\": \".projectmem/b.md\"}\r\n",
+    )
+    .unwrap();
+    machine.apply();
+    assert_eq!(
+        fs::read(machine.root.join(".dejafix/events.jsonl")).unwrap(),
+        b"{\"location\": \".dejafix/a.md\"}\r\n{\"location\": \".dejafix/b.md\"}\r\n"
+    );
+    assert!(
+        read(&machine.root.join(".gitignore"))
+            .replace("\r\n", "\n")
+            .contains("node_modules/\n.dejafix/events.jsonl\n")
+    );
+}
+
+#[test]
+fn project_configs_still_pointing_at_projectmem_are_reported() {
+    let machine = legacy();
+    let root = &machine.root;
+    write(
+        &root.join(".mcp.json"),
+        "{\"mcpServers\": {\"projectmem\": {}}}",
+    );
+    write(
+        &root.join(".claude/settings.local.json"),
+        "{\"hooks\": {\"SessionStart\": [{\"command\": \"pjm brief\"}]}}",
+    );
+    write(&root.join(".codex/config.toml"), "[mcp_servers.dejafix]\n");
+    let events = machine.run(&machine.options(false, &[])).unwrap();
+    assert_eq!(
+        events.last(),
+        Some(&MigrateEvent::Leftovers {
+            configs: vec![
+                ("Project MCP config", root.join(".mcp.json")),
+                (
+                    "Project Claude Code local settings",
+                    root.join(".claude/settings.local.json")
+                ),
+            ],
+            env: Vec::new(),
+        })
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn a_project_config_linked_out_of_the_project_is_not_read() {
+    let machine = legacy();
+    let outside = machine.base.join("outside.json");
+    write(&outside, "{\"projectmem\": 1}");
+    std::os::unix::fs::symlink(&outside, machine.root.join(".mcp.json")).unwrap();
+    let events = machine.run(&machine.options(false, &[])).unwrap();
+    assert!(
+        !events
+            .iter()
+            .any(|event| matches!(event, MigrateEvent::Leftovers { .. }))
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn a_hook_linked_to_a_script_in_the_project_is_converted() {
+    let machine = legacy();
+    let hook = machine.root.join(".git/hooks/pre-commit");
+    let script = machine.root.join("scripts/pre-commit");
+    write(&script, OLD_HOOK);
+    fs::remove_file(&hook).unwrap();
+    std::os::unix::fs::symlink(&script, &hook).unwrap();
+    machine.apply();
+    let text = read(&hook);
+    assert!(text.contains("echo user hook"));
+    assert!(!text.contains("pjm auto-capture"));
+    assert_eq!(text.matches("# >>> dejafix auto-capture >>>").count(), 1);
+}
+
+#[test]
+fn a_project_config_is_reported_once_when_the_project_is_given_twice() {
+    let machine = legacy();
+    write(
+        &machine.root.join(".mcp.json"),
+        "{\"mcpServers\": {\"projectmem\": {}}}",
+    );
+    let root = machine.root.display().to_string();
+    let events = machine.run(&machine.options(false, &[&root])).unwrap();
+    assert_eq!(
+        events.last(),
+        Some(&MigrateEvent::Leftovers {
+            configs: vec![("Project MCP config", machine.root.join(".mcp.json"))],
+            env: Vec::new(),
+        })
+    );
+}

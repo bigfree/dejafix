@@ -42,7 +42,7 @@ impl Machine {
             color: false,
             zone: jiff::tz::TimeZone::UTC,
             path_var: None,
-            exe_dir: None,
+            exe: None,
             legacy_env: Vec::new(),
         }
     }

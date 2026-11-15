@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use serde_json::{Value, json};
+use serde_json::{Map, Value, json};
 
 use super::{
     Loaded, ProjectRecord, RegisterResult, Registry, RegistryError, is_slug, list_payload, load,
@@ -76,7 +76,7 @@ fn a_0_2_x_list_gets_ids_and_is_marked_dirty() {
         list_payload(&registry),
         json!([p("/code/alpha"), p("/code/beta")])
     );
-    let meta = meta_payload(&registry);
+    let meta = meta_payload(&registry, &Map::new());
     let keys: Vec<&String> = meta["by_path"].as_object().unwrap().keys().collect();
     assert_eq!(keys, [&p("/code/alpha"), &p("/code/beta")]);
     let Loaded::Clean(again) = loaded(&list_payload(&registry), Some(&meta)) else {
@@ -91,7 +91,7 @@ fn the_sidecar_is_written_in_python_key_order() {
         panic!("not dirty");
     };
     registry.active_project = Some("alpha".to_owned());
-    let text = serde_json::to_string(&meta_payload(&registry)).unwrap();
+    let text = serde_json::to_string(&meta_payload(&registry, &Map::new())).unwrap();
     assert_eq!(
         text,
         format!(
@@ -327,7 +327,7 @@ fn the_active_project_is_set_cleared_and_dropped_on_removal() {
 fn an_older_dejafix_can_only_append_a_path() {
     let mut registry = registry_of(&["/code/alpha"]);
     registry.set_alias("alpha", "a", NOW, no_resolve).unwrap();
-    let meta = meta_payload(&registry);
+    let meta = meta_payload(&registry, &Map::new());
     let Loaded::Dirty(appended) = loaded(&json!([p("/code/alpha"), p("/code/beta")]), Some(&meta))
     else {
         panic!("not dirty");
@@ -356,4 +356,29 @@ fn remove_id_removes_only_that_record_and_clears_it_as_active() {
     );
     assert_eq!(registry.active_project, None);
     assert_eq!(registry.remove_id("web"), None);
+}
+
+#[test]
+fn the_sidecar_keeps_keys_it_does_not_own_after_its_own() {
+    let Loaded::Dirty(registry) = loaded(&json!([p("/code/alpha")]), None) else {
+        panic!("not dirty");
+    };
+    let mut existing = Map::new();
+    existing.insert("last_version".to_owned(), json!("1.0.0rc3"));
+    existing.insert("schema_version".to_owned(), json!(0));
+    existing.insert("future_key".to_owned(), json!({"a": 1}));
+    let meta = meta_payload(&registry, &existing);
+    let keys: Vec<&String> = meta.as_object().unwrap().keys().collect();
+    assert_eq!(
+        keys,
+        [
+            "schema_version",
+            "active_project",
+            "by_path",
+            "last_version",
+            "future_key"
+        ]
+    );
+    assert_eq!(meta["schema_version"], json!(1));
+    assert_eq!(meta["last_version"], json!("1.0.0rc3"));
 }

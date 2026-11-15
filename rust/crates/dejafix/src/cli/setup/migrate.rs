@@ -3,7 +3,7 @@ use std::ops::ControlFlow;
 
 use dejafix_core::{MigrateEvent, MigrateOptions, ProjectState, Settings, migrate};
 
-use crate::cli::hooks::print_report;
+use crate::cli::hooks::{print_configured, print_report};
 use crate::cli::init::print_bridge;
 use crate::cli::types::Outcome;
 
@@ -62,6 +62,7 @@ pub(super) fn write_event(
         MigrateEvent::Project { label, state } => write_project(label, state, out),
         MigrateEvent::Bridge(file, outcome) => print_bridge(file, *outcome, out),
         MigrateEvent::Hooks(report) => print_report(report, out, err),
+        MigrateEvent::HooksConfigured { path, snippets } => print_configured(path, snippets, out),
         MigrateEvent::Leftovers { configs, env } => {
             writeln!(
                 out,

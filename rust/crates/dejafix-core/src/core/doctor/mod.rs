@@ -4,7 +4,7 @@ mod version;
 
 pub use pins::track_pins;
 pub use types::{Reverted, SeenConfig};
-pub use version::{is_newer, version_key};
+pub use version::is_newer;
 
 #[cfg(test)]
 mod tests;

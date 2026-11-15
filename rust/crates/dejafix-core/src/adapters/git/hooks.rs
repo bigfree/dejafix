@@ -3,12 +3,68 @@ use std::fs::{self, File};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
-use crate::adapters::fs::{StoreError, read_optional_text};
+use super::git;
+use super::types::HooksLocation;
+use crate::adapters::fs::{StoreError, identity, read_optional_text};
 use crate::core::hooks::shell_path;
 
+pub(crate) fn same_file(left: &Path, right: &Path) -> bool {
+    matches!((identity(left), identity(right)), (Some(left), Some(right)) if left == right)
+}
+
+fn owns_git_dir(root: &Path, git_dir: &Path, common: &Path) -> bool {
+    let dot_git = root.join(".git");
+    if same_file(git_dir, &dot_git) {
+        return true;
+    }
+    let linked = git_dir
+        .parent()
+        .is_some_and(|parent| same_file(parent, &common.join("worktrees")));
+    linked
+        && read_optional_text(&git_dir.join("gitdir"))
+            .ok()
+            .flatten()
+            .is_some_and(|backlink| {
+                let backlink = Path::new(backlink.trim());
+                backlink.is_absolute() && same_file(backlink, &dot_git)
+            })
+}
+
 #[must_use]
-pub fn hooks_dir(root: &Path) -> PathBuf {
-    root.join(".git").join("hooks")
+pub fn hooks_location(root: &Path) -> HooksLocation {
+    let fallback = HooksLocation::Folder(root.join(".git").join("hooks"));
+    let Some(output) = git(
+        root,
+        &[
+            "rev-parse",
+            "--show-toplevel",
+            "--absolute-git-dir",
+            "--git-common-dir",
+            "--git-path",
+            "hooks",
+        ],
+    ) else {
+        return fallback;
+    };
+    let Ok(text) = String::from_utf8(output) else {
+        return fallback;
+    };
+    let mut lines = text.lines().map(str::trim);
+    let (Some(top), Some(git_dir), Some(common), Some(hooks)) =
+        (lines.next(), lines.next(), lines.next(), lines.next())
+    else {
+        return fallback;
+    };
+    let common = root.join(common);
+    if !same_file(Path::new(top), root) || !owns_git_dir(root, Path::new(git_dir), &common) {
+        return fallback;
+    }
+    let hooks = root.join(hooks);
+    if hooks == common.join("hooks") {
+        HooksLocation::Folder(hooks)
+    } else {
+        HooksLocation::Configured(hooks)
+    }
 }
 
 #[cfg(unix)]
@@ -52,14 +108,18 @@ fn found_on_path(path_var: &OsStr, windows: bool) -> Option<PathBuf> {
 }
 
 #[must_use]
-pub fn resolve_djf_binary(
-    exe_dir: Option<&Path>,
-    path_var: Option<&OsStr>,
-    windows: bool,
-) -> String {
-    let found = exe_dir
-        .and_then(|directory| found_in_exe_dir(directory, windows))
-        .or_else(|| path_var.and_then(|var| found_on_path(var, windows)));
+pub fn resolve_djf_binary(exe: Option<&Path>, path_var: Option<&OsStr>, windows: bool) -> String {
+    let on_path = path_var.and_then(|var| found_on_path(var, windows));
+    let found = on_path
+        .clone()
+        .filter(|candidate| {
+            candidate.is_absolute() && exe.is_some_and(|exe| same_file(candidate, exe))
+        })
+        .or_else(|| {
+            exe.and_then(Path::parent)
+                .and_then(|directory| found_in_exe_dir(directory, windows))
+        })
+        .or(on_path);
     match found {
         Some(path) => shell_path(&path.to_string_lossy()),
         None => "djf".to_owned(),

@@ -37,7 +37,10 @@ djf init
 `djf init` does the following:
 
 1. Creates `.dejafix/` and registers the project.
-2. Installs the git hooks.
+2. Installs the git hooks. In a linked worktree they go to the main
+   repository's hooks folder. When `core.hooksPath` is set, for example by
+   husky, nothing is written; `djf init` prints the lines to add to your hook
+   manager instead.
 3. Writes a short bridge block into `CLAUDE.md` and `AGENTS.md`.
 4. Prints the MCP configuration with the path of `djf-mcp` filled in.
 
@@ -170,7 +173,8 @@ that off. See [SECURITY.md](SECURITY.md).
 To move an existing projectmem install, run `djf migrate` to see the changes,
 then `djf migrate --apply` to make them. It moves the memory folders, the home
 folder and the hooks. It also lists the client configs you need to update by
-hand.
+hand, including a project's own `.mcp.json`, `.cursor/mcp.json`,
+`.claude/settings*.json` and `.codex/config.toml`.
 
 ## License
 

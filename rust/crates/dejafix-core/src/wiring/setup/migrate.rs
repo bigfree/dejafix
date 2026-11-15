@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::fs;
 use std::io;
 use std::ops::ControlFlow;
@@ -11,7 +12,7 @@ use crate::adapters::fs::{
     holds_data, is_symlink, live_watcher, move_entry, points_outside, project_name, read_universal,
     resolve_path, write_atomic,
 };
-use crate::adapters::git::{exclude_file, hooks_dir};
+use crate::adapters::git::{HooksLocation, exclude_file, hooks_location};
 use crate::core::hooks::HookKind;
 use crate::core::migrate::{
     BRIDGE_BLOCK, Block, HOOK_BLOCK, LEGACY_DIR, MigrateStep, convert_block, has_legacy_path,
@@ -19,7 +20,7 @@ use crate::core::migrate::{
 };
 use crate::core::registry::{Loaded, Registry, load, slugify};
 use crate::core::scaffold::{INSTRUCTIONS_VERSION, instructions_version};
-use crate::wiring::hooks::install;
+use crate::wiring::hooks::{configured_snippets, install};
 use crate::wiring::init::{MEMORY_DIR, RULE_FILES, refresh_instructions, write_bridges};
 use crate::wiring::registry::now_text;
 use crate::wiring::types::{Settings, WiringError};
@@ -28,6 +29,16 @@ const LIST_FILE: &str = "projects.json";
 const STAMP_ONLY: &str = "projects.meta.json";
 const INSTRUCTIONS_FILE: &str = "AI_INSTRUCTIONS.md";
 const GITIGNORE: &str = ".gitignore";
+const PROJECT_CONFIGS: [(&str, &str); 5] = [
+    ("Project MCP config", ".mcp.json"),
+    ("Project Cursor MCP config", ".cursor/mcp.json"),
+    ("Project Claude Code settings", ".claude/settings.json"),
+    (
+        "Project Claude Code local settings",
+        ".claude/settings.local.json",
+    ),
+    ("Project Codex config", ".codex/config.toml"),
+];
 
 fn emit(
     sink: &mut impl FnMut(MigrateEvent) -> ControlFlow<()>,
@@ -184,12 +195,19 @@ impl IgnoreFile {
     }
 }
 
-fn has_old_block(path: &Path, root: &Path, block: &Block) -> bool {
-    read_inside(path, root).is_some_and(|text| text.contains(block.old_start))
+fn read_inside_any(path: &Path, roots: &[&Path]) -> Option<String> {
+    if roots.iter().all(|root| points_outside(path, root)) {
+        return None;
+    }
+    read_universal(path)
 }
 
-fn convert_file(path: &Path, root: &Path, block: &Block) -> Result<(), StoreError> {
-    let Some(text) = read_inside(path, root) else {
+fn has_old_block(path: &Path, roots: &[&Path], block: &Block) -> bool {
+    read_inside_any(path, roots).is_some_and(|text| text.contains(block.old_start))
+}
+
+fn convert_file(path: &Path, roots: &[&Path], block: &Block) -> Result<(), StoreError> {
+    let Some(text) = read_inside_any(path, roots) else {
         return Ok(());
     };
     match convert_block(&text, block) {
@@ -199,7 +217,16 @@ fn convert_file(path: &Path, root: &Path, block: &Block) -> Result<(), StoreErro
 }
 
 fn rewrite_paths(path: &Path, root: &Path) -> Result<(), StoreError> {
-    match read_inside(path, root).and_then(|text| rewrite_legacy_paths(&text)) {
+    if points_outside(path, root) {
+        return Ok(());
+    }
+    let Some(text) = fs::read(path)
+        .ok()
+        .and_then(|bytes| String::from_utf8(bytes).ok())
+    else {
+        return Ok(());
+    };
+    match rewrite_legacy_paths(&text) {
         Some(updated) => write_atomic(path, updated.as_bytes()),
         None => Ok(()),
     }
@@ -222,7 +249,10 @@ impl Plan {
             steps.push(MigrateStep::Bridges(self.bridges.clone()));
         }
         if !self.hooks.is_empty() {
-            steps.push(MigrateStep::Hooks(self.hooks.clone()));
+            steps.push(match self.hooks_folder {
+                HooksLocation::Folder(_) => MigrateStep::Hooks(self.hooks.clone()),
+                HooksLocation::Configured(_) => MigrateStep::ManagedHooks(self.hooks.clone()),
+            });
         }
         steps
     }
@@ -248,7 +278,10 @@ fn blocked(legacy: &Path, target: &Path) -> Option<ProjectState> {
 fn plan(root: &Path, legacy: &Path, target: &Path) -> Plan {
     let rename = legacy.is_dir();
     let memory = if rename { legacy } else { target };
-    let hooks = hooks_dir(root);
+    let hooks_folder = hooks_location(root);
+    let folder = match &hooks_folder {
+        HooksLocation::Folder(folder) | HooksLocation::Configured(folder) => folder.clone(),
+    };
     Plan {
         rename,
         stale: files_with_legacy_paths(memory),
@@ -262,13 +295,14 @@ fn plan(root: &Path, legacy: &Path, target: &Path) -> Plan {
             .collect(),
         bridges: RULE_FILES
             .into_iter()
-            .filter(|file| has_old_block(&root.join(file), root, &BRIDGE_BLOCK))
+            .filter(|file| has_old_block(&root.join(file), &[root], &BRIDGE_BLOCK))
             .collect(),
         hooks: HookKind::ALL
             .into_iter()
             .map(HookKind::file_name)
-            .filter(|name| has_old_block(&hooks.join(name), root, &HOOK_BLOCK))
+            .filter(|name| has_old_block(&folder.join(name), &[&folder, root], &HOOK_BLOCK))
             .collect(),
+        hooks_folder,
     }
 }
 
@@ -295,18 +329,28 @@ fn apply_plan(
     }
     if !plan.bridges.is_empty() {
         for file in &plan.bridges {
-            convert_file(&root.join(file), root, &BRIDGE_BLOCK)?;
+            convert_file(&root.join(file), &[root], &BRIDGE_BLOCK)?;
         }
         for (file, outcome) in write_bridges(root, &project.name)? {
             emit(sink, MigrateEvent::Bridge(file, outcome))?;
         }
     }
     if !plan.hooks.is_empty() {
-        let directory = hooks_dir(root);
-        for name in &plan.hooks {
-            convert_file(&directory.join(name), root, &HOOK_BLOCK)?;
+        match &plan.hooks_folder {
+            HooksLocation::Folder(directory) => {
+                for name in &plan.hooks {
+                    convert_file(&directory.join(name), &[directory, root], &HOOK_BLOCK)?;
+                }
+                emit(sink, MigrateEvent::Hooks(install(root, directory, djf)?))?;
+            }
+            HooksLocation::Configured(path) => emit(
+                sink,
+                MigrateEvent::HooksConfigured {
+                    path: path.clone(),
+                    snippets: configured_snippets(djf),
+                },
+            )?,
         }
-        emit(sink, MigrateEvent::Hooks(install(&directory, djf)?))?;
     }
     Ok(())
 }
@@ -349,8 +393,23 @@ fn migrate_project(
     Ok(())
 }
 
+fn project_configs(projects: &[LegacyProject]) -> Vec<(&'static str, PathBuf)> {
+    projects
+        .iter()
+        .flat_map(|project| {
+            PROJECT_CONFIGS
+                .into_iter()
+                .map(|(label, relative)| (label, project.root.join(relative)))
+                .filter(|(_, path)| {
+                    read_inside(path, &project.root).is_some_and(|text| is_stale_config(&text))
+                })
+        })
+        .collect()
+}
+
 fn leftovers(
     options: &MigrateOptions,
+    projects: &[LegacyProject],
     sink: &mut impl FnMut(MigrateEvent) -> ControlFlow<()>,
 ) -> Result<(), Halt> {
     let home = &options.clients.home;
@@ -360,10 +419,13 @@ fn leftovers(
         home.join(".claude").join("settings.json"),
     ));
     files.push(("Codex hooks", home.join(".codex").join("hooks.json")));
-    let configs: Vec<(&'static str, PathBuf)> = files
+    let mut configs: Vec<(&'static str, PathBuf)> = files
         .into_iter()
         .filter(|(_, path)| read_universal(path).is_some_and(|text| is_stale_config(&text)))
         .collect();
+    configs.extend(project_configs(projects));
+    let mut seen = HashSet::new();
+    configs.retain(|(_, path)| seen.insert(path.clone()));
     if configs.is_empty() && options.legacy_env.is_empty() {
         return Ok(());
     }
@@ -393,7 +455,7 @@ fn run(
     for project in &projects {
         migrate_project(project, options, sink)?;
     }
-    leftovers(options, sink)?;
+    leftovers(options, &projects, sink)?;
     if options.apply {
         emit(sink, MigrateEvent::Done)?;
     }

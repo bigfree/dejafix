@@ -283,6 +283,9 @@ fn print_hooks(
                 "  Auto-capture active — events will be logged automatically."
             )
         }
+        Some(InitHooks::Configured { path, snippets }) => {
+            super::hooks::print_configured(path, snippets, out)
+        }
         Some(InitHooks::NoGit) => writeln!(
             out,
             "  Note: No .git directory found. Run `djf hooks install` after `git init`."

@@ -126,6 +126,8 @@ const PROMOTED_STORE: &str = "home/.dejafix/global/library_gotchas.jsonl";
 const PROMOTION_CACHE: &str = "home/.dejafix/global/.promotable.json";
 const GLOBAL_DIR: &str = "home/.dejafix/global/";
 const LOCK_FILE: &str = ".jsonl.lock";
+const SIDECAR: &str = "home/.dejafix/projects.meta.json";
+const SIDECAR_KEYS: [&str; 3] = ["schema_version", "active_project", "by_path"];
 
 pub fn without_language_rules(text: &str) -> String {
     let crlf = |lf: &str| lf.replace('\n', "\r\n");
@@ -200,13 +202,42 @@ fn promoted_during(text: &str, since: &str) -> String {
         .collect()
 }
 
+fn only_registry_keys(text: &str) -> String {
+    let Ok(serde_json::Value::Object(meta)) = serde_json::from_str::<serde_json::Value>(text)
+    else {
+        return text.to_owned();
+    };
+    let extra: Vec<String> = meta
+        .keys()
+        .filter(|key| !SIDECAR_KEYS.contains(&key.as_str()))
+        .map(|key| format!(" {}: ", serde_json::Value::String(key.clone())))
+        .collect();
+    if extra.is_empty() {
+        return text.to_owned();
+    }
+    let newline = if text.contains("\r\n") { "\r\n" } else { "\n" };
+    let mut lines: Vec<&str> = text
+        .lines()
+        .filter(|line| !extra.iter().any(|prefix| line.starts_with(prefix.as_str())))
+        .collect();
+    let closing = lines.len().saturating_sub(2);
+    if let Some(line) = lines.get_mut(closing) {
+        *line = line.strip_suffix(',').unwrap_or(line);
+    }
+    let mut kept = lines.join(newline);
+    kept.push_str(newline);
+    kept
+}
+
 pub fn approved_departures(
     files: &mut std::collections::BTreeMap<String, String>,
     implementation: Implementation,
     since: &str,
 ) {
     for (path, text) in files.iter_mut() {
-        if path.ends_with("/.gitignore") {
+        if path == SIDECAR {
+            *text = only_registry_keys(text);
+        } else if path.ends_with("/.gitignore") {
             let kept: String = text
                 .split_inclusive('\n')
                 .filter(|line| line.trim_end_matches(['\r', '\n']) != ".djf-*")

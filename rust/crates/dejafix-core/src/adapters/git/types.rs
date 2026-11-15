@@ -21,6 +21,12 @@ pub struct RepoState {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub enum HooksLocation {
+    Folder(PathBuf),
+    Configured(PathBuf),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GitDirs {
     pub dir: PathBuf,
     pub common: PathBuf,
