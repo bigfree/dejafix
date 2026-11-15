@@ -1,5 +1,42 @@
 # Changelog
 
+## 1.0.0-rc.3
+
+**Third release candidate of the Rust rewrite.** Project memory and global memory share one ranked search. Global memory is written only on purpose, and every write is checked before it is stored. Memory is kept in English.
+
+### Added
+
+- **Ranked search.** `djf search` and `search_events` rank events by relevance (BM25F with an English analyzer and the Snowball English stemmer) and drop weak matches. The result line format is unchanged. `djf search --exact` and `--regex` keep the previous matching.
+- **`global_query` and `djf global query`** return the global gotchas that match a question. Results are ranked, capped at 8 and fitted to a token budget. `get_global_gotchas` keeps its name and arguments.
+- **`add_global_gotcha` and `djf global add-gotcha --keyword ...`** are the only ways to write global memory. A write is refused when it is:
+  - not in English;
+  - filed under a library that is not a package name;
+  - a duplicate of an existing record;
+  - carrying project details: project paths, ticket ids, internal hosts or private IP addresses.
+
+  Possible project details that are not certain are reported as warnings. Secrets are redacted before the record is stored.
+- **Version 2 global records** with `keywords`, `versions` and `reviewed`, and `libraries.json` for library aliases. Version 1 records are still read and are listed as "(not upgraded)".
+- **`djf global upgrade --export` / `--apply`** converts version 1 records from a draft that an agent fills and you review. It takes a backup first and is safe to run again.
+- **`djf global edit`** changes a record, checks it again and manages library aliases.
+- `djf global export` carries `libraries.json`, and `djf global import` merges it. Exports without it import as before.
+
+### Changed
+
+- **Memory is written in English.** Notes, decisions, issues and attempts that are not in English are refused with a message asking for an English rewrite. Auto-captured commits are exempt.
+- **No automatic promotion to global memory.** `.promotable.json` is no longer used. Lesson notes and failed attempts instead reply with a hint to call `add_global_gotcha`.
+- **`djf init` no longer copies global records into `AI_INSTRUCTIONS.md`.**
+- **Instructions version 4.** `AI_INSTRUCTIONS.md`, the `CLAUDE.md` / `AGENTS.md` bridge and the MCP instructions ask the agent to write memory in English, answer in the user's language, and call `global_query` before using a library or after an unexpected failure. Run `djf init` in each project to refresh them.
+- **Smaller release binaries.** The archives, installers and Homebrew binaries are stripped of symbols, as the PyPI wheels already were. `djf` and `dejafix` shrink from 6.3 to 4.9 MiB and `djf-mcp` from 5.8 to 4.3 MiB. Backtraces of release binaries show addresses instead of function names.
+
+### Upgrading
+
+Global records written by earlier versions stay readable. To convert them to version 2:
+
+1. Run `djf global upgrade --export`.
+2. Let an agent fill the draft.
+3. Review the draft.
+4. Run `djf global upgrade --apply`.
+
 ## 1.0.0-rc.2
 
 **Second release candidate of the Rust rewrite.** It closes the ways a cloned repository or a prompt-injected MCP call could make dejafix read, write or run something outside the project. It also widens the systems the release runs on.

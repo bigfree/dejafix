@@ -42,7 +42,7 @@ body:
     attributes:
       label: dejafix version
       description: For example from `pip show dejafix`, `brew list --versions dejafix` or the release you downloaded.
-      placeholder: 1.0.0-rc.2
+      placeholder: 1.0.0-rc.3
     validations:
       required: true
 
