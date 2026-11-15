@@ -572,10 +572,19 @@ fn only_kept_issues_are_rendered_and_names_match_full_rendering() {
 
 #[test]
 fn a_renamed_generated_file_is_recognised_and_nothing_else_is() {
-    let rendered: HashSet<&str> = ["0238-new-title.md", "0238-b-other.md"].into();
+    let rendered: HashSet<String> =
+        ["0238-new-title.md".to_owned(), "0238-b-other.md".to_owned()].into();
     let ids: HashSet<&str> = ["0238", "0238-b"].into();
-    let renamed =
-        |name: &str, head: &str| super::is_renamed_issue_file(name, head, &rendered, &ids);
+    let renamed = |name: &str, head: &str| {
+        super::is_renamed_issue_file(name, &rendered, &ids, || Some(head.to_owned()))
+    };
+    let unread =
+        |name: &str| super::is_renamed_issue_file(name, &rendered, &ids, || panic!("{name}"));
+    assert!(!unread("0238-new-title.md"));
+    assert!(!unread("0238-New-Title.md"));
+    assert!(!unread("0999-gone.md"));
+    assert!(!unread("notes.txt"));
+    assert!(!renamed("0238-old-title.md", "no header"));
     assert!(renamed("0238-old-title.md", "# #0238 old title\n"));
     assert!(renamed("0238-old-title.md", "# #0238 old title\r\n"));
     assert!(!renamed("0238-new-title.md", "# #0238 new title\n"));

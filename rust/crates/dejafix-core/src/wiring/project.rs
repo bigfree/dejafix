@@ -94,15 +94,17 @@ pub(super) fn regenerate_locked(
         source,
     })?;
     let present = regular_file_names(&directory)?;
-    let listed: HashSet<&str> = present.iter().map(String::as_str).collect();
-    let rendered = issue_files_where(log, |id, name| {
-        name.is_some_and(|name| match scope {
-            IssueScope::All => true,
-            IssueScope::Touched(touched) => {
-                !listed.contains(name) || touched.iter().any(|issue| issue == id)
-            }
-        })
-    });
+    let rendered = match scope {
+        IssueScope::All => issue_files_where(log, |_, name| name.is_some()),
+        IssueScope::Touched(touched) => {
+            let listed: HashSet<&str> = present.iter().map(String::as_str).collect();
+            issue_files_where(log, |id, name| {
+                name.is_some_and(|name| {
+                    !listed.contains(name) || touched.iter().any(|issue| issue == id)
+                })
+            })
+        }
+    };
     let files: Vec<(PathBuf, &str)> = rendered
         .iter()
         .filter_map(|file| {
@@ -125,18 +127,14 @@ fn remove_renamed(
     present: &[String],
     report: &mut Regenerated,
 ) {
-    let rendered: HashSet<&str> = files
+    let folded: HashSet<String> = files
         .iter()
-        .filter_map(|file| file.name.as_deref())
+        .filter_map(|file| file.name.as_deref().map(str::to_ascii_lowercase))
         .collect();
     let ids: HashSet<&str> = files.iter().map(|file| file.issue).collect();
-    for name in present
-        .iter()
-        .filter(|name| !rendered.contains(name.as_str()))
-    {
+    for name in present {
         let path = directory.join(name);
-        let head = file_head(&path, HEAD_LIMIT).unwrap_or_default();
-        if !is_renamed_issue_file(name, &head, &rendered, &ids) {
+        if !is_renamed_issue_file(name, &folded, &ids, || file_head(&path, HEAD_LIMIT)) {
             continue;
         }
         match remove_if_present(&path) {

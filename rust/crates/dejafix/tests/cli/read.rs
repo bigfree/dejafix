@@ -162,3 +162,29 @@ fn regenerate_removes_a_renamed_issue_file_and_says_so() -> TestResult {
     assert!(!again.contains("Removed"));
     Ok(())
 }
+
+#[cfg(unix)]
+#[test]
+fn regenerate_reports_a_file_it_cannot_remove_with_its_name_escaped() -> TestResult {
+    use std::os::unix::fs::PermissionsExt;
+    let repo = Repo::new()?;
+    repo.djf(&["log", "token expiry bug"]).assert().success();
+    let issues = repo.mem().join("issues");
+    let stale = issues.join("0001-old\u{1b}title.md");
+    fs::write(&stale, "# #0001 old title\n")?;
+    fs::set_permissions(&issues, fs::Permissions::from_mode(0o555))?;
+    if fs::write(issues.join("probe"), "").is_ok() {
+        fs::set_permissions(&issues, fs::Permissions::from_mode(0o755))?;
+        return Ok(());
+    }
+    let output = repo.djf(&["regenerate"]).output();
+    fs::set_permissions(&issues, fs::Permissions::from_mode(0o755))?;
+    let output = output?;
+    assert!(output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.starts_with("Could not remove 0001-old\\x1btitle.md: "));
+    assert!(!stderr.contains('\u{1b}'));
+    assert!(!String::from_utf8_lossy(&output.stdout).contains("Removed"));
+    assert!(stale.exists());
+    Ok(())
+}

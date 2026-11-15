@@ -158,30 +158,32 @@ pub fn issue_files_where<'l>(
 }
 
 #[must_use]
-pub fn is_renamed_issue_file<S: BuildHasher>(
+pub fn is_renamed_issue_file<S: BuildHasher, T: BuildHasher>(
     name: &str,
-    head: &str,
-    rendered: &HashSet<&str, S>,
-    ids: &HashSet<&str, S>,
+    folded_rendered: &HashSet<String, S>,
+    ids: &HashSet<&str, T>,
+    head: impl FnOnce() -> Option<String>,
 ) -> bool {
     if Path::new(name)
         .extension()
         .is_none_or(|extension| extension != "md")
-        || rendered
-            .iter()
-            .any(|rendered| rendered.eq_ignore_ascii_case(name))
+        || folded_rendered.contains(&name.to_ascii_lowercase())
     {
         return false;
     }
-    ids.iter()
+    let Some(owner) = ids
+        .iter()
         .filter(|id| {
             name.strip_prefix(**id)
                 .is_some_and(|rest| rest.starts_with('-'))
         })
         .max_by_key(|id| id.len())
-        .is_some_and(|id| {
-            head.strip_prefix("# #")
-                .and_then(|rest| rest.strip_prefix(*id))
-                .is_some_and(|rest| rest.starts_with(' '))
-        })
+    else {
+        return false;
+    };
+    head().is_some_and(|head| {
+        head.strip_prefix("# #")
+            .and_then(|rest| rest.strip_prefix(*owner))
+            .is_some_and(|rest| rest.starts_with(' '))
+    })
 }
