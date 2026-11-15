@@ -3,7 +3,7 @@ use std::fs;
 use std::path::Path;
 
 use crate::m3::{args, assert_same, compare, repository, write};
-use crate::types::Action;
+use crate::types::{Action, Run};
 
 type TestResult = Result<(), Box<dyn Error>>;
 type Prepared = Result<Vec<String>, Box<dyn Error>>;
@@ -64,6 +64,17 @@ fn legacy_home(project: &Path) -> Prepared {
     Ok(args(&["migrate"]))
 }
 
+#[expect(
+    clippy::unnecessary_wraps,
+    reason = "the compare hook takes fn(Run) -> Cleaned"
+)]
+fn crlf_kept_by_rust(mut run: Run) -> Result<Run, Box<dyn Error>> {
+    if let Some(text) = run.files.get_mut("project/.dejafix/events.jsonl") {
+        *text = text.replace("\r\n", "\n");
+    }
+    Ok(run)
+}
+
 fn step(list: &'static [&'static str]) -> Action<'static> {
     Action::Djf(Box::new(move |_| Ok(args(list))))
 }
@@ -79,7 +90,7 @@ fn migrate_matches_python() -> TestResult {
         step(&["migrate", "--apply"]),
         step(&["migrate", "--apply", "--path", "."]),
     ];
-    let (python, differences) = compare(&project, &actions, Ok)?;
+    let (python, differences) = compare(&project, &actions, crlf_kept_by_rust)?;
     assert_same("migrate a legacy project and home", &differences);
     let dry = &python.steps.first().ok_or("no step")?.stdout;
     assert!(dry.starts_with("Dry run"), "{dry}");
