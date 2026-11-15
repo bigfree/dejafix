@@ -1,0 +1,7 @@
+---
+source: crates/dejafix-core/src/core/global/tests.rs
+expression: "global_reply(&store(), \"worker never exits on sigterm\", None, 2_000)"
+---
+Global gotchas for "worker never exits on sigterm" (1 of 1 shown):
+- got_33f8cfe2c2d5 · bullmq >=6.2.0 <6.3 · from home-log, reviewed 2026-11-14
+  bullmq 6.2.0 Worker.close() never resolves against an unreachable Redis, so the process never exits on SIGTERM; pass a timeout.

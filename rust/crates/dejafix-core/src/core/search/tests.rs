@@ -1,7 +1,8 @@
 use serde_json::json;
 
 use super::{
-    SearchQuery, excerpt, match_line, mcp_match_line, no_match_message, search, search_reply,
+    SearchMode, SearchQuery, event_index, excerpt, match_line, mcp_match_line, no_match_message,
+    ranked, search, search_reply,
 };
 use crate::core::log::EventLog;
 use crate::core::path::PathContext;
@@ -21,25 +22,67 @@ fn log_text() -> String {
     .collect()
 }
 
-fn found(text: &str, regex: bool, failed_only: bool) -> Vec<String> {
-    let lines = log_text();
+fn parsed(lines: &str) -> EventLog<'_> {
     let context = PathContext {
         root: "/p".into(),
         cwd: "/p".into(),
         fold_case: false,
     };
-    let log = EventLog::parse(lines.as_bytes(), &fixed_clock(), &context, &NoResolve);
+    EventLog::parse(lines.as_bytes(), &fixed_clock(), &context, &NoResolve)
+}
+
+fn found(text: &str, regex: bool, failed_only: bool) -> Vec<String> {
+    let lines = log_text();
+    let log = parsed(&lines);
     search(
         &log,
         &SearchQuery {
             text,
-            regex,
+            mode: if regex {
+                SearchMode::Regex
+            } else {
+                SearchMode::Exact
+            },
             failed_only,
         },
     )
     .into_iter()
     .map(|event| event.id.as_str().to_owned())
     .collect()
+}
+
+fn ranked_ids(text: &str, failed_only: bool) -> Vec<String> {
+    let lines = log_text();
+    let log = parsed(&lines);
+    ranked(
+        &log,
+        &event_index(&log),
+        &SearchQuery {
+            text,
+            mode: SearchMode::Ranked,
+            failed_only,
+        },
+    )
+    .into_iter()
+    .map(|event| event.id.as_str().to_owned())
+    .collect()
+}
+
+#[test]
+fn ranked_search_finds_words_in_any_order_and_form() {
+    assert_eq!(ranked_ids("expired token", false), ["evt_1"]);
+    assert_eq!(ranked_ids("layouts contained", false), ["evt_3"]);
+    assert_eq!(ranked_ids("favicon carousel", false), ["evt_4"]);
+    assert_eq!(ranked_ids("payment", false), ["evt_3"]);
+    assert_eq!(ranked_ids("strasse closed", false), ["evt_2"]);
+    assert_eq!(ranked_ids("use", false), ["evt_5", "evt_6"]);
+    assert_eq!(ranked_ids("kubernetes", false), Vec::<String>::new());
+}
+
+#[test]
+fn failed_only_filters_before_ranking() {
+    assert_eq!(ranked_ids("carousel", true), Vec::<String>::new());
+    assert_eq!(ranked_ids("contain layout token", true), ["evt_3"]);
 }
 
 #[test]
@@ -93,16 +136,23 @@ fn lines_and_messages_match_python() {
     );
     let plain = SearchQuery {
         text: "a|b",
-        regex: false,
+        mode: SearchMode::Exact,
         failed_only: false,
     };
-    assert!(no_match_message(&plain).starts_with("No matches. (Tip:"));
+    assert!(no_match_message(&plain).starts_with("No matches. (Tip: substring"));
     assert_eq!(
         no_match_message(&SearchQuery {
-            regex: true,
+            mode: SearchMode::Regex,
             ..plain
         }),
         "No matches."
+    );
+    assert_eq!(
+        no_match_message(&SearchQuery {
+            mode: SearchMode::Ranked,
+            ..plain
+        }),
+        "No matches. (Tip: rerun with --exact for a plain substring match.)"
     );
     assert_eq!(
         no_match_message(&SearchQuery {
@@ -212,24 +262,38 @@ fn mcp_match_lines_are_python_s() {
 }
 
 #[test]
-fn search_reply_lists_the_last_matches_oldest_first() {
+fn search_reply_lists_the_best_matches_first_in_the_same_line_format() {
     let lines = log_text();
-    let context = PathContext {
-        root: "/p".into(),
-        cwd: "/p".into(),
-        fold_case: false,
-    };
-    let log = EventLog::parse(lines.as_bytes(), &fixed_clock(), &context, &NoResolve);
+    let log = parsed(&lines);
+    let index = event_index(&log);
     assert_eq!(
-        search_reply(&log, "use", 1, false),
-        "Found 1 match(es) for 'use':\n  [decision] evt_6 2027-01-01: use argon2"
+        search_reply(&log, &index, "argon2 decision", 1, false),
+        "Found 1 match(es) for 'argon2 decision':\n  [decision] evt_6 2027-01-01: use argon2"
     );
     assert_eq!(
-        search_reply(&log, "use", 10, false),
-        "Found 3 match(es) for 'use':\n  [attempt #0001 (worked)] evt_4 2027-01-01: rewrote the carousel\n  [decision] evt_5 2027-01-01: use bcrypt (superseded)\n  [decision] evt_6 2027-01-01: use argon2"
+        search_reply(&log, &index, "use", 10, false),
+        "Found 2 match(es) for 'use':\n  [decision] evt_5 2027-01-01: use bcrypt (superseded)\n  [decision] evt_6 2027-01-01: use argon2"
     );
     assert_eq!(
-        search_reply(&log, "zebra", 10, false),
+        search_reply(&log, &index, "zebra", 10, false),
         "No events match 'zebra'."
+    );
+}
+
+#[test]
+fn a_ranked_match_in_the_summary_shows_the_summary_not_the_notes() {
+    let lines = [json!({"id": "evt_1", "summary": "startup is slow because the cache warms twice", "notes": "seen after the deploy", "timestamp": "2027-01-01T00:00:00Z", "type": "note"})]
+    .iter()
+    .map(|event| event.to_string() + "\n")
+    .collect::<String>();
+    let log = parsed(&lines);
+    let index = event_index(&log);
+    assert_eq!(
+        search_reply(&log, &index, "slow startup", 10, false),
+        "Found 1 match(es) for 'slow startup':\n  [note] evt_1 2027-01-01: startup is slow because the cache warms twice"
+    );
+    assert_eq!(
+        search_reply(&log, &index, "deployment notes", 10, false),
+        "Found 1 match(es) for 'deployment notes':\n  [note] evt_1 2027-01-01: startup is slow because the cache warms twice | notes: seen after the deploy"
     );
 }

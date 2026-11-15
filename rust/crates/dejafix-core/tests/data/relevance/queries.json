@@ -1,0 +1,95 @@
+{
+  "queries": [
+    {
+      "query": "worker never exits on sigterm",
+      "first": "got_000000000001"
+    },
+    {
+      "query": "where are type definitions for this version",
+      "first": "got_00000000002f"
+    },
+    {
+      "query": "too many database connections after hot reload",
+      "first": "got_000000000007"
+    },
+    {
+      "query": "effects run twice in development",
+      "first": "got_000000000011"
+    },
+    {
+      "query": "environment variable undefined in the browser",
+      "first": "got_000000000014"
+    },
+    {
+      "query": "async route handler error request hangs",
+      "first": "got_00000000001b"
+    },
+    {
+      "query": "unknown keys removed from parsed object",
+      "first": "got_000000000020"
+    },
+    {
+      "query": "dynamic class names missing from css",
+      "first": "got_000000000022"
+    },
+    {
+      "query": "MissingGreenlet when reading a relationship",
+      "first": "got_000000000031"
+    },
+    {
+      "query": "blocking call stalls all requests",
+      "first": "got_000000000035"
+    },
+    {
+      "query": "proxy_pass trailing slash sends wrong path",
+      "first": "got_00000000003b"
+    },
+    {
+      "query": "task lost when the worker is killed",
+      "first": "got_00000000003d"
+    },
+    {
+      "query": "renamed column drops data in a migration",
+      "first": "got_00000000003f"
+    },
+    {
+      "query": "script hangs at the end because the database pool stays open",
+      "first": "got_000000000042"
+    },
+    {
+      "query": "ttl disappears after overwriting a key",
+      "first": "got_000000000046"
+    },
+    {
+      "query": "repeatable job scheduled twice after changing cron",
+      "first": "got_000000000003"
+    },
+    {
+      "query": "fetch results cached in the app router",
+      "first": "got_00000000000d"
+    },
+    {
+      "query": "eslintrc config ignored",
+      "first": "got_000000000027"
+    },
+    {
+      "query": "relative import needs a js extension",
+      "first": "got_000000000026"
+    },
+    {
+      "query": "docker image does not get smaller after deleting files",
+      "first": "got_00000000003a"
+    },
+    {
+      "query": "stale cached result after changing an environment variable",
+      "first": "got_000000000028"
+    }
+  ],
+  "off_topic": [
+    "kubernetes ingress certificate",
+    "terraform state lock",
+    "android gradle build variant",
+    "swift ui navigation",
+    "excel pivot table formula"
+  ]
+}

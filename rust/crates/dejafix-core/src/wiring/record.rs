@@ -3,17 +3,16 @@ use std::path::PathBuf;
 use super::project::regenerate_locked;
 use super::types::{Project, Recorded, WiringError};
 use crate::adapters::fs::{
-    FsResolver, GlobalStore, LockedLog, StoreError, clear_marker, detect_stack, lock_events,
-    read_marker, write_marker,
+    FsResolver, LockedLog, StoreError, clear_marker, detect_stack, lock_events, read_marker,
+    write_marker,
 };
 use crate::adapters::git::head_short;
-use crate::core::event::{Event, EventKind};
-use crate::core::global::{gotcha_entry, promotable_libraries, promotable_set, promotion};
+use crate::core::event::Event;
+use crate::core::global::{GlobalHint, global_hint, hint_candidate};
 use crate::core::log::EventLog;
-use crate::core::time::iso_micros;
 use crate::core::write::{
     Command, Ids, MarkerChange, MarkerState, ValidationError, WriteContext, checks_marker,
-    marker_state, plan_command,
+    language_notice, marker_state, plan_command,
 };
 
 pub fn record(
@@ -39,6 +38,10 @@ pub(crate) fn record_with(
         &FsResolver,
     );
     let command = command(&log)?;
+    let hints: Vec<String> = language_notice(&command)?
+        .map(str::to_owned)
+        .into_iter()
+        .collect();
     let marker = if checks_marker(&command) {
         let marker = read_marker(dir);
         if marker_state(&log, marker.as_deref()) == MarkerState::Stale {
@@ -60,6 +63,8 @@ pub(crate) fn record_with(
         .iter()
         .map(|event| event.id.as_str().to_owned())
         .collect();
+    let mut hints = hints;
+    hints.extend(plan.events.last().and_then(|event| hint(project, event)));
     let incomplete = commit_events(
         project,
         &mut locked,
@@ -67,13 +72,13 @@ pub(crate) fn record_with(
         plan.events,
         Some(&plan.marker),
         true,
-        ids,
     )?;
     drop(locked);
     Ok(Recorded {
         events,
         outcome: plan.outcome,
         notices: plan.notices,
+        hints,
         incomplete,
     })
 }
@@ -85,7 +90,6 @@ pub(super) fn commit_events<'a>(
     events: Vec<Event<'a>>,
     marker: Option<&MarkerChange>,
     regenerate: bool,
-    ids: &mut impl Ids,
 ) -> Result<Option<WiringError>, WiringError> {
     let dir = &project.memory.dir;
     let mut lines = Vec::new();
@@ -103,9 +107,6 @@ pub(super) fn commit_events<'a>(
         Some(MarkerChange::Set(issue)) => write_marker(dir, issue.as_str()),
         Some(MarkerChange::Clear) => clear_marker(dir),
     }
-    for event in &events {
-        promote(project, event, ids);
-    }
     for event in events {
         log.push(event, &project.context, &FsResolver);
     }
@@ -116,42 +117,14 @@ pub(super) fn commit_events<'a>(
     })
 }
 
-fn promote(project: &Project, event: &Event<'_>, ids: &mut impl Ids) {
-    if !matches!(
-        event.kind,
-        EventKind::Attempt | EventKind::Decision | EventKind::Note
-    ) {
-        return;
+fn hint(project: &Project, event: &Event<'_>) -> Option<String> {
+    let summary = event.summary.as_str();
+    let candidate = hint_candidate(summary, event.kind, event.outcome);
+    if candidate == GlobalHint::None {
+        return None;
     }
-    let store = GlobalStore::new(&project.settings.dejafix_home);
     let stack = detect_stack(&project.memory.root);
-    let libraries = promotable_libraries(&stack);
-    let _ = store.record_promotable(&libraries);
-    let Some(cached) = store.promotable() else {
-        return;
-    };
-    let promotable = promotable_set(&cached);
-    let source = project.name();
-    let discovered = iso_micros(&project.settings.clock);
-    let _ = store.append_gotcha_if_new(|existing| {
-        promotion(
-            event.summary.as_str(),
-            event.kind,
-            event.outcome,
-            &promotable,
-            &libraries,
-            existing,
-        )
-        .map(|library| {
-            gotcha_entry(
-                &library,
-                event.summary.as_str(),
-                ids.entry_id("got"),
-                discovered,
-                &source,
-            )
-        })
-    });
+    global_hint(summary, candidate, &stack.libraries)
 }
 
 pub fn regenerate(project: &Project) -> Result<PathBuf, WiringError> {

@@ -38,6 +38,35 @@ fn log_attempt_and_fix_write_events() -> TestResult {
 }
 
 #[test]
+fn a_note_in_another_language_exits_one_and_is_not_stored() -> TestResult {
+    let repo = Repo::new()?;
+    repo.djf(&["note", "zmazať cache"]).assert().code(1).stderr(
+        "Error: Memory is stored in English: too many letters outside ASCII. Rewrite the text in English and call the tool again.\n",
+    );
+    let output = repo.djf(&["log", "キャッシュを削除する"]).assert().code(1);
+    assert!(
+        String::from_utf8(output.get_output().stderr.clone())?
+            .contains("Memory is stored in English: it contains letters outside the Latin script.")
+    );
+    assert_eq!(repo.events()?.len(), 0);
+    Ok(())
+}
+
+#[test]
+fn a_doubtful_note_is_stored_and_warns_on_stderr() -> TestResult {
+    let repo = Repo::new()?;
+    repo.djf(&[
+        "note",
+        "smazat cache pri startu aplikace nebo restartu serveru",
+    ])
+    .assert()
+    .success()
+    .stderr("This does not look like English; if it is not, rewrite it in English.\n");
+    assert_eq!(repo.events()?.len(), 1);
+    Ok(())
+}
+
+#[test]
 fn fix_issue_closes_target_without_clearing_newer_active_issue() -> TestResult {
     let repo = Repo::new()?;
     repo.djf(&["log", "first"]).assert().success();
@@ -278,27 +307,63 @@ fn secrets_are_redacted_with_a_notice_unless_disabled() -> TestResult {
 }
 
 #[test]
-fn appending_an_event_stays_inside_an_isolated_home() -> TestResult {
+fn a_lesson_note_hints_at_global_memory_and_writes_nothing_there() -> TestResult {
     let repo = Repo::new()?;
     fs::write(
         repo.root.join("package.json"),
         r#"{"dependencies": {"react": "18"}}"#,
     )?;
-    repo.djf(&["note", "gotcha: react strict mode mounts twice"])
+    let assert = repo
+        .djf(&["note", "gotcha: react strict mode mounts twice"])
         .assert()
         .success();
+    assert_eq!(
+        String::from_utf8(assert.get_output().stderr.clone())?,
+        "If this applies beyond this project, also call add_global_gotcha(library=\"react\", ...) in English without project details.\n"
+    );
+    repo.djf(&[
+        "attempt",
+        "react portals lose context",
+        "--failed",
+        "--auto-issue",
+    ])
+    .assert()
+    .success();
     assert!(
-        repo.home
+        !repo
+            .home
             .join(".dejafix/global/library_gotchas.jsonl")
             .exists()
     );
+    assert!(!repo.home.join(".dejafix/global/.promotable.json").exists());
+    Ok(())
+}
+
+const LESSON: [&str; 8] = [
+    "global",
+    "add-gotcha",
+    "Vite reads environment variables once at startup; restart the dev server after a change.",
+    "--library",
+    "vite",
+    "--keyword",
+    "environment variable",
+    "--keyword=dev server",
+];
+
+#[test]
+fn global_memory_stays_inside_an_isolated_home() -> TestResult {
+    let repo = Repo::new()?;
     let elsewhere = repo.home.join("isolated");
-    repo.djf(&["note", "gotcha: react portals lose context"])
+    repo.djf(&LESSON)
         .env("DEJAFIX_HOME", &elsewhere)
         .assert()
         .success();
+    assert!(fs::read_to_string(elsewhere.join("global/library_gotchas.jsonl"))?.contains("Vite"));
     assert!(
-        fs::read_to_string(elsewhere.join("global/library_gotchas.jsonl"))?.contains("portals")
+        !repo
+            .home
+            .join(".dejafix/global/library_gotchas.jsonl")
+            .exists()
     );
     Ok(())
 }
@@ -306,11 +371,7 @@ fn appending_an_event_stays_inside_an_isolated_home() -> TestResult {
 #[test]
 fn global_memory_falls_back_to_home_without_the_env_var() -> TestResult {
     let repo = Repo::new()?;
-    fs::write(
-        repo.root.join("package.json"),
-        r#"{"dependencies": {"vite": "5"}}"#,
-    )?;
-    repo.djf(&["note", "gotcha: vite caches env vars"])
+    repo.djf(&LESSON)
         .env_remove("DEJAFIX_HOME")
         .assert()
         .success();

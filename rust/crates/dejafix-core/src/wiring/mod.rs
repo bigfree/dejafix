@@ -1,4 +1,5 @@
 mod files;
+mod global;
 mod hooks;
 mod init;
 mod mcp;
@@ -12,6 +13,7 @@ mod setup;
 mod types;
 
 pub use files::{add_plan_idea, read_memory_file};
+pub use global::add_gotcha;
 pub use hooks::{
     CaptureOutcome, EditHookRun, HooksAction, HooksOutcome, HooksReport, PrecheckOutcome,
     PrecheckRequest, auto_capture, edit_hook, hooks_action, precheck,
@@ -27,9 +29,9 @@ pub use setup::{
     set_auto_check, update_status,
 };
 pub use types::{
-    BridgeOutcome, CorruptLog, DoctorOptions, DoctorReport, FoundProject, Inherited, InitHooks,
-    InitOptions, InitReport, ListedProject, MemoryFile, Project, Recorded, RegistryOp,
-    RegistryReply, ScanReport, SearchOutput, Settings, UpgradeNotice, WiringError,
+    BridgeOutcome, CorruptLog, DoctorOptions, DoctorReport, FoundProject, InitHooks, InitOptions,
+    InitReport, ListedProject, MemoryFile, Project, Recorded, RegistryOp, RegistryReply,
+    ScanReport, SearchOutput, Settings, UpgradeNotice, WiringError,
 };
 
 #[cfg(test)]

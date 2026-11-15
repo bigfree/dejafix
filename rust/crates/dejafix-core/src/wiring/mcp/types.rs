@@ -7,8 +7,10 @@ use jiff::tz::TimeZone;
 
 use crate::adapters::git::{GitDirs, RepoState};
 use crate::core::event::Outcome;
+use crate::core::global::{GlobalIndex, GotchaInput};
 use crate::core::log::EventLog;
 use crate::core::path::PathContext;
+use crate::core::rank::Index;
 
 #[derive(Debug, Clone)]
 pub struct McpSettings {
@@ -25,6 +27,16 @@ pub struct McpState {
     pub(super) settings: McpSettings,
     pub(super) cache: Mutex<LogCache>,
     pub(super) git: Mutex<GitMemo>,
+    pub(super) global: Mutex<Option<GlobalEntry>>,
+}
+
+pub(super) type FileStamp = Option<(u64, Option<SystemTime>)>;
+
+#[derive(Debug)]
+pub(super) struct GlobalEntry {
+    pub(super) gotchas: FileStamp,
+    pub(super) libraries: FileStamp,
+    pub(super) index: Arc<GlobalIndex>,
 }
 
 #[derive(Debug, Default)]
@@ -67,6 +79,7 @@ pub(super) struct CacheEntry {
 pub struct CachedLog {
     pub log: EventLog<'static>,
     pub context: PathContext,
+    pub(super) index: std::sync::OnceLock<Index>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -90,6 +103,12 @@ pub enum ToolCall {
         focus: Option<String>,
     },
     GetGlobalGotchas(Option<String>),
+    GlobalQuery {
+        query: String,
+        library: Option<String>,
+        budget: u32,
+    },
+    AddGlobalGotcha(GotchaInput),
     Write(WriteCall),
     ListProjects,
     CurrentProject,

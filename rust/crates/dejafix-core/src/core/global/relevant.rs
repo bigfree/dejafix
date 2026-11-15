@@ -1,13 +1,8 @@
 use std::collections::HashSet;
-use std::fmt::Write;
 
 use serde_json::Value;
 
 use super::types::{Entry, Relevant, Stack};
-use crate::core::json::python_str;
-
-const HEADING: &str = "## Global Memory — Inherited Knowledge\n";
-const INTRO: &str = "The following patterns and gotchas were inherited from your global memory\n(~/.dejafix/global/). They represent lessons learned from other projects.\n";
 
 fn pattern_matches(entry: &Entry, project_tags: &HashSet<&str>) -> bool {
     match entry.get("tags") {
@@ -74,57 +69,4 @@ pub(crate) fn is_truthy(value: &Value) -> bool {
         Value::Array(items) => !items.is_empty(),
         Value::Object(map) => !map.is_empty(),
     }
-}
-
-fn field(entry: &Entry, key: &str, default: &str) -> String {
-    entry
-        .get(key)
-        .map_or_else(|| default.to_owned(), python_str)
-}
-
-fn suffix(entry: &Entry, key: &str, render: impl Fn(&str) -> String) -> String {
-    entry
-        .get(key)
-        .filter(|value| is_truthy(value))
-        .map(|value| render(&python_str(value)))
-        .unwrap_or_default()
-}
-
-#[must_use]
-pub fn inherited_block(relevant: &Relevant<'_>) -> Option<String> {
-    if relevant.patterns.is_empty() && relevant.gotchas.is_empty() {
-        return None;
-    }
-    let mut block = format!("{HEADING}\n{INTRO}");
-    if !relevant.gotchas.is_empty() {
-        block.push_str("\n### Library Gotchas\n");
-        for gotcha in &relevant.gotchas {
-            let _ = write!(
-                block,
-                "\n- **{}**{}: {}{}",
-                field(gotcha, "library", "unknown"),
-                suffix(gotcha, "version_range", |version| format!(" [{version}]")),
-                field(gotcha, "gotcha", ""),
-                suffix(gotcha, "source_project", |source| format!(
-                    " (from {source})"
-                )),
-            );
-        }
-        block.push('\n');
-    }
-    if !relevant.patterns.is_empty() {
-        block.push_str("\n### Cross-Project Patterns\n");
-        for pattern in &relevant.patterns {
-            let _ = write!(
-                block,
-                "\n- {}{}",
-                field(pattern, "pattern", ""),
-                suffix(pattern, "source_project", |source| format!(
-                    " (from {source})"
-                )),
-            );
-        }
-        block.push('\n');
-    }
-    Some(block)
 }

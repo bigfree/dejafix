@@ -315,17 +315,17 @@
     }
   },
   {
-    "description": "Plain-text search across all logged events.\n\nToken-efficient alternative to get_summary when you only need events\nmatching a keyword. Each match shows its type, issue, event id (what\nadd_decision's `supersedes` takes) and date, and its text clipped to\nRECORD_CHARS around the match; a match found only in notes shows the\nnotes. Retired decisions are marked (superseded). Pass `full=True` for\nwhole texts once the query is narrow.\n\nRead-only. Empty result returns a friendly message, not an error.",
+    "description": "Search all logged events by relevance: the words of the query may\nappear in any order or form (English stemming).\n\nToken-efficient alternative to get_summary when you only need events\nabout one topic. Matches are listed best first. Each match shows its type, issue, event id (what\nadd_decision's `supersedes` takes) and date, and its text clipped to\nRECORD_CHARS around the match; a match found only in notes shows the\nnotes. Retired decisions are marked (superseded). Pass `full=True` for\nwhole texts once the query is narrow.\n\nRead-only. Empty result returns a friendly message, not an error.",
     "inputSchema": {
       "properties": {
         "query": {
-          "description": "Case-insensitive substring matched against each event's summary, notes, location and files. Plain text only — no regex or boolean operators.",
+          "description": "Words to look for in each event's summary, notes, location and files, in English. Ranked by relevance; no regex or boolean operators.",
           "title": "Query",
           "type": "string"
         },
         "limit": {
           "default": 10,
-          "description": "How many of the most recent matches to return, listed oldest first. Defaults to 10. Recommended range: 1-100.",
+          "description": "How many of the best matches to return, best first. Defaults to 10. Recommended range: 1-100.",
           "maximum": 100,
           "minimum": 1,
           "title": "Limit",
@@ -466,7 +466,7 @@
     }
   },
   {
-    "description": "Query cross-project library gotchas from ~/.dejafix/global/.\n\nReturns lessons learned in past projects that apply to the libraries\nyou're about to use. Call whenever working with an unfamiliar library\nor starting a new feature.\n\nRead-only. Reads from ~/.dejafix/global/ (cross-project memory,\nnot this repo's .dejafix/).",
+    "description": "List one library's lessons from global memory (~/.dejafix/global/).\n\nTo search by what you are doing or by a failure, call global_query\ninstead; it ranks lessons by relevance.\n\nRead-only. Reads from ~/.dejafix/global/ (cross-project memory,\nnot this repo's .dejafix/).",
     "inputSchema": {
       "properties": {
         "library": {
@@ -479,7 +479,7 @@
             }
           ],
           "default": null,
-          "description": "Optional library name to filter by (case-insensitive substring match — 'react' also matches 'react-router'). When omitted, returns all gotchas across every library — useful when starting a new feature to scan for any relevant past lessons.",
+          "description": "Library name or one of its aliases ('nextjs' finds 'next'). When omitted, lists every library's lessons within the default reply budget.",
           "title": "Library"
         },
         "project": {
@@ -512,6 +512,44 @@
       ],
       "type": "object",
       "title": "get_global_gotchasOutput"
+    }
+  },
+  {
+    "name": "global_query",
+    "description": "Search lessons from all projects (global memory), ranked by relevance. Call it before using a library and after an unexpected failure.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "What you are about to do or the failure you saw, in English."
+        },
+        "library": {
+          "type": "string",
+          "description": "Only records of this library or its aliases."
+        },
+        "budget": {
+          "type": "integer",
+          "minimum": 500,
+          "maximum": 8000,
+          "default": 2000,
+          "description": "Reply size in tokens."
+        }
+      },
+      "required": [
+        "query"
+      ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "result": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "result"
+      ]
     }
   },
   {
@@ -789,11 +827,11 @@
     }
   },
   {
-    "description": "Record a gotcha, setup detail, or other durable context.\n\nUse when you discover something important that doesn't fit as an\nissue or decision. Notes survive across sessions and appear in\nwrap context blocks.\n\nReplies with the note's event id. Side effects: appends a `note`\nevent. Notes prefixed `gotcha:`,\n`lesson:`, or `warning:` are eligible for auto-promotion to\n~/.dejafix/global/ for cross-project recall (L-046).",
+    "description": "Record a gotcha, setup detail, or other durable context.\n\nUse when you discover something important that doesn't fit as an\nissue or decision. Notes survive across sessions and appear in\nwrap context blocks.\n\nReplies with the note's event id. Side effects: appends a `note`\nevent. Nothing is written to global memory; a lesson that holds\nbeyond this project goes to add_global_gotcha.",
     "inputSchema": {
       "properties": {
         "summary": {
-          "description": "One-line description of the gotcha, setup detail, or context worth preserving. Prefix with 'gotcha:' or 'lesson:' to enable cross-project promotion — e.g., 'gotcha: bcrypt v4 silently truncates passwords longer than 72 bytes'. Keep it under 300 characters: summary.md clips longer text.",
+          "description": "One-line description in English of the gotcha, setup detail, or context worth preserving — e.g., 'gotcha: bcrypt v4 silently truncates passwords longer than 72 bytes'. Keep it under 300 characters: summary.md clips longer text.",
           "title": "Summary",
           "type": "string"
         },
@@ -843,6 +881,50 @@
       ],
       "type": "object",
       "title": "add_noteOutput"
+    }
+  },
+  {
+    "name": "add_global_gotcha",
+    "description": "Store a lesson that holds beyond this project in global memory. Write it in English, without project paths, ticket numbers, hosts or project names; a refusal lists every problem. Call global_query first so you do not add a duplicate.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "library": {
+          "type": "string",
+          "description": "Package name as published, e.g. 'bullmq' or '@nx/js'."
+        },
+        "keywords": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "2 to 8 English phrases of at most 4 words that a later search would use."
+        },
+        "gotcha": {
+          "type": "string",
+          "description": "The lesson, 30 to 600 characters."
+        },
+        "versions": {
+          "type": "string",
+          "description": "Optional version range it applies to, e.g. '>=6.2 <6.3'."
+        }
+      },
+      "required": [
+        "library",
+        "keywords",
+        "gotcha"
+      ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "result": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "result"
+      ]
     }
   },
   {

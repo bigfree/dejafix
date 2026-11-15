@@ -1,8 +1,8 @@
 use super::{
     BRIDGE_END, BRIDGE_START, BridgeChange, INSTRUCTIONS_VERSION, ManifestInfo, TITLE_CHARS,
-    ai_instructions, apply_bridge, bridge_block, extract_global_block, gitignore_with,
-    initial_plan, initial_project_map, initial_summary, instructions_version, plan_with_idea,
-    project_map_from_stack, splice_global_block, stack_summary_suffix,
+    ai_instructions, apply_bridge, bridge_block, gitignore_with, initial_plan, initial_project_map,
+    initial_summary, instructions_version, plan_with_idea, project_map_from_stack,
+    stack_summary_suffix,
 };
 use crate::core::global::Stack;
 use crate::core::summary::RECORD_CHARS;
@@ -45,56 +45,6 @@ fn the_instructions_state_record_lengths_and_supersedes() {
     assert!(text.contains("supersedes=") || text.contains("--supersedes"));
     assert!(text.contains("precheck_file(file_path)"));
     insta::assert_snapshot!(text);
-}
-
-#[test]
-fn a_global_block_is_extracted_up_to_the_next_heading() {
-    assert_eq!(
-        extract_global_block(STALE).as_deref(),
-        Some(
-            "## Global Memory — Inherited Knowledge\n\n### Library Gotchas\n\n- **vite**: dev server caches deps (from other-app)\n"
-        )
-    );
-    assert_eq!(extract_global_block("no block here"), None);
-    assert_eq!(
-        extract_global_block("x\n## Global Memory — Inherited Knowledge\nbody\n\n\n").as_deref(),
-        Some("## Global Memory — Inherited Knowledge\nbody\n")
-    );
-}
-
-#[test]
-fn a_spliced_block_replaces_the_old_one_before_the_rules() {
-    let block = extract_global_block(STALE).unwrap();
-    let fresh = splice_global_block(ai_instructions(), &block);
-    assert_eq!(
-        fresh
-            .matches("## Global Memory — Inherited Knowledge")
-            .count(),
-        1
-    );
-    assert!(fresh.find("Global Memory").unwrap() < fresh.find("## Rules summary").unwrap());
-    let again = splice_global_block(&fresh, "## Global Memory — Inherited Knowledge\nnew\n");
-    assert_eq!(again.matches("## Global Memory").count(), 1);
-    assert!(again.contains("Inherited Knowledge\nnew\n\n## Rules summary"));
-    assert!(!again.contains("vite"));
-}
-
-#[test]
-fn a_block_goes_to_the_end_without_a_rules_heading() {
-    assert_eq!(
-        splice_global_block(
-            "# Title\n\n\n",
-            "## Global Memory — Inherited Knowledge\nx\n"
-        ),
-        "# Title\n\n## Global Memory — Inherited Knowledge\nx\n"
-    );
-    assert_eq!(
-        splice_global_block(
-            "a\n## Global Memory — Inherited Knowledge\nold\n\n## Next\nb\n",
-            "NEW\n"
-        ),
-        "a\n\n## Next\nb\n\nNEW\n"
-    );
 }
 
 #[test]

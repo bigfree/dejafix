@@ -80,7 +80,7 @@ impl McpState {
         }
         let name = &target.name;
         let last = recorded.events.last().map_or("", String::as_str);
-        Ok(match recorded.outcome {
+        let mut reply = match recorded.outcome {
             WriteOutcome::Logged(issue) => format!("Logged issue #{} → {name}", issue.as_str()),
             WriteOutcome::Attempted { outcome, issue } => format!(
                 "Recorded {} attempt on #{} → {name}",
@@ -95,6 +95,11 @@ impl McpState {
                 format!("Recorded decision {last} → {name}{retired}")
             }
             WriteOutcome::Noted => format!("Recorded note {last} → {name}"),
-        })
+        };
+        for notice in &recorded.hints {
+            reply.push('\n');
+            reply.push_str(notice);
+        }
+        Ok(reply)
     }
 }

@@ -87,6 +87,10 @@ pub struct WritePlan {
 pub enum ValidationError {
     #[error("Event summary cannot be empty")]
     EmptySummary,
+    #[error(
+        "Memory is stored in English: {0}. Rewrite the text in English and call the tool again."
+    )]
+    NotEnglish(String),
     #[error("Use only one of --worked, --failed, or --partial.")]
     TwoOutcomes,
     #[error(

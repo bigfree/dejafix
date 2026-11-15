@@ -1,22 +1,24 @@
-use std::collections::{BTreeSet, HashSet};
-use std::fs::{self, OpenOptions};
-use std::io::{Read, Seek, SeekFrom, Write};
+use std::collections::HashSet;
+use std::fs::{self, File, OpenOptions};
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 
 use jiff::tz::TimeZone;
 use serde_json::{Map, Value};
 
 use super::store::read_python_text;
-use super::types::{GlobalStore, StoreError};
-use super::write::write_text;
-use crate::core::global::{Entry, PROMOTABLE_SEED, is_prunable};
+use super::types::{GlobalStore, GotchaWrite, StoreError};
+use super::write::{write_atomic, write_text};
+use crate::core::global::{Entry, Libraries, StoredGotcha, is_prunable, stored_line};
 use crate::core::json::{write_canonical, write_python_json_indented};
 use crate::core::text::{platform_newlines, python_lines, python_strip, universal_newlines};
 
 const PATTERNS_FILE: &str = "patterns.jsonl";
 const GOTCHAS_FILE: &str = "library_gotchas.jsonl";
 const PREFERENCES_FILE: &str = "stack_preferences.md";
-const PROMOTABLE_FILE: &str = ".promotable.json";
+const LIBRARIES_FILE: &str = "libraries.json";
+const BACKUP_FILE: &str = "library_gotchas.v1.jsonl";
+const LOCK_ATTEMPTS: usize = 16;
 
 fn write_error(path: &Path) -> impl Fn(std::io::Error) -> StoreError + '_ {
     move |source| StoreError::Write {
@@ -48,28 +50,42 @@ fn parse_entries(text: &str) -> Option<Vec<Entry>> {
         .collect()
 }
 
-fn library_names(value: Option<&Value>) -> Option<Vec<String>> {
-    match value {
-        None => Some(Vec::new()),
-        Some(Value::Array(items)) => Some(
-            items
-                .iter()
-                .filter_map(Value::as_str)
-                .filter(|name| !name.is_empty())
-                .map(str::to_lowercase)
-                .collect(),
+fn invalid_store(path: &Path) -> StoreError {
+    StoreError::Read {
+        path: path.to_path_buf(),
+        source: std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "a line is not a JSON object",
         ),
-        Some(Value::Object(map)) => Some(
-            map.keys()
-                .filter(|name| !name.is_empty())
-                .map(|name| name.to_lowercase())
-                .collect(),
-        ),
-        Some(Value::String(text)) => {
-            Some(text.chars().map(|c| c.to_lowercase().collect()).collect())
-        }
-        Some(Value::Null | Value::Bool(_) | Value::Number(_)) => None,
     }
+}
+
+#[cfg(unix)]
+fn same_file(file: &File, path: &Path) -> bool {
+    use std::os::unix::fs::MetadataExt;
+    match (file.metadata(), fs::metadata(path)) {
+        (Ok(open), Ok(named)) => open.dev() == named.dev() && open.ino() == named.ino(),
+        _ => false,
+    }
+}
+
+#[cfg(not(unix))]
+fn same_file(file: &File, path: &Path) -> bool {
+    match (file.metadata(), fs::metadata(path)) {
+        (Ok(open), Ok(named)) => {
+            open.len() == named.len() && open.modified().ok() == named.modified().ok()
+        }
+        _ => false,
+    }
+}
+
+fn joined_lines(lines: &[String]) -> String {
+    let mut text = String::with_capacity(lines.iter().map(|line| line.len() + 1).sum());
+    for line in lines {
+        text.push_str(line);
+        text.push('\n');
+    }
+    text
 }
 
 impl GlobalStore {
@@ -95,57 +111,6 @@ impl GlobalStore {
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
             Err(_) => Err(()),
         }
-    }
-
-    #[must_use]
-    pub fn promotable(&self) -> Option<Vec<String>> {
-        let _ = self.ensure();
-        let text = match self.read(PROMOTABLE_FILE, true) {
-            Ok(Some(text)) => text,
-            Ok(None) => return Some(Vec::new()),
-            Err(()) => return None,
-        };
-        match serde_json::from_str::<Value>(&text) {
-            Ok(Value::Object(data)) => library_names(data.get("libraries")),
-            Ok(_) => None,
-            Err(_) => Some(Vec::new()),
-        }
-    }
-
-    pub fn record_promotable(&self, libraries: &[String]) -> Result<(), StoreError> {
-        let fresh: BTreeSet<String> = libraries
-            .iter()
-            .filter(|library| !library.is_empty())
-            .map(|library| library.to_lowercase())
-            .collect();
-        if fresh.is_empty() {
-            return Ok(());
-        }
-        let Some(cached) = self.promotable() else {
-            return Ok(());
-        };
-        let mut known: BTreeSet<String> = PROMOTABLE_SEED
-            .iter()
-            .map(|library| (*library).to_owned())
-            .chain(cached)
-            .collect();
-        if fresh.is_subset(&known) {
-            return Ok(());
-        }
-        known.extend(fresh);
-        let path = self.path(PROMOTABLE_FILE);
-        let value = serde_json::json!({"libraries": known.into_iter().collect::<Vec<_>>()});
-        let mut out = Vec::new();
-        write_python_json_indented(&mut out, &value, 2, true)
-            .map_err(|error| write_error(&path)(error.into()))?;
-        self.ensure()?;
-        write_text(&path, &String::from_utf8_lossy(&out))
-    }
-
-    #[must_use]
-    pub fn has_entries(&self) -> bool {
-        let _ = self.ensure();
-        self.path(PATTERNS_FILE).exists() || self.path(GOTCHAS_FILE).exists()
     }
 
     #[must_use]
@@ -205,24 +170,93 @@ impl GlobalStore {
         Ok(String::from_utf8_lossy(&bytes).into_owned())
     }
 
-    fn append(&self, name: &str, entry: &Entry) -> Result<(), StoreError> {
-        self.ensure()?;
-        let path = self.path(name);
-        let text = Self::canonical_lines(&path, &[entry])?;
-        OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&path)
-            .and_then(|mut file| file.write_all(platform_newlines(&text).as_bytes()))
-            .map_err(write_error(&path))
+    fn split_lines(text: &str) -> Vec<String> {
+        text.lines().map(str::to_owned).collect()
     }
 
     pub fn append_pattern(&self, entry: &Entry) -> Result<(), StoreError> {
-        self.append(PATTERNS_FILE, entry)
+        let lines = Self::split_lines(&Self::canonical_lines(&self.path(PATTERNS_FILE), &[entry])?);
+        self.change_locked(PATTERNS_FILE, true, |_| {
+            (GotchaWrite::Append(lines.clone()), ())
+        })
+        .map(drop)
     }
 
-    pub fn append_gotcha(&self, entry: &Entry) -> Result<(), StoreError> {
-        self.append(GOTCHAS_FILE, entry)
+    fn change_locked<T>(
+        &self,
+        name: &str,
+        create: bool,
+        mut decide: impl FnMut(Vec<Entry>) -> (GotchaWrite, T),
+    ) -> Result<Option<T>, StoreError> {
+        self.ensure()?;
+        let path = self.path(name);
+        let read_error = |source| StoreError::Read {
+            path: path.clone(),
+            source,
+        };
+        let lock_error = |source| StoreError::Lock {
+            path: path.clone(),
+            source,
+        };
+        for _ in 0..LOCK_ATTEMPTS {
+            let mut created = false;
+            let mut file = match OpenOptions::new().read(true).append(true).open(&path) {
+                Ok(file) => file,
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound && !create => {
+                    return Ok(None);
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                    match OpenOptions::new()
+                        .read(true)
+                        .append(true)
+                        .create_new(true)
+                        .open(&path)
+                    {
+                        Ok(file) => {
+                            created = true;
+                            file
+                        }
+                        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+                            continue;
+                        }
+                        Err(error) => return Err(write_error(&path)(error)),
+                    }
+                }
+                Err(error) => return Err(read_error(error)),
+            };
+            file.lock().map_err(lock_error)?;
+            if !same_file(&file, &path) {
+                continue;
+            }
+            let mut text = String::new();
+            file.read_to_string(&mut text).map_err(read_error)?;
+            let entries =
+                parse_entries(&universal_newlines(&text)).ok_or_else(|| invalid_store(&path))?;
+            let (write, value) = decide(entries);
+            if created && text.is_empty() && matches!(write, GotchaWrite::Keep) {
+                fs::remove_file(&path).map_err(write_error(&path))?;
+                return Ok(Some(value));
+            }
+            self.apply(&path, &mut file, write)?;
+            return Ok(Some(value));
+        }
+        Err(lock_error(std::io::Error::new(
+            std::io::ErrorKind::WouldBlock,
+            "the file kept being replaced while waiting for its lock",
+        )))
+    }
+
+    fn apply(&self, path: &Path, file: &mut File, write: GotchaWrite) -> Result<(), StoreError> {
+        match write {
+            GotchaWrite::Keep => Ok(()),
+            GotchaWrite::Append(lines) => file
+                .write_all(platform_newlines(&joined_lines(&lines)).as_bytes())
+                .map_err(write_error(path)),
+            GotchaWrite::Replace(lines) => {
+                self.ensure()?;
+                write_atomic(path, platform_newlines(&joined_lines(&lines)).as_bytes())
+            }
+        }
     }
 
     fn retain_locked(
@@ -230,40 +264,109 @@ impl GlobalStore {
         name: &str,
         mut keep: impl FnMut(&Entry) -> bool,
     ) -> Result<usize, StoreError> {
-        self.ensure()?;
         let path = self.path(name);
-        let read_error = |source| StoreError::Read {
-            path: path.clone(),
-            source,
-        };
-        let mut file = match OpenOptions::new().read(true).write(true).open(&path) {
-            Ok(file) => file,
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(0),
-            Err(error) => return Err(read_error(error)),
-        };
-        file.lock().map_err(|source| StoreError::Lock {
-            path: path.clone(),
-            source,
+        let mut failure = None;
+        let removed = self.change_locked(name, false, |entries| {
+            let total = entries.len();
+            let kept: Vec<Entry> = entries.into_iter().filter(|entry| keep(entry)).collect();
+            let removed = total - kept.len();
+            if removed == 0 {
+                return (GotchaWrite::Keep, 0);
+            }
+            if name == GOTCHAS_FILE {
+                let lines = kept
+                    .into_iter()
+                    .map(|entry| stored_line(&StoredGotcha::from_entry(entry)))
+                    .collect();
+                return (GotchaWrite::Replace(lines), removed);
+            }
+            let kept: Vec<&Entry> = kept.iter().collect();
+            match Self::canonical_lines(&path, &kept) {
+                Ok(text) => (GotchaWrite::Replace(Self::split_lines(&text)), removed),
+                Err(error) => {
+                    failure = Some(error);
+                    (GotchaWrite::Keep, 0)
+                }
+            }
         })?;
-        let mut text = String::new();
-        file.read_to_string(&mut text).map_err(read_error)?;
-        let entries = parse_entries(&universal_newlines(&text)).ok_or_else(|| {
-            read_error(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                "a line is not a JSON object",
-            ))
-        })?;
-        let kept: Vec<&Entry> = entries.iter().filter(|entry| keep(entry)).collect();
-        let removed = entries.len() - kept.len();
-        if removed == 0 {
-            return Ok(0);
+        failure.map_or(Ok(removed.unwrap_or(0)), Err)
+    }
+
+    pub fn edit_gotchas<T>(
+        &self,
+        decide: impl FnMut(Vec<Entry>) -> (GotchaWrite, T),
+    ) -> Result<T, StoreError> {
+        let mut decide = decide;
+        self.change_locked(GOTCHAS_FILE, true, &mut decide)?
+            .ok_or_else(|| invalid_store(&self.path(GOTCHAS_FILE)))
+    }
+
+    pub fn replace_gotchas(&self, lines: &[String]) -> Result<(), StoreError> {
+        self.edit_gotchas(|_| (GotchaWrite::Replace(lines.to_vec()), ()))
+    }
+
+    pub fn libraries(&self) -> Result<Libraries, StoreError> {
+        let path = self.path(LIBRARIES_FILE);
+        let Some(text) = read_json_text(&path)? else {
+            return Ok(Libraries::default());
+        };
+        serde_json::from_str::<Value>(&text)
+            .ok()
+            .and_then(|value| Libraries::from_value(&value))
+            .ok_or_else(|| StoreError::Read {
+                path,
+                source: std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "libraries.json is not an object of library name to alias list",
+                ),
+            })
+    }
+
+    pub fn save_libraries(&self, libraries: &Libraries) -> Result<(), StoreError> {
+        self.ensure()?;
+        let path = self.path(LIBRARIES_FILE);
+        let mut out = Vec::new();
+        write_python_json_indented(&mut out, &libraries.to_value(), 2, true)
+            .map_err(|error| write_error(&path)(error.into()))?;
+        out.push(b'\n');
+        write_text(&path, &String::from_utf8_lossy(&out))
+    }
+
+    pub fn create_new(path: &Path, text: &str) -> Result<bool, StoreError> {
+        match OpenOptions::new().write(true).create_new(true).open(path) {
+            Ok(mut file) => file
+                .write_all(platform_newlines(text).as_bytes())
+                .map(|()| true)
+                .map_err(write_error(path)),
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => Ok(false),
+            Err(error) => Err(write_error(path)(error)),
         }
-        let lines = Self::canonical_lines(&path, &kept)?;
-        file.set_len(0)
-            .and_then(|()| file.seek(SeekFrom::Start(0)))
-            .and_then(|_| file.write_all(platform_newlines(&lines).as_bytes()))
-            .map_err(write_error(&path))?;
-        Ok(removed)
+    }
+
+    pub fn backup_v1(&self) -> Result<PathBuf, StoreError> {
+        self.ensure()?;
+        let backup = self.path(BACKUP_FILE);
+        let source = self.path(GOTCHAS_FILE);
+        let bytes = match fs::read(&source) {
+            Ok(bytes) => bytes,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Vec::new(),
+            Err(error) => {
+                return Err(StoreError::Read {
+                    path: source,
+                    source: error,
+                });
+            }
+        };
+        match OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&backup)
+        {
+            Ok(mut file) => file.write_all(&bytes).map_err(write_error(&backup))?,
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {}
+            Err(error) => return Err(write_error(&backup)(error)),
+        }
+        Ok(backup)
     }
 
     pub fn remove(&self, id: &str) -> Result<bool, StoreError> {
@@ -301,42 +404,78 @@ impl GlobalStore {
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => String::new(),
             Err(source) => return Err(StoreError::Read { path, source }),
         };
-        Ok(serde_json::json!({
+        let libraries = self.libraries()?;
+        let mut export = serde_json::json!({
             "version": "1.0",
             "exported_at": exported_at,
             "patterns": self.load_patterns()?,
             "gotchas": self.load_gotchas()?,
             "preferences": preferences,
-        }))
+        });
+        if let Value::Object(map) = &mut export
+            && !libraries.is_empty()
+        {
+            map.insert("libraries".to_owned(), libraries.to_value());
+        }
+        Ok(export)
     }
 
-    pub fn import(&self, data: &Map<String, Value>) -> Result<(usize, usize), StoreError> {
-        let known = |entries: Vec<Entry>| -> HashSet<String> {
-            entries
+    fn merge_libraries(&self, imported: &Libraries) -> Result<(), StoreError> {
+        let mut failure = None;
+        self.edit_gotchas(|_| {
+            let saved = self.libraries().and_then(|mut libraries| {
+                if libraries.merge(imported) {
+                    self.save_libraries(&libraries)
+                } else {
+                    Ok(())
+                }
+            });
+            failure = saved.err();
+            (GotchaWrite::Keep, ())
+        })?;
+        failure.map_or(Ok(()), Err)
+    }
+
+    fn import_entries(&self, name: &str, items: &[Value]) -> Result<usize, StoreError> {
+        let path = self.path(name);
+        let mut failure = None;
+        let added = self.change_locked(name, true, |existing| {
+            let known: HashSet<String> = existing
                 .iter()
                 .filter_map(|entry| entry.get("id"))
                 .map(Value::to_string)
-                .collect()
-        };
-        let known_patterns = known(self.load_patterns()?);
-        let known_gotchas = known(self.load_gotchas()?);
-        let mut added = [0_usize; 2];
-        for (slot, (key, name, known)) in added.iter_mut().zip([
-            ("patterns", PATTERNS_FILE, &known_patterns),
-            ("gotchas", GOTCHAS_FILE, &known_gotchas),
-        ]) {
-            let Some(Value::Array(items)) = data.get(key) else {
-                continue;
-            };
-            for entry in items.iter().filter_map(Value::as_object) {
-                if entry
-                    .get("id")
-                    .is_some_and(|id| known.contains(&id.to_string()))
-                {
-                    continue;
+                .collect();
+            let fresh: Vec<&Entry> = items
+                .iter()
+                .filter_map(Value::as_object)
+                .filter(|entry| {
+                    entry
+                        .get("id")
+                        .is_none_or(|id| !known.contains(&id.to_string()))
+                })
+                .collect();
+            if fresh.is_empty() {
+                return (GotchaWrite::Keep, 0);
+            }
+            match Self::canonical_lines(&path, &fresh) {
+                Ok(text) => (GotchaWrite::Append(Self::split_lines(&text)), fresh.len()),
+                Err(error) => {
+                    failure = Some(error);
+                    (GotchaWrite::Keep, 0)
                 }
-                self.append(name, entry)?;
-                *slot += 1;
+            }
+        })?;
+        failure.map_or(Ok(added.unwrap_or(0)), Err)
+    }
+
+    pub fn import(&self, data: &Map<String, Value>) -> Result<(usize, usize), StoreError> {
+        let mut added = [0_usize; 2];
+        for (slot, (key, name)) in added
+            .iter_mut()
+            .zip([("patterns", PATTERNS_FILE), ("gotchas", GOTCHAS_FILE)])
+        {
+            if let Some(Value::Array(items)) = data.get(key) {
+                *slot = self.import_entries(name, items)?;
             }
         }
         if let Some(Value::String(preferences)) = data.get("preferences")
@@ -345,64 +484,10 @@ impl GlobalStore {
         {
             write_text(&self.path(PREFERENCES_FILE), preferences)?;
         }
+        if let Some(imported) = data.get("libraries").and_then(Libraries::from_value) {
+            self.merge_libraries(&imported)?;
+        }
         let [patterns, gotchas] = added;
         Ok((patterns, gotchas))
-    }
-
-    pub fn append_gotcha_if_new(
-        &self,
-        decide: impl FnOnce(&[Entry]) -> Option<Entry>,
-    ) -> Result<bool, StoreError> {
-        self.ensure()?;
-        let path = self.path(GOTCHAS_FILE);
-        let opened = OpenOptions::new().read(true).append(true).open(&path);
-        let (mut file, entry) = match opened {
-            Ok(mut file) => {
-                file.lock().map_err(|source| StoreError::Lock {
-                    path: path.clone(),
-                    source,
-                })?;
-                let mut text = String::new();
-                if file.read_to_string(&mut text).is_err() {
-                    return Ok(false);
-                }
-                let Some(existing) = parse_entries(&universal_newlines(&text)) else {
-                    return Ok(false);
-                };
-                let Some(entry) = decide(&existing) else {
-                    return Ok(false);
-                };
-                (file, entry)
-            }
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-                let Some(entry) = decide(&[]) else {
-                    return Ok(false);
-                };
-                let mut file = OpenOptions::new()
-                    .read(true)
-                    .append(true)
-                    .create(true)
-                    .open(&path)
-                    .map_err(write_error(&path))?;
-                file.lock().map_err(|source| StoreError::Lock {
-                    path: path.clone(),
-                    source,
-                })?;
-                let mut text = String::new();
-                if file.read_to_string(&mut text).is_err() || !text.is_empty() {
-                    return Ok(false);
-                }
-                (file, entry)
-            }
-            Err(error) => return Err(write_error(&path)(error)),
-        };
-        let mut line = Vec::new();
-        write_canonical(&mut line, &Value::Object(entry))
-            .map_err(|error| write_error(&path)(error.into()))?;
-        line.push(b'\n');
-        let line = String::from_utf8_lossy(&line).into_owned();
-        file.write_all(platform_newlines(&line).as_bytes())
-            .map_err(write_error(&path))?;
-        Ok(true)
     }
 }

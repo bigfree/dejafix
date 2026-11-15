@@ -2,9 +2,9 @@ use std::fs;
 use std::path::Path;
 use std::process::{Command, Stdio};
 
-use criterion::{Criterion, criterion_group, criterion_main};
-use dejafix_core::testing::{FIXTURE_SEED, write_project};
-use dejafix_core::{McpSettings, McpState, OsIds, ToolCall};
+use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
+use dejafix_core::testing::{FIXTURE_SEED, gotcha_lines, write_project};
+use dejafix_core::{GotchaInput, McpSettings, McpState, OsIds, ToolCall};
 
 const CITED: &str = "src/app.py";
 const UNCITED: &str = "src/never_logged.py";
@@ -32,6 +32,30 @@ fn state(root: &Path, home: &Path) -> McpState {
         dejafix_home: home.join(".dejafix"),
         redact: true,
         zone: jiff::tz::TimeZone::UTC,
+    })
+}
+
+fn reply(state: &McpState, call: ToolCall) -> String {
+    state
+        .call(call, None, jiff::Timestamp::now(), &mut OsIds)
+        .text
+}
+
+fn global_query() -> ToolCall {
+    ToolCall::GlobalQuery {
+        query: "worker never exits on shutdown".to_owned(),
+        library: None,
+        budget: 2_000,
+    }
+}
+
+fn new_gotcha() -> ToolCall {
+    ToolCall::AddGlobalGotcha(GotchaInput {
+        library: "bullmq".to_owned(),
+        keywords: vec!["benchmark".to_owned(), "unique lesson".to_owned()],
+        gotcha: "bullmq benchmark lesson that no generated record repeats, about queue draining."
+            .to_owned(),
+        versions: None,
     })
 }
 
@@ -74,6 +98,44 @@ fn mcp(criterion: &mut Criterion) {
     group.bench_function("precheck_file/cold/uncited/3000", |bencher| {
         bencher.iter(|| precheck(&state(&root, &home), UNCITED));
     });
+    let search = || {
+        reply(
+            &warm,
+            ToolCall::SearchEvents {
+                query: "token refresh login loop".to_owned(),
+                limit: 10,
+                full: false,
+            },
+        )
+    };
+    assert!(search().starts_with("Found 10 match(es)"));
+    group.bench_function("search_events/warm/3000", |bencher| {
+        bencher.iter(search);
+    });
+    let global = home.join(".dejafix/global");
+    fs::create_dir_all(&global).expect("global folder");
+    let store = global.join("library_gotchas.jsonl");
+    let lines: String = gotcha_lines(500, FIXTURE_SEED)
+        .into_iter()
+        .map(|line| line + "\n")
+        .collect();
+    fs::write(&store, &lines).expect("global store");
+    assert!(reply(&warm, global_query()).starts_with("Global gotchas for"));
+    group.bench_function("global_query/warm/500", |bencher| {
+        bencher.iter(|| reply(&warm, global_query()));
+    });
+    group.bench_function("global_query/cold/500", |bencher| {
+        bencher.iter(|| reply(&state(&root, &home), global_query()));
+    });
+    assert!(reply(&warm, new_gotcha()).starts_with("Added global gotcha"));
+    group.bench_function("add_global_gotcha/500", |bencher| {
+        bencher.iter_batched(
+            || fs::write(&store, &lines).expect("reset store"),
+            |()| reply(&warm, new_gotcha()),
+            BatchSize::PerIteration,
+        );
+    });
+    fs::write(&store, &lines).expect("reset store");
     group.bench_function("git_log_since", |bencher| {
         bencher.iter(|| {
             Command::new("git")

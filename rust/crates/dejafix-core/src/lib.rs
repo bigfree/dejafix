@@ -3,10 +3,10 @@ mod core;
 mod wiring;
 
 pub use crate::adapters::fs::{
-    ClientConfig, ClientPaths, ConfigState, FsResolver, GlobalStore, Identity, MemoryDir,
-    RegistryFiles, StoreError, canonical_path, client_configs, dedupe_paths, default_roots,
-    detect_stack, find_memory_dir, find_projects, identity, manifest_info, path_context,
-    pinned_client_configs, read_events_file, resolve_path, scan_client_configs,
+    ClientConfig, ClientPaths, ConfigState, FsResolver, GlobalStore, GotchaWrite, Identity,
+    MemoryDir, RegistryFiles, StoreError, canonical_path, client_configs, dedupe_paths,
+    default_roots, detect_stack, find_memory_dir, find_projects, identity, manifest_info,
+    path_context, pinned_client_configs, read_events_file, resolve_path, scan_client_configs,
 };
 pub use crate::adapters::fs::{forget_session, report_is_new, seen_root};
 pub use crate::adapters::git::{GitHistory, recent_changes};
@@ -27,9 +27,11 @@ pub use crate::core::event::{
     Outcome, Summary,
 };
 pub use crate::core::global::{
-    Entry, GlobalAction, GlobalOutcome, PROMOTABLE_SEED, Relevant, Stack, Usage, filtered,
-    global_report, gotcha_entry, inherited_block, is_gotcha_signal, is_prunable,
-    promotable_libraries, promotable_set, promotion, relevant_entries, similar,
+    AddOutcome, CheckFailure, CheckReport, CheckWarning, DEFAULT_BUDGET, Draft, DraftError, Entry,
+    GLOBAL_FIELDS, GlobalAction, GlobalDoc, GlobalHint, GlobalIndex, GlobalOutcome, GotchaInput,
+    GotchaV2, Libraries, Relevant, Stack, StoredGotcha, UpgradeOutcome, Usage, add_reply,
+    check_gotcha, filtered, global_hint, global_reply, global_report, hint_candidate, is_prunable,
+    is_upgraded, line, normalize_input, parse_store, relevant_entries,
 };
 pub use crate::core::hooks::{
     HOOK_MARKER_END, HOOK_MARKER_START, HOOK_SHEBANG, HookChange, HookKind, Removal,
@@ -53,6 +55,9 @@ pub use crate::core::precheck::{
     Warning, WarningKind, age, analyze, expiry_iso, parse_snooze, read_expiry, remaining,
     render_warnings, snooze_note, snoozed_until, targets,
 };
+pub use crate::core::rank::{
+    Analyzer, Document, FieldSpec, Index, QueryTerms, RankParams, STOP_WORDS, Scored, stem,
+};
 pub use crate::core::redact::redact_event;
 pub use crate::core::redact::{REDACTABLE_FIELDS, Redaction, SecretKind, redact, redaction_notice};
 pub use crate::core::registry::{
@@ -60,21 +65,21 @@ pub use crate::core::registry::{
     list_payload, load as load_registry, meta_payload, normalize_path, same_path, slugify,
     unique_id,
 };
-pub use crate::core::reply::{current_reply, gotchas_reply, precheck_report, projects_reply};
+pub use crate::core::reply::{current_reply, precheck_report, projects_reply};
 pub use crate::core::resolve::{Probe, Resolution, ResolveError, Source, resolve};
 pub use crate::core::scaffold::{
     BRIDGE_END, BRIDGE_START, BridgeChange, INITIAL_CONFIG, INSTRUCTIONS_BACKUP_FILE,
     INSTRUCTIONS_VERSION, ManifestInfo, TITLE_CHARS, ai_instructions, apply_bridge, bridge_block,
-    extract_global_block, gitignore_with, initial_plan, initial_project_map, initial_summary,
-    instructions_version, plan_with_idea, project_map_from_stack, splice_global_block,
-    stack_summary_suffix,
+    gitignore_with, initial_plan, initial_project_map, initial_summary, instructions_version,
+    plan_with_idea, project_map_from_stack, stack_summary_suffix,
 };
 pub use crate::core::score::{
     Score, ScoreError, ScoreEvent, calculate_score, raw_events, score_event, score_event_of,
     score_reply,
 };
 pub use crate::core::search::{
-    SearchQuery, excerpt, match_line, mcp_match_line, no_match_message, search, search_reply,
+    EVENT_FIELDS, EventDoc, SearchMode, SearchQuery, event_index, excerpt, match_line,
+    mcp_match_line, no_match_message, ranked, search, search_reply,
 };
 pub use crate::core::session::{
     MAP_POINTER, SESSION_START_DONE, current_plan, placeholder_map, session_start,
@@ -96,9 +101,9 @@ pub use crate::core::write::{
 };
 pub use crate::wiring::{
     BridgeOutcome, CaptureOutcome, CorruptLog, DoctorOptions, DoctorReport, EditHookRun,
-    FoundProject, HooksAction, HooksOutcome, HooksReport, Inherited, InitHooks, InitOptions,
-    InitReport, ListedProject, MemoryFile, PrecheckOutcome, PrecheckRequest, Project, Recorded,
-    RegistryOp, RegistryReply, ScanReport, SearchOutput, Settings, UpgradeNotice, WiringError,
+    FoundProject, HooksAction, HooksOutcome, HooksReport, InitHooks, InitOptions, InitReport,
+    ListedProject, MemoryFile, PrecheckOutcome, PrecheckRequest, Project, Recorded, RegistryOp,
+    RegistryReply, ScanReport, SearchOutput, Settings, UpgradeNotice, WiringError, add_gotcha,
     add_plan_idea, auto_capture, brief, doctor, edit_hook, global, hooks_action, init_project,
     other_projects, precheck, read_memory_file, record, regenerate, register_project, registry_op,
     scan_projects, search_project, show, upgrade_notice,

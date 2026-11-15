@@ -182,7 +182,7 @@ fn a_fresh_init_writes_the_current_instructions_without_a_backup() -> TestResult
 }
 
 #[test]
-fn init_refreshes_a_stale_file_keeping_a_backup_and_the_global_block() -> TestResult {
+fn init_refreshes_a_stale_file_keeping_a_backup_and_dropping_the_global_block() -> TestResult {
     let repo = Repo::bare()?;
     init_stdout(&repo, &["--no-global"])?;
     let path = repo.mem().join("AI_INSTRUCTIONS.md");
@@ -192,15 +192,9 @@ fn init_refreshes_a_stale_file_keeping_a_backup_and_the_global_block() -> TestRe
     assert!(!text.contains("precheck_file(path)"));
     assert!(text.contains("precheck_file(file_path)"));
     assert!(text.contains("<!-- dejafix-instructions: "));
-    assert_eq!(
-        text.matches("## Global Memory — Inherited Knowledge")
-            .count(),
-        1
-    );
-    assert!(text.contains("- **vite**: dev server caches deps (from other-app)"));
-    let global = text.find("Global Memory").ok_or("no global block")?;
-    let rules = text.find("## Rules summary").ok_or("no rules summary")?;
-    assert!(global < rules);
+    assert!(!text.contains("## Global Memory — Inherited Knowledge"));
+    assert!(!text.contains("dev server caches deps"));
+    assert!(text.contains("call `global_query`"));
     assert_eq!(
         support::text(&repo.mem().join("AI_INSTRUCTIONS.md.bak"))?,
         STALE

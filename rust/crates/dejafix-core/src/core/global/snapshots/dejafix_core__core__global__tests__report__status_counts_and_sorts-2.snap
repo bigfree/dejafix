@@ -14,6 +14,7 @@ expression: "global_report(&outcome, true)"
     Unique tags:         [1m2[0m
     Libraries tracked:   [1m1[0m
     Source projects:     [1m2[0m
+    Not upgraded:        [1m2[0m
 
   [2mTags:[0m python, web
   [2mLibraries:[0m sqlalchemy

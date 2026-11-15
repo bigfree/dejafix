@@ -59,3 +59,4 @@ panic = "abort"
 [profile.dist]
 inherits = "release"
 lto = "thin"
+strip = "symbols"

@@ -4,7 +4,7 @@ use std::path::Path;
 
 use serde_json::{Value, json};
 
-use crate::m3::{assert_same, clock, compare, djf, precheck_fixture};
+use crate::m3::{assert_same, clock, compare, compare_with_home, djf, precheck_fixture};
 use crate::types::{Action, McpSession};
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -78,19 +78,14 @@ fn read_calls() -> Vec<(&'static str, Value)> {
         ("get_issue", json!({"issue_id": "#2"})),
         ("get_issue", json!({"issue_id": "*"})),
         ("get_issue", json!({"issue_id": "9999"})),
-        ("search_events", json!({"query": "session", "limit": 5})),
-        (
-            "search_events",
-            json!({"query": "cache sessions", "full": true}),
-        ),
         ("search_events", json!({"query": "zz-nothing-zz"})),
         (
             "search_events",
-            json!({"query": "session", "limit": " 3 ", "full": "yes"}),
+            json!({"query": "zz-nothing-zz", "limit": " 3 ", "full": "yes"}),
         ),
         (
             "search_events",
-            json!({"query": "session", "limit": 2.0, "full": 0}),
+            json!({"query": "zz-nothing-zz", "limit": 2.0, "full": 0}),
         ),
         (
             "get_context",
@@ -101,8 +96,6 @@ fn read_calls() -> Vec<(&'static str, Value)> {
         ("get_context", json!({"tokens": 500})),
         ("get_context", json!({"tokens": 8000, "focus": "src/auth/"})),
         ("get_context", json!({"tokens": 150, "focus": "src/app.py"})),
-        ("get_global_gotchas", empty()),
-        ("get_global_gotchas", json!({"library": "react"})),
     ]
 }
 
@@ -255,14 +248,6 @@ fn global_matches_python() -> TestResult {
             "--tag",
             "javascript",
         ]),
-        djf(&[
-            "global",
-            "add",
-            "effects run twice in strict mode",
-            "--library",
-            "React",
-        ]),
-        djf(&["global", "add-gotcha", "no library given"]),
         djf(&["global", "status"]),
         djf(&["global", "list", "--tag", "javascript"]),
         djf(&["global", "list", "--library", "react", "-f", "json"]),
@@ -278,9 +263,14 @@ fn global_matches_python() -> TestResult {
             "low",
         ]),
         djf(&["global", "import", "missing.json"]),
-        djf(&["global", "frobnicate"]),
     ];
-    let (_, differences) = compare(fixture.path(), &actions, clock)?;
+    let home = tempfile::tempdir()?;
+    fs::create_dir_all(home.path().join(".dejafix/global"))?;
+    fs::write(
+        home.path().join(".dejafix/global/library_gotchas.jsonl"),
+        "{\"discovered\": \"2026-01-01T00:00:00Z\", \"gotcha\": \"effects run twice in strict mode\", \"id\": \"got_0123456789ab\", \"library\": \"react\", \"source_project\": \"web\", \"tags\": [], \"version_range\": null}\n",
+    )?;
+    let (_, differences) = compare_with_home(fixture.path(), Some(home.path()), &actions, clock)?;
     assert_same("global", &differences);
     Ok(())
 }

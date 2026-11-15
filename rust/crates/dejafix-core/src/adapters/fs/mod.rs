@@ -38,7 +38,7 @@ pub use store::{
     read_text_within,
 };
 pub(crate) use types::LockedLog;
-pub use types::{FsResolver, GlobalStore, MemoryDir, RegistryFiles, StoreError};
+pub use types::{FsResolver, GlobalStore, GotchaWrite, MemoryDir, RegistryFiles, StoreError};
 pub(crate) use write::write_atomic;
 pub use write::{write_text, write_text_if_changed};
 

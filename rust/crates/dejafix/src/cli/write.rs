@@ -58,7 +58,7 @@ pub fn run(
         Ok(recorded) => recorded,
         Err(error) => return Ok(Err(error)),
     };
-    for notice in &recorded.notices {
+    for notice in recorded.notices.iter().chain(&recorded.hints) {
         writeln!(err, "{notice}")?;
     }
     match recorded.outcome {

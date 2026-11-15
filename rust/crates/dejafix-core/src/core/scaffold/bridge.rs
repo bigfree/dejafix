@@ -10,6 +10,10 @@ response. Do NOT answer from conversation history or by re-reading
 package.json / README / source files. Call `get_project_map()` only
 when the file layout matters.
 
+Write every memory record in English. Read memory in English and
+answer the user in their language. Before using a library, or after
+an unexpected failure, call `global_query`.
+
 BEFORE modifying ANY file:
   - Call `precheck_file(file_path)` — check failure history first.
 

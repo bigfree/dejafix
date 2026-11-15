@@ -129,15 +129,21 @@ pub enum Commands {
     },
     #[command(about = "Print the current summary.md.")]
     Show,
-    #[command(about = "Substring (default) or regex search across events.")]
+    #[command(about = "Search events by relevance, or by substring or regex.")]
     Search {
         query: String,
         #[arg(
             short,
             long,
+            conflicts_with = "exact",
             help = "Treat query as a case-insensitive Python regex (enables OR-patterns)."
         )]
         regex: bool,
+        #[arg(
+            long,
+            help = "Plain case-insensitive substring match in log order instead of ranking."
+        )]
+        exact: bool,
         #[arg(
             long = "failed-only",
             help = "Only show failed attempts — the project's catalogue of dead ends."
@@ -174,7 +180,7 @@ pub enum Commands {
 pub struct GlobalArgs {
     #[arg(
         default_value = "status",
-        help = "Action: status, list, add, add-gotcha, remove, export, import, prune, detect."
+        help = "Action: status, list, add, add-gotcha, query, edit, upgrade, remove, export, import, prune, detect."
     )]
     pub action: String,
     #[arg(help = "Pattern text, gotcha text, entry ID, or import file path.")]
@@ -193,12 +199,49 @@ pub struct GlobalArgs {
     #[arg(long, help = "Confidence filter for prune.")]
     pub confidence: Option<String>,
     #[arg(
+        long = "keyword",
+        value_name = "PHRASE",
+        help = "Keyword phrase for add-gotcha (repeat 2 to 8 times)."
+    )]
+    pub keyword: Vec<String>,
+    #[arg(
+        long,
+        value_name = "RANGE",
+        help = "Version range a gotcha applies to."
+    )]
+    pub versions: Option<String>,
+    #[arg(
+        long,
+        default_value_t = 2_000,
+        value_parser = clap::value_parser!(u32).range(500..=8_000),
+        help = "Reply size of query in tokens (500 to 8000)."
+    )]
+    pub budget: u32,
+    #[arg(
         short = 'f',
         long = "format",
         default_value = "text",
         help = "Output format for list/detect: text, json."
     )]
     pub format: String,
+    #[arg(
+        long = "export",
+        value_name = "FILE",
+        help = "Write upgrade drafts for version 1 gotchas to FILE."
+    )]
+    pub export_file: Option<String>,
+    #[arg(
+        long = "apply",
+        value_name = "FILE",
+        help = "Apply the filled upgrade drafts in FILE."
+    )]
+    pub apply_file: Option<String>,
+    #[arg(
+        long = "alias",
+        value_name = "LIBRARY=ALIAS",
+        help = "Add an alias of a library for edit (repeatable)."
+    )]
+    pub alias: Vec<String>,
 }
 
 #[derive(Debug, Args)]
@@ -209,7 +252,10 @@ pub struct GlobalArgs {
 pub struct InitArgs {
     #[arg(long = "no-hooks", help = "Skip git hook installation.")]
     pub no_hooks: bool,
-    #[arg(long = "no-global", help = "Skip global memory inheritance.")]
+    #[arg(
+        long = "no-global",
+        help = "Accepted for compatibility; init no longer copies global memory."
+    )]
     pub no_global: bool,
     #[arg(long = "no-watch", hide = true)]
     pub no_watch: bool,
@@ -239,7 +285,7 @@ pub struct InitArgs {
     pub no_structure: bool,
     #[arg(
         long = "global-tags",
-        help = "Only inherit matching tags (comma-separated)."
+        help = "Accepted for compatibility; init no longer copies global memory."
     )]
     pub global_tags: Option<String>,
 }

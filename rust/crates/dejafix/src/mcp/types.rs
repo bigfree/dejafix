@@ -55,6 +55,24 @@ pub(super) struct GotchaArgs {
 }
 
 #[derive(Debug, Deserialize)]
+pub(super) struct GlobalQueryArgs {
+    pub(super) query: String,
+    #[serde(default)]
+    pub(super) library: Option<String>,
+    #[serde(default = "default_budget", deserialize_with = "super::lax::integer")]
+    pub(super) budget: i64,
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct GlobalGotchaArgs {
+    pub(super) library: String,
+    pub(super) keywords: Vec<String>,
+    pub(super) gotcha: String,
+    #[serde(default)]
+    pub(super) versions: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
 pub(super) struct WriteArgs {
     pub(super) summary: String,
     #[serde(default)]
@@ -99,6 +117,10 @@ fn default_limit() -> i64 {
 }
 
 fn default_tokens() -> i64 {
+    2000
+}
+
+fn default_budget() -> i64 {
     2000
 }
 

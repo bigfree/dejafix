@@ -186,7 +186,7 @@ pub fn run_actions(
             Action::Djf(arguments) => (
                 env!("CARGO_BIN_EXE_djf"),
                 "dejafix.cli",
-                arguments(&project)?,
+                exact_search(implementation, arguments(&project)?),
                 None,
             ),
             Action::EditHook(payload) => (
@@ -236,7 +236,7 @@ pub fn run_actions(
     snapshot(&project, "project", &mut files)?;
     snapshot(&home, "home", &mut files)?;
     snapshot_git_hooks(implementation, &project, &mut files)?;
-    crate::normalize::approved_departures(&mut files);
+    crate::normalize::approved_departures(&mut files, implementation, &since);
     let python_version = python_version(&repository)?;
     let mut normalizer = Normalizer::new(
         &[
@@ -273,7 +273,10 @@ fn step_output(
             implementation,
             printed(implementation, &output.stdout),
         )),
-        stderr: normalizer.apply(&printed(implementation, &output.stderr)),
+        stderr: normalizer.apply(&crate::normalize::approved_stderr(
+            implementation,
+            printed(implementation, &output.stderr),
+        )),
     }
 }
 
@@ -314,6 +317,35 @@ fn sorted(value: &serde_json::Value) -> serde_json::Value {
     }
 }
 
+const NEW_TOOLS: [&str; 2] = ["add_global_gotcha", "global_query"];
+const REWORDED_TOOLS: [&str; 3] = ["add_note", "get_global_gotchas", "search_events"];
+
+fn without_descriptions(value: &serde_json::Value) -> serde_json::Value {
+    match value {
+        serde_json::Value::Object(map) => serde_json::Value::Object(
+            map.iter()
+                .filter(|(key, _)| key.as_str() != "description")
+                .map(|(key, value)| (key.clone(), without_descriptions(value)))
+                .collect(),
+        ),
+        serde_json::Value::Array(items) => {
+            serde_json::Value::Array(items.iter().map(without_descriptions).collect())
+        }
+        other => other.clone(),
+    }
+}
+
+fn exact_search(implementation: Implementation, mut args: Vec<String>) -> Vec<String> {
+    let regex = args.iter().any(|arg| arg == "--regex" || arg == "-r");
+    if matches!(implementation, Implementation::Rust)
+        && args.first().is_some_and(|command| command == "search")
+        && !regex
+    {
+        args.push("--exact".to_owned());
+    }
+    args
+}
+
 fn mcp_transcript(name: &str, response: &serde_json::Value) -> Result<String, Box<dyn Error>> {
     let result = response
         .get("result")
@@ -326,12 +358,34 @@ fn mcp_transcript(name: &str, response: &serde_json::Value) -> Result<String, Bo
                 .and_then(serde_json::Value::as_str)
                 .unwrap_or_default()
         ),
-        "tools/list" => format!(
-            "### tools/list\n{}\n",
-            serde_json::to_string_pretty(&sorted(
-                result.get("tools").unwrap_or(&serde_json::Value::Null)
-            ))?
-        ),
+        "tools/list" => {
+            let tools: Vec<serde_json::Value> = result
+                .get("tools")
+                .and_then(serde_json::Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter(|tool| {
+                    tool.get("name")
+                        .and_then(serde_json::Value::as_str)
+                        .is_none_or(|name| !NEW_TOOLS.contains(&name))
+                })
+                .map(|tool| {
+                    let reworded = tool
+                        .get("name")
+                        .and_then(serde_json::Value::as_str)
+                        .is_some_and(|name| REWORDED_TOOLS.contains(&name));
+                    sorted(&if reworded {
+                        without_descriptions(tool)
+                    } else {
+                        tool.clone()
+                    })
+                })
+                .collect();
+            format!(
+                "### tools/list\n{}\n",
+                serde_json::to_string_pretty(&tools)?
+            )
+        }
         _ => {
             let text = result
                 .pointer("/content/0/text")

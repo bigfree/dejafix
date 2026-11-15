@@ -94,8 +94,7 @@ fn capture(
     };
     let summary = event.summary.as_str().to_owned();
     let notices: Vec<String> = redaction_notice(&fired).into_iter().collect();
-    let incomplete =
-        commit_events(project, &mut locked, &mut log, vec![event], None, true, ids).ok()?;
+    let incomplete = commit_events(project, &mut locked, &mut log, vec![event], None, true).ok()?;
     drop(locked);
     if incomplete.is_some() {
         return None;

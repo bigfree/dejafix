@@ -96,6 +96,43 @@ fn events(root: &Path) -> String {
 }
 
 #[test]
+fn a_note_in_another_language_is_refused_and_a_doubtful_one_is_recorded_with_a_notice() {
+    let world = World::new();
+    let root = world.project("alpha");
+    let state = world.state(Some(&root), &world.base);
+    let refused = call(&state, note("zmazať cache pri štarte"), None);
+    assert!(refused.error);
+    assert_eq!(
+        refused.text,
+        "dejafix tool error: DejafixError: Memory is stored in English: too many letters outside ASCII. Rewrite the text in English and call the tool again."
+    );
+    assert!(!events(&root).contains("zmazať"));
+    let doubtful = text(
+        &state,
+        note("smazat cache pri startu aplikace nebo restartu serveru"),
+        None,
+    );
+    assert!(doubtful.starts_with("Recorded note "));
+    assert!(
+        doubtful
+            .ends_with("\nThis does not look like English; if it is not, rewrite it in English.")
+    );
+    assert!(events(&root).contains("smazat cache"));
+}
+
+#[test]
+fn a_redaction_notice_stays_out_of_the_reply_as_in_python() {
+    let world = World::new();
+    let root = world.project("alpha");
+    let state = world.state(Some(&root), &world.base);
+    let token = format!("the deploy token is {}{}", "ghp_", "a".repeat(36));
+    let reply = text(&state, note(&token), None);
+    assert!(reply.starts_with("Recorded note "));
+    assert!(!reply.contains('\n'), "{reply}");
+    assert!(!events(&root).contains("ghp_aaaa"));
+}
+
+#[test]
 fn a_pinned_server_writes_and_names_the_project() {
     let world = World::new();
     let root = world.project("alpha");
@@ -293,7 +330,10 @@ fn read_tools_answer_on_a_bare_project() {
         (ToolCall::GetPlan, "No plan found."),
         (ToolCall::GetIssue("1".into()), "No issue found with ID 1."),
         (ToolCall::GetIssue("*".into()), "No issue found with ID *."),
-        (ToolCall::GetGlobalGotchas(None), "No global gotchas found."),
+        (
+            ToolCall::GetGlobalGotchas(None),
+            "Global memory is empty. Add a lesson with add_global_gotcha.",
+        ),
         (
             ToolCall::SearchEvents {
                 query: "x".into(),
@@ -755,4 +795,212 @@ fn precheck_files_accepts_at_most_two_hundred_paths() {
     );
     let state = world.state(Some(&root), &world.base);
     assert!(!text(&state, ToolCall::PrecheckFiles(paths(200)), None).contains("at most 200"));
+}
+
+fn global_gotcha(library: &str, gotcha: &str, keywords: &[&str]) -> ToolCall {
+    ToolCall::AddGlobalGotcha(crate::core::global::GotchaInput {
+        library: library.to_owned(),
+        keywords: keywords
+            .iter()
+            .map(|keyword| (*keyword).to_owned())
+            .collect(),
+        gotcha: gotcha.to_owned(),
+        versions: None,
+    })
+}
+
+#[test]
+fn add_global_gotcha_checks_writes_and_names_the_source_project() {
+    let world = World::new();
+    let root = world.project("alpha");
+    world.register(&root);
+    let state = world.state(Some(&root), &world.base);
+    let added = text(
+        &state,
+        global_gotcha(
+            "BullMQ",
+            "bullmq Worker.close() never resolves when Redis is unreachable; pass a timeout.",
+            &["shutdown", "worker close"],
+        ),
+        None,
+    );
+    let id = added
+        .strip_prefix("Added global gotcha ")
+        .and_then(|rest| rest.strip_suffix(" (bullmq)."))
+        .unwrap();
+    let store =
+        fs::read_to_string(world.home.join(".dejafix/global/library_gotchas.jsonl")).unwrap();
+    assert!(store.contains(&format!("\"id\": \"{id}\"")));
+    assert!(store.contains("\"source_project\": \"alpha\""));
+    assert!(store.contains("\"discovered\": \"2027-01-15\""), "{store}");
+    let refused = text(&state, global_gotcha("bullmq", "short", &["one"]), None);
+    assert_eq!(
+        refused,
+        "Not added: give 2 to 8 keywords, not 1; the gotcha must be 30 to 600 characters long, not 5."
+    );
+    let warned = text(
+        &state,
+        global_gotcha(
+            "vite",
+            "vite dev server in alpha keeps a stale value after a hot reload of the config file.",
+            &["hot reload", "config"],
+        ),
+        None,
+    );
+    assert!(
+        warned.ends_with("\nWarning: it names the project 'alpha'."),
+        "{warned}"
+    );
+}
+
+#[test]
+fn the_global_index_is_reused_until_the_store_or_the_aliases_change() {
+    let world = World::new();
+    let root = world.project("alpha");
+    let state = world.state(Some(&root), &world.base);
+    let empty = state.global_index().unwrap();
+    assert!(Arc::ptr_eq(&empty, &state.global_index().unwrap()));
+    text(
+        &state,
+        global_gotcha(
+            "bullmq",
+            "bullmq Worker.close() never resolves when Redis is unreachable; pass a timeout.",
+            &["shutdown", "worker close"],
+        ),
+        None,
+    );
+    let first = state.global_index().unwrap();
+    assert!(!Arc::ptr_eq(&empty, &first));
+    assert_eq!(first.len(), 1);
+    assert!(Arc::ptr_eq(&first, &state.global_index().unwrap()));
+    fs::write(
+        world.home.join(".dejafix/global/libraries.json"),
+        "{\"bullmq\": [\"bull-mq\"]}\n",
+    )
+    .unwrap();
+    let aliased = state.global_index().unwrap();
+    assert!(!Arc::ptr_eq(&first, &aliased));
+    let reply = text(
+        &state,
+        ToolCall::GlobalQuery {
+            query: "worker shutdown".to_owned(),
+            library: Some("bull-mq".to_owned()),
+            budget: 2_000,
+        },
+        None,
+    );
+    assert!(
+        reply.starts_with("Global gotchas for \"worker shutdown\" in bull-mq (1 of 1 shown):"),
+        "{reply}"
+    );
+    let listed = text(
+        &state,
+        ToolCall::GetGlobalGotchas(Some("bullmq".to_owned())),
+        None,
+    );
+    assert!(
+        listed.starts_with("Global gotchas of bullmq (1 of 1 shown):"),
+        "{listed}"
+    );
+    fs::write(
+        world.home.join(".dejafix/global/library_gotchas.jsonl"),
+        "[1]\n",
+    )
+    .unwrap();
+    let broken = call(&state, ToolCall::GetGlobalGotchas(None), None);
+    assert!(broken.error);
+    assert!(
+        broken
+            .text
+            .contains("holds a line that is not a JSON object"),
+        "{}",
+        broken.text
+    );
+}
+
+#[test]
+fn a_warm_ranked_search_reuses_the_log_index() {
+    let world = World::new();
+    let root = world.project("alpha");
+    let state = world.state(Some(&root), &world.base);
+    text(
+        &state,
+        note("startup is slow because the cache warms twice"),
+        None,
+    );
+    let search = || {
+        text(
+            &state,
+            ToolCall::SearchEvents {
+                query: "slow startup".to_owned(),
+                limit: 10,
+                full: false,
+            },
+            None,
+        )
+    };
+    assert!(search().starts_with("Found 1 match(es) for 'slow startup':\n  [note] evt_"));
+    let clock = fixed_clock();
+    let cached = state.cached_log(&root, &clock).unwrap();
+    let first: *const crate::core::rank::Index = cached.index();
+    search();
+    let again = state.cached_log(&root, &clock).unwrap();
+    assert!(Arc::ptr_eq(&cached, &again));
+    assert!(std::ptr::eq(first, again.index()));
+    text(&state, note("the cache is cold after a deploy"), None);
+    let rebuilt = state.cached_log(&root, &clock).unwrap();
+    assert!(!Arc::ptr_eq(&cached, &rebuilt));
+    assert_eq!(rebuilt.index().len(), 2);
+}
+
+#[test]
+fn add_global_gotcha_refuses_an_unknown_project_argument() {
+    let world = World::new();
+    let root = world.project("alpha");
+    world.register(&root);
+    let state = world.state(None, &world.base);
+    let reply = call(
+        &state,
+        global_gotcha(
+            "bullmq",
+            "bullmq Worker.close() never resolves when Redis is unreachable; pass a timeout.",
+            &["shutdown", "worker close"],
+        ),
+        Some("nope"),
+    );
+    assert!(reply.error, "{}", reply.text);
+    assert!(reply.text.contains("No project 'nope'"), "{}", reply.text);
+    assert!(
+        !world
+            .home
+            .join(".dejafix/global/library_gotchas.jsonl")
+            .exists()
+    );
+}
+
+#[test]
+fn a_secret_in_a_global_gotcha_is_redacted_and_reported() {
+    let world = World::new();
+    let root = world.project("alpha");
+    let state = world.state(Some(&root), &world.base);
+    let token = format!("{}{}", "ghp_", "a".repeat(36));
+    let reply = text(
+        &state,
+        global_gotcha(
+            "octokit",
+            &format!(
+                "octokit needs a token such as {token} in the environment before the first call."
+            ),
+            &["auth token", "environment"],
+        ),
+        None,
+    );
+    assert!(reply.starts_with("Added global gotcha "), "{reply}");
+    assert!(
+        reply.contains("\nWarning: dejafix: redacted 1 secret(s) before write"),
+        "{reply}"
+    );
+    let store =
+        fs::read_to_string(world.home.join(".dejafix/global/library_gotchas.jsonl")).unwrap();
+    assert!(!store.contains(&token), "{store}");
 }

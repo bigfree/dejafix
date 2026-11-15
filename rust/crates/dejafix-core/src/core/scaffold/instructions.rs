@@ -5,11 +5,9 @@ use regex::Regex;
 use crate::core::summary::RECORD_CHARS;
 use crate::core::text::{PYTHON_SPACE_CLASS, decimal_value};
 
-pub const INSTRUCTIONS_VERSION: u32 = 3;
+pub const INSTRUCTIONS_VERSION: u32 = 4;
 pub const TITLE_CHARS: usize = 140;
 pub const INSTRUCTIONS_BACKUP_FILE: &str = "AI_INSTRUCTIONS.md.bak";
-const GLOBAL_MEMORY_HEADING: &str = "## Global Memory — Inherited Knowledge";
-const RULES_HEADING: &str = "## Rules";
 
 static TEMPLATE: LazyLock<String> = LazyLock::new(|| {
     format!(
@@ -20,6 +18,10 @@ static TEMPLATE: LazyLock<String> = LazyLock::new(|| {
 These instructions are MANDATORY for all AI coding agents working in this project. Failure to follow them means your work is incomplete and the audit trail is corrupted.
 
 This file is stable operating guidance. Do not rewrite it unless the user asks or dejafix itself changes.
+
+## Language and global memory
+
+Write every memory record in English. Read memory in English and answer the user in their language. Before using a library, or after an unexpected failure, call `global_query`.
 
 ## Start of every session
 
@@ -201,42 +203,4 @@ pub fn instructions_version(text: &str) -> u32 {
         .and_then(|found| found.get(1))
         .and_then(|digits| decimal_value(digits.as_str()))
         .map_or(0, |value| value.saturating_u32())
-}
-
-fn global_block_span(content: &str) -> Option<(usize, usize)> {
-    let start = content.find(GLOBAL_MEMORY_HEADING)?;
-    let body = start + GLOBAL_MEMORY_HEADING.len();
-    let end = content
-        .get(body..)
-        .and_then(|rest| rest.find("\n## "))
-        .map_or(content.len(), |next| body + next);
-    Some((start, end))
-}
-
-#[must_use]
-pub fn extract_global_block(content: &str) -> Option<String> {
-    let (start, end) = global_block_span(content)?;
-    let block = content.get(start..end)?.trim_end_matches('\n');
-    Some(format!("{block}\n"))
-}
-
-#[must_use]
-pub fn splice_global_block(content: &str, block: &str) -> String {
-    let mut content = content.to_owned();
-    if let Some((start, end)) = global_block_span(&content) {
-        let head = content
-            .get(..start)
-            .unwrap_or_default()
-            .trim_end_matches('\n');
-        let tail = content
-            .get(end..)
-            .unwrap_or_default()
-            .trim_start_matches('\n');
-        content = format!("{head}\n\n{tail}");
-    }
-    if let Some(index) = content.find(RULES_HEADING) {
-        let (head, tail) = content.split_at(index);
-        return format!("{head}{block}\n{tail}");
-    }
-    format!("{}\n\n{block}", content.trim_end_matches('\n'))
 }

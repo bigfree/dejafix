@@ -225,17 +225,7 @@ fn note(
         return Vec::new();
     };
     let mut log = EventLog::parse(&bytes, &settings.clock, &project.context, &FsResolver);
-    if commit_events(
-        &project,
-        &mut locked,
-        &mut log,
-        vec![event],
-        None,
-        false,
-        ids,
-    )
-    .is_err()
-    {
+    if commit_events(&project, &mut locked, &mut log, vec![event], None, false).is_err() {
         return Vec::new();
     }
     redaction_notice(&fired).into_iter().collect()

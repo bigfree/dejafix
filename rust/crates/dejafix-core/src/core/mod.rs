@@ -11,6 +11,7 @@ pub mod log;
 pub mod migrate;
 pub mod path;
 pub mod precheck;
+pub mod rank;
 pub mod redact;
 pub mod registry;
 pub mod reply;

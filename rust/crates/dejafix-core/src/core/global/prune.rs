@@ -3,7 +3,7 @@ use std::borrow::Cow;
 use jiff::tz::TimeZone;
 use serde_json::Value;
 
-use super::inherit::is_truthy;
+use super::relevant::is_truthy;
 use super::types::Entry;
 use crate::core::time::normalize_timestamp;
 

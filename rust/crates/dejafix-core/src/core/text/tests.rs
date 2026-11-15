@@ -1,9 +1,11 @@
 use std::borrow::Cow;
 
+use super::types::LanguageReason;
 use super::{
-    casefold, char_len, char_prefix, collapse_whitespace, contains_word, decimal_value,
-    is_python_decimal, is_python_space, is_python_word, python_int, python_lines, python_split,
-    python_strip, python_strip_matches, universal_newlines, zfill,
+    LanguageVerdict, casefold, char_len, char_prefix, collapse_whitespace, contains_word,
+    decimal_value, is_python_decimal, is_python_space, is_python_word, language, language_verdict,
+    python_int, python_lines, python_split, python_strip, python_strip_matches, universal_newlines,
+    zfill,
 };
 
 fn lines(bytes: &[u8]) -> Vec<(usize, Vec<u8>)> {
@@ -191,4 +193,114 @@ fn integers_parse_like_python_int() {
     ] {
         assert_eq!(python_int(text), None, "{text:?}");
     }
+}
+
+fn rejected(text: &str) -> Option<LanguageReason> {
+    match language_verdict(text) {
+        LanguageVerdict::Rejected { reason } => Some(reason),
+        LanguageVerdict::English | LanguageVerdict::Doubtful => None,
+    }
+}
+
+#[test]
+fn slovak_and_polish_are_rejected_for_their_accented_letters() {
+    for text in [
+        "Oprava chyby pri načítaní konfigurácie v štarte aplikácie",
+        "Naprawiono błąd w ładowaniu konfiguracji przy starcie aplikacji",
+        "zmazať cache",
+    ] {
+        assert_eq!(
+            rejected(text),
+            Some(LanguageReason::TooManyNonAscii),
+            "{text}"
+        );
+    }
+}
+
+#[test]
+fn other_scripts_are_rejected_on_the_first_letter() {
+    for text in [
+        "キャッシュを削除する",
+        "Исправлена ошибка кэша",
+        "fix the λ handler",
+    ] {
+        assert_eq!(
+            rejected(text),
+            Some(LanguageReason::NonLatinScript),
+            "{text}"
+        );
+    }
+}
+
+#[test]
+fn a_name_with_one_accent_inside_an_english_sentence_passes() {
+    let text = "The configuration loader reads every file under the project directory, as Mikó \
+                designed it, and reports an error when a key is missing";
+    assert_eq!(language_verdict(text), LanguageVerdict::English);
+}
+
+#[test]
+fn latin_letters_beyond_ascii_are_not_a_foreign_script() {
+    for c in ['é', 'ł', 'ǆ', 'ɐ', 'ḅ', 'Ａ', 'ª'] {
+        assert!(c.is_alphabetic());
+        let text = format!("{c}{}", "a".repeat(60));
+        assert_ne!(
+            rejected(&text),
+            Some(LanguageReason::NonLatinScript),
+            "{c:?}"
+        );
+    }
+}
+
+#[test]
+fn terse_commit_like_english_is_never_rejected() {
+    for text in [
+        "Merge: feat(config): add SHOP_CATALOG_TTL_SECONDS",
+        "fix: guard the login submit",
+        "Revert \"fix: guard the login submit\"",
+        "chore(deps): bump serde from 1.0.1 to 1.0.2",
+    ] {
+        assert!(rejected(text).is_none(), "{text}");
+    }
+}
+
+#[test]
+fn eight_words_without_function_words_are_doubtful() {
+    assert_eq!(
+        language_verdict("smazat cache pri startu aplikace nebo restartu serveru"),
+        LanguageVerdict::Doubtful
+    );
+    assert_eq!(
+        language_verdict("smazat cache pri startu aplikace"),
+        LanguageVerdict::English
+    );
+    assert_eq!(
+        language_verdict("Clear the cache when the application starts or the server restarts"),
+        LanguageVerdict::English
+    );
+}
+
+#[test]
+fn function_words_match_regardless_of_case_and_the_list_is_sorted() {
+    assert!(
+        language::FUNCTION_WORDS
+            .windows(2)
+            .all(|pair| pair[0] < pair[1])
+    );
+    assert_eq!(
+        language_verdict("THE Cache IS Cleared WHEN Startup Finishes Without Errors Today"),
+        LanguageVerdict::English
+    );
+}
+
+#[test]
+fn the_reason_reads_as_an_english_phrase() {
+    assert_eq!(
+        LanguageReason::NonLatinScript.to_string(),
+        "it contains letters outside the Latin script"
+    );
+    assert_eq!(
+        LanguageReason::TooManyNonAscii.to_string(),
+        "too many letters outside ASCII"
+    );
 }

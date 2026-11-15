@@ -102,8 +102,8 @@ mod store {
     use std::thread;
 
     use super::super::{
-        GlobalStore, StoreError, clear_marker, find_memory_dir, lock_events, read_marker,
-        write_marker, write_text_if_changed,
+        GlobalStore, GotchaWrite, StoreError, clear_marker, find_memory_dir, lock_events,
+        read_marker, write_marker, write_text_if_changed,
     };
     use crate::adapters::fs::write::write_atomic;
 
@@ -248,57 +248,29 @@ mod store {
     }
 
     #[test]
-    fn the_promotable_cache_grows_only_with_new_libraries() {
-        let dir = tempfile::tempdir().unwrap();
-        let store = GlobalStore::new(dir.path());
-        let cache = dir.path().join("global/.promotable.json");
-        store
-            .record_promotable(&["React".into(), String::new()])
-            .unwrap();
-        assert!(!cache.exists());
-        store.record_promotable(&["zod".into()]).unwrap();
-        let text = fs::read_to_string(&cache).unwrap();
-        assert!(text.starts_with(&super::nl("{\n  \"libraries\": [\n    \"alembic\",")));
-        assert!(text.contains("\"zod\"") && !text.ends_with('\n'));
-        assert_eq!(store.promotable().unwrap().len(), 28);
-        fs::write(&cache, "{broken").unwrap();
-        assert_eq!(store.promotable(), Some(Vec::new()));
-        fs::write(&cache, "[1]").unwrap();
-        assert_eq!(store.promotable(), None);
-    }
-
-    #[test]
-    fn gotchas_are_appended_once_as_sorted_json_lines() {
+    fn gotchas_are_appended_under_the_lock_and_a_corrupt_store_is_an_error() {
         let dir = tempfile::tempdir().unwrap();
         let store = GlobalStore::new(dir.path());
         assert_eq!(store.gotchas(), Some(Vec::new()));
-        let entry = serde_json::json!({"library": "react", "id": "got_1"})
-            .as_object()
-            .cloned()
+        let line = "{\"id\": \"got_1\", \"library\": \"react\"}".to_owned();
+        let seen = store
+            .edit_gotchas(|existing| (GotchaWrite::Append(vec![line.clone()]), existing.len()))
             .unwrap();
-        assert!(
-            store
-                .append_gotcha_if_new(|existing| {
-                    assert_eq!(existing.len(), 0);
-                    Some(entry.clone())
-                })
-                .unwrap()
-        );
-        assert!(
-            !store
-                .append_gotcha_if_new(|existing| {
-                    assert_eq!(existing.len(), 1);
-                    None
-                })
-                .unwrap()
-        );
+        assert_eq!(seen, 0);
+        let seen = store
+            .edit_gotchas(|existing| (GotchaWrite::Keep, existing.len()))
+            .unwrap();
+        assert_eq!(seen, 1);
         assert_eq!(
             fs::read_to_string(dir.path().join("global/library_gotchas.jsonl")).unwrap(),
             super::nl("{\"id\": \"got_1\", \"library\": \"react\"}\n")
         );
         fs::write(dir.path().join("global/library_gotchas.jsonl"), "[1]\n").unwrap();
         assert_eq!(store.gotchas(), None);
-        assert!(!store.append_gotcha_if_new(|_| Some(entry.clone())).unwrap());
+        assert!(matches!(
+            store.edit_gotchas(|_| (GotchaWrite::Keep, ())),
+            Err(StoreError::Read { .. })
+        ));
     }
 }
 
@@ -559,25 +531,27 @@ fn main_folders_skip_dependencies_and_dot_folders() {
 }
 
 #[test]
-fn no_gotcha_file_is_created_when_nothing_is_promoted() {
+fn no_gotcha_file_is_created_when_nothing_is_written() {
     let home = tempfile::tempdir().unwrap();
     let store = super::GlobalStore::new(home.path());
-    assert!(!store.append_gotcha_if_new(|_| None).unwrap());
+    store
+        .edit_gotchas(|_| (super::GotchaWrite::Keep, ()))
+        .unwrap();
     assert!(!store.dir.join("library_gotchas.jsonl").exists());
-    let mut entry = serde_json::Map::new();
-    entry.insert("library".to_owned(), serde_json::json!("react"));
-    assert!(
-        store
-            .append_gotcha_if_new(|existing| existing.is_empty().then_some(entry))
-            .unwrap()
-    );
+    assert!(!store.dir.join(".promotable.json").exists());
+    store
+        .edit_gotchas(|existing| {
+            assert_eq!(existing, Vec::<crate::core::global::Entry>::new());
+            (super::GotchaWrite::Append(vec!["{}".to_owned()]), ())
+        })
+        .unwrap();
     assert!(store.dir.join("library_gotchas.jsonl").exists());
 }
 
 #[cfg(unix)]
 #[test]
-fn global_removal_rewrites_in_place_so_a_locked_append_is_never_lost() {
-    use std::os::unix::fs::MetadataExt;
+fn global_removal_replaces_the_file_and_keeps_its_mode() {
+    use std::os::unix::fs::PermissionsExt;
     let home = tempfile::tempdir().unwrap();
     let store = super::GlobalStore::new(home.path());
     store.ensure().unwrap();
@@ -587,14 +561,109 @@ fn global_removal_rewrites_in_place_so_a_locked_append_is_never_lost() {
         "{\"gotcha\": \"a\", \"id\": \"got_a\", \"library\": \"x\"}\n{\"gotcha\": \"b\", \"id\": \"got_b\", \"library\": \"x\"}\n",
     )
     .unwrap();
-    let inode = fs::metadata(&path).unwrap().ino();
+    fs::set_permissions(&path, fs::Permissions::from_mode(0o640)).unwrap();
     assert!(store.remove("got_a").unwrap());
     assert!(!store.remove("got_zzz").unwrap());
-    assert_eq!(fs::metadata(&path).unwrap().ino(), inode);
     assert_eq!(
         fs::read_to_string(&path).unwrap(),
         "{\"gotcha\": \"b\", \"id\": \"got_b\", \"library\": \"x\"}\n"
     );
+    assert_eq!(
+        fs::metadata(&path).unwrap().permissions().mode() & 0o777,
+        0o640
+    );
+    store
+        .replace_gotchas(&["{\"id\": \"got_c\"}".to_owned()])
+        .unwrap();
+    assert_eq!(fs::read_to_string(&path).unwrap(), "{\"id\": \"got_c\"}\n");
+    assert_eq!(
+        fs::metadata(&path).unwrap().permissions().mode() & 0o777,
+        0o640
+    );
+}
+
+#[test]
+fn an_append_waiting_for_the_lock_lands_in_the_replaced_file() {
+    use std::sync::mpsc;
+    use std::time::Duration;
+    let home = tempfile::tempdir().unwrap();
+    let store = super::GlobalStore::new(home.path());
+    store.ensure().unwrap();
+    fs::write(
+        store.path("library_gotchas.jsonl"),
+        "{\"id\": \"got_old\"}\n",
+    )
+    .unwrap();
+    let (started, waiting) = mpsc::channel();
+    let appender = {
+        let store = store.clone();
+        std::thread::spawn(move || {
+            waiting.recv().unwrap();
+            store
+                .edit_gotchas(|existing| {
+                    let ids: Vec<String> = existing
+                        .iter()
+                        .filter_map(|entry| entry.get("id")?.as_str().map(str::to_owned))
+                        .collect();
+                    (
+                        super::GotchaWrite::Append(vec!["{\"id\": \"got_late\"}".to_owned()]),
+                        ids,
+                    )
+                })
+                .unwrap()
+        })
+    };
+    store
+        .edit_gotchas(|_| {
+            started.send(()).unwrap();
+            std::thread::sleep(Duration::from_millis(200));
+            (
+                super::GotchaWrite::Replace(vec!["{\"id\": \"got_new\"}".to_owned()]),
+                (),
+            )
+        })
+        .unwrap();
+    assert_eq!(appender.join().unwrap(), ["got_new"]);
+    assert_eq!(
+        fs::read_to_string(store.path("library_gotchas.jsonl")).unwrap(),
+        nl("{\"id\": \"got_new\"}\n{\"id\": \"got_late\"}\n")
+    );
+}
+
+#[test]
+fn libraries_are_empty_until_saved_and_a_corrupt_file_is_an_error() {
+    let home = tempfile::tempdir().unwrap();
+    let store = super::GlobalStore::new(home.path());
+    assert_eq!(
+        store.libraries().unwrap(),
+        crate::core::global::Libraries::default()
+    );
+    let mut libraries = crate::core::global::Libraries::default();
+    libraries.add_alias("next", "nextjs");
+    store.save_libraries(&libraries).unwrap();
+    assert_eq!(
+        fs::read_to_string(store.path("libraries.json")).unwrap(),
+        nl("{\n  \"next\": [\n    \"nextjs\"\n  ]\n}\n")
+    );
+    assert_eq!(store.libraries().unwrap(), libraries);
+    fs::write(store.path("libraries.json"), "[1]").unwrap();
+    assert!(matches!(
+        store.libraries(),
+        Err(super::StoreError::Read { .. })
+    ));
+}
+
+#[test]
+fn the_version_one_backup_is_written_once() {
+    let home = tempfile::tempdir().unwrap();
+    let store = super::GlobalStore::new(home.path());
+    store.ensure().unwrap();
+    fs::write(store.path("library_gotchas.jsonl"), "first\n").unwrap();
+    let backup = store.backup_v1().unwrap();
+    assert_eq!(backup, store.path("library_gotchas.v1.jsonl"));
+    fs::write(store.path("library_gotchas.jsonl"), "second\n").unwrap();
+    assert_eq!(store.backup_v1().unwrap(), backup);
+    assert_eq!(fs::read_to_string(&backup).unwrap(), "first\n");
 }
 
 mod containment {
@@ -684,5 +753,145 @@ mod containment {
         assert!(!points_outside(&root.join(".gitignore"), &root));
         assert!(points_outside(&base.path().join("other/x"), &root));
         assert!(MemoryDir::at(&root).is_ok());
+    }
+}
+
+#[test]
+fn removing_a_gotcha_keeps_the_version_two_field_order() {
+    let home = tempfile::tempdir().unwrap();
+    let store = super::GlobalStore::new(home.path());
+    store.ensure().unwrap();
+    let kept = "{\"v\": 2, \"id\": \"got_1\", \"library\": \"zod\", \"keywords\": [\"a\", \"b\"], \"versions\": null, \"gotcha\": \"zod strips unknown keys by default.\"}";
+    let legacy = "{\"gotcha\": \"old\", \"id\": \"got_3\", \"library\": \"zod\"}";
+    fs::write(
+        store.path("library_gotchas.jsonl"),
+        format!("{kept}\n{{\"v\": 2, \"id\": \"got_2\", \"library\": \"zod\", \"keywords\": [], \"versions\": null, \"gotcha\": \"x\"}}\n{legacy}\n"),
+    )
+    .unwrap();
+    assert!(store.remove("got_2").unwrap());
+    assert_eq!(
+        fs::read_to_string(store.path("library_gotchas.jsonl")).unwrap(),
+        nl(&format!("{kept}\n{legacy}\n"))
+    );
+}
+
+#[test]
+fn an_existing_empty_store_is_kept_when_nothing_is_written() {
+    let home = tempfile::tempdir().unwrap();
+    let store = super::GlobalStore::new(home.path());
+    store.ensure().unwrap();
+    fs::write(store.path("library_gotchas.jsonl"), "").unwrap();
+    store
+        .edit_gotchas(|_| (super::GotchaWrite::Keep, ()))
+        .unwrap();
+    assert!(store.path("library_gotchas.jsonl").exists());
+}
+
+fn libraries_of(value: &serde_json::Value) -> crate::core::global::Libraries {
+    crate::core::global::Libraries::from_value(value).unwrap()
+}
+
+#[test]
+fn an_export_carries_libraries_and_an_import_into_a_fresh_home_restores_them() {
+    let source_home = tempfile::tempdir().unwrap();
+    let source = super::GlobalStore::new(source_home.path());
+    let empty = source.export("2026-11-15T00:00:00Z").unwrap();
+    assert!(empty.get("libraries").is_none());
+    let libraries = libraries_of(&serde_json::json!({
+        "next": ["next.js", "nextjs"],
+        "nx": ["@nx/js"],
+        "prisma": []
+    }));
+    source.save_libraries(&libraries).unwrap();
+    let exported = source.export("2026-11-15T00:00:00Z").unwrap();
+    assert_eq!(
+        exported.get("libraries"),
+        Some(&serde_json::json!({"next": ["next.js", "nextjs"], "nx": ["@nx/js"], "prisma": []}))
+    );
+    let keys: Vec<&str> = exported
+        .as_object()
+        .unwrap()
+        .keys()
+        .map(String::as_str)
+        .collect();
+    assert_eq!(
+        keys,
+        [
+            "version",
+            "exported_at",
+            "patterns",
+            "gotchas",
+            "preferences",
+            "libraries"
+        ]
+    );
+    let target_home = tempfile::tempdir().unwrap();
+    let target = super::GlobalStore::new(target_home.path());
+    assert_eq!(
+        target.import(exported.as_object().unwrap()).unwrap(),
+        (0, 0)
+    );
+    assert_eq!(target.libraries().unwrap(), libraries);
+    assert!(!target.path("library_gotchas.jsonl").exists());
+}
+
+#[test]
+fn an_import_merges_aliases_and_keeps_existing_mappings_on_conflict() {
+    let home = tempfile::tempdir().unwrap();
+    let store = super::GlobalStore::new(home.path());
+    store
+        .save_libraries(&libraries_of(&serde_json::json!({
+            "next": ["nextjs"],
+            "vue": []
+        })))
+        .unwrap();
+    let data = serde_json::json!({
+        "libraries": {
+            "next": ["next.js"],
+            "nuxt": ["nextjs", "nuxtjs"],
+            "vue": ["vuejs"],
+            "nextjs": ["next-js"],
+            "react": ["vue"],
+            "bad name": ["x"]
+        }
+    });
+    assert_eq!(store.import(data.as_object().unwrap()).unwrap(), (0, 0));
+    assert_eq!(
+        store.libraries().unwrap(),
+        libraries_of(&serde_json::json!({
+            "next": ["next-js", "next.js", "nextjs"],
+            "nuxt": ["nuxtjs"],
+            "react": [],
+            "vue": ["vuejs"]
+        }))
+    );
+}
+
+#[test]
+fn an_import_without_libraries_leaves_libraries_json_alone() {
+    let home = tempfile::tempdir().unwrap();
+    let store = super::GlobalStore::new(home.path());
+    let legacy = serde_json::json!({
+        "version": "1.0",
+        "patterns": [],
+        "gotchas": [{"id": "got_legacy000001", "library": "zod", "gotcha": "legacy"}],
+        "preferences": ""
+    });
+    assert_eq!(store.import(legacy.as_object().unwrap()).unwrap(), (0, 1));
+    assert!(!store.path("libraries.json").exists());
+    store
+        .save_libraries(&libraries_of(&serde_json::json!({"next": ["nextjs"]})))
+        .unwrap();
+    let before = fs::read_to_string(store.path("libraries.json")).unwrap();
+    for data in [
+        legacy.clone(),
+        serde_json::json!({"libraries": {"next": ["nextjs"]}}),
+        serde_json::json!({"libraries": ["not", "an", "object"]}),
+    ] {
+        store.import(data.as_object().unwrap()).unwrap();
+        assert_eq!(
+            fs::read_to_string(store.path("libraries.json")).unwrap(),
+            before
+        );
     }
 }

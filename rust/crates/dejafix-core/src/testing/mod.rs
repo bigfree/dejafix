@@ -1,10 +1,12 @@
 mod fakes;
 mod fixtures;
+mod gotchas;
 mod rng;
 mod types;
 
 pub use fakes::{FIXED_NOW, fixed_clock};
 pub use fixtures::{FIXTURE_SEED, FIXTURE_SIZES, write_project};
+pub use gotchas::gotcha_lines;
 pub use types::{FixtureError, NoResolve, SeqIds};
 
 pub use crate::core::json::write_python_json_indented;

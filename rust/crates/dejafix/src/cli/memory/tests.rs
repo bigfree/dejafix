@@ -12,6 +12,12 @@ fn args(action: &str, text: Option<&str>, library: Option<&str>) -> GlobalArgs {
         older_than: 365,
         confidence: None,
         format: "text".to_owned(),
+        keyword: Vec::new(),
+        versions: None,
+        budget: 2_000,
+        export_file: None,
+        apply_file: None,
+        alias: Vec::new(),
     }
 }
 
@@ -22,7 +28,24 @@ fn add_with_a_library_becomes_add_gotcha() {
         GlobalAction::AddGotcha {
             library: Some("sqlalchemy".to_owned()),
             text: Some("close sessions".to_owned()),
-            tag: None,
+            keywords: Vec::new(),
+            versions: None,
+        }
+    );
+}
+
+#[test]
+fn add_gotcha_carries_keywords_and_versions() {
+    let mut asked = args("add-gotcha", Some("text"), Some("bullmq"));
+    asked.keyword = vec!["shutdown".to_owned(), "worker close".to_owned()];
+    asked.versions = Some(">=6".to_owned());
+    assert_eq!(
+        action_of(asked),
+        GlobalAction::AddGotcha {
+            library: Some("bullmq".to_owned()),
+            text: Some("text".to_owned()),
+            keywords: vec!["shutdown".to_owned(), "worker close".to_owned()],
+            versions: Some(">=6".to_owned()),
         }
     );
 }

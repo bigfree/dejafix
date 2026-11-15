@@ -1,7 +1,9 @@
 use super::types::{Project, SearchOutput, WiringError};
 use crate::adapters::fs::{FsResolver, read_events_file, read_text_inside};
 use crate::core::log::EventLog;
-use crate::core::search::{SearchQuery, match_line, no_match_message, search};
+use crate::core::search::{
+    SearchMode, SearchQuery, event_index, match_line, no_match_message, ranked, search,
+};
 
 pub fn show(project: &Project) -> Result<String, WiringError> {
     Ok(read_text_inside(
@@ -21,7 +23,11 @@ pub fn search_project(
         &project.context,
         &FsResolver,
     );
-    let found = search(&log, query);
+    let found = if query.mode == SearchMode::Ranked {
+        ranked(&log, &event_index(&log), query)
+    } else {
+        search(&log, query)
+    };
     if found.is_empty() {
         return Ok(SearchOutput::Nothing(no_match_message(query)));
     }

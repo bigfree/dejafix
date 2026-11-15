@@ -3,10 +3,11 @@ use std::path::Path;
 
 use serde_json::Value;
 
-use super::init::detect_and_record;
+use super::global::{add_action, edit_action, global_query, non_empty, upgrade_action};
 use super::types::{Project, Settings, WiringError};
 use crate::adapters::fs::{
-    FsResolver, GlobalStore, path_context, project_name, read_events_file, read_json_text,
+    FsResolver, GlobalStore, detect_stack, path_context, project_name, read_events_file,
+    read_json_text,
 };
 use crate::adapters::git::GitHistory;
 use crate::core::brief::{BriefInput, render_brief};
@@ -32,7 +33,7 @@ pub fn brief(cwd: &Path, settings: &Settings, color: bool) -> Result<String, Wir
         None::<&HashSet<&str>>,
         STALE_COMMIT_THRESHOLD,
     );
-    let stack = detect_and_record(cwd, settings);
+    let stack = detect_stack(cwd);
     let store = GlobalStore::new(&settings.dejafix_home);
     let stored = store
         .load_patterns()
@@ -68,10 +69,6 @@ fn tags_of(tag: Option<String>) -> Value {
             .into_iter()
             .collect(),
     )
-}
-
-fn non_empty(text: Option<String>) -> Option<String> {
-    text.filter(|text| !text.is_empty())
 }
 
 fn import(store: &GlobalStore, cwd: &Path, file: &str) -> Result<GlobalOutcome, WiringError> {
@@ -127,14 +124,24 @@ pub fn global(
         GlobalAction::Add { text, tag } => {
             add_pattern(&store, &project, settings, non_empty(text), tag, ids)
         }
-        GlobalAction::AddGotcha { library, text, tag } => add_gotcha(
-            &store,
-            &project,
+        GlobalAction::AddGotcha {
+            library,
+            text,
+            keywords,
+            versions,
+        } => add_action(settings, &project, library, text, keywords, versions, ids),
+        GlobalAction::Query {
+            text,
+            library,
+            budget,
+        } => Ok(GlobalOutcome::Reply(global_query(
             settings,
-            (non_empty(library), non_empty(text)),
-            tag,
-            ids,
-        ),
+            text.as_deref().unwrap_or(""),
+            library.as_deref(),
+            budget,
+        )?)),
+        GlobalAction::Upgrade { export, apply } => upgrade_action(settings, cwd, export, apply),
+        action @ GlobalAction::Edit { .. } => edit_action(settings, action),
         GlobalAction::Remove(id) => {
             let Some(id) = non_empty(id) else {
                 return Ok(GlobalOutcome::Usage(Usage::Remove));
@@ -164,7 +171,7 @@ pub fn global(
             )?,
             older_than,
         }),
-        GlobalAction::Detect { json } => detect(&store, cwd, settings, json),
+        GlobalAction::Detect { json } => detect(&store, cwd, json),
         GlobalAction::Unknown(action) => Ok(GlobalOutcome::Unknown(action)),
     }
 }
@@ -193,37 +200,8 @@ fn add_pattern(
     Ok(GlobalOutcome::PatternAdded { id, text })
 }
 
-fn add_gotcha(
-    store: &GlobalStore,
-    project: &str,
-    settings: &Settings,
-    asked: (Option<String>, Option<String>),
-    tag: Option<String>,
-    ids: &mut impl Ids,
-) -> Result<GlobalOutcome, WiringError> {
-    let (Some(library), Some(text)) = asked else {
-        return Ok(GlobalOutcome::Usage(Usage::AddGotcha));
-    };
-    let id = ids.entry_id("got");
-    store.append_gotcha(&entry_of([
-        ("id", Value::String(id.clone())),
-        ("library", Value::String(library.to_lowercase())),
-        ("gotcha", Value::String(text.clone())),
-        ("tags", tags_of(tag)),
-        ("source_project", Value::String(project.to_owned())),
-        ("version_range", Value::Null),
-        ("discovered", Value::String(iso_micros(&settings.clock))),
-    ]))?;
-    Ok(GlobalOutcome::GotchaAdded { id, library, text })
-}
-
-fn detect(
-    store: &GlobalStore,
-    cwd: &Path,
-    settings: &Settings,
-    json: bool,
-) -> Result<GlobalOutcome, WiringError> {
-    let stack = detect_and_record(cwd, settings);
+fn detect(store: &GlobalStore, cwd: &Path, json: bool) -> Result<GlobalOutcome, WiringError> {
+    let stack = detect_stack(cwd);
     let patterns = store.load_patterns()?;
     let gotchas = store.load_gotchas()?;
     let relevant = relevant_entries(&stack, None, &patterns, &gotchas);

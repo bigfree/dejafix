@@ -3,8 +3,9 @@ use std::fmt::Write;
 
 use serde_json::{Map, Value, json};
 
-use super::inherit::is_truthy;
-use super::types::{Entry, GlobalOutcome, Palette, Stack, Usage};
+use super::record::is_upgraded;
+use super::relevant::is_truthy;
+use super::types::{AddOutcome, Entry, GlobalOutcome, Palette, Stack, Usage};
 use crate::core::json::{python_str, write_python_json_indented};
 
 const RULE: &str = "─";
@@ -13,7 +14,8 @@ const DETECT_RULE_WIDTH: usize = 50;
 const STATUS_BAR_WIDTH: usize = 48;
 const SHOWN_LIBRARIES: usize = 15;
 const META_SEPARATOR: &str = " · ";
-const AVAILABLE: &str = "status, list, add, add-gotcha, remove, export, import, prune, detect";
+const AVAILABLE: &str =
+    "status, list, add, add-gotcha, query, edit, upgrade, remove, export, import, prune, detect";
 
 fn items(entry: &Entry, key: &str) -> Vec<String> {
     match entry.get(key) {
@@ -111,6 +113,10 @@ fn status(
         libraries.len(),
         projects.len(),
     );
+    let not_upgraded = gotchas.iter().filter(|entry| !is_upgraded(entry)).count();
+    if not_upgraded > 0 {
+        let _ = writeln!(out, "    Not upgraded:        {bold}{not_upgraded}{reset}");
+    }
     let joined = |set: &BTreeSet<String>| {
         set.iter()
             .map(String::as_str)
@@ -171,7 +177,7 @@ fn list_text(
             );
         }
         out.push_str(
-            "\n  Add patterns:  djf global add \"your pattern here\"\n  Add gotchas:   djf global add-gotcha \"gotcha text\" --library <library>\n",
+            "\n  Add patterns:  djf global add \"your pattern here\"\n  Add gotchas:   djf global add-gotcha \"gotcha text\" --library <library> --keyword <phrase> --keyword <phrase>\n",
         );
         return out;
     }
@@ -210,15 +216,25 @@ fn list_text(
             gotchas.len()
         );
         for entry in gotchas {
+            let upgraded = is_upgraded(entry);
             let _ = writeln!(
                 out,
-                "  {yellow}{}{reset}  [{bold}{}{reset}] {}",
+                "  {yellow}{}{reset}{}  [{bold}{}{reset}] {}",
                 text_of(entry, "id", "?"),
+                if upgraded { "" } else { " (not upgraded)" },
                 text_of(entry, "library", "unknown"),
                 text_of(entry, "gotcha", "")
             );
             let mut parts = Vec::new();
-            if let Some(version) = truthy_text(entry, "version_range") {
+            if upgraded {
+                let keywords = items(entry, "keywords").join(", ");
+                if !keywords.is_empty() {
+                    parts.push(format!("keywords: {keywords}"));
+                }
+            }
+            let version =
+                truthy_text(entry, "versions").or_else(|| truthy_text(entry, "version_range"));
+            if let Some(version) = version {
                 parts.push(format!("version: {version}"));
             }
             if let Some(source) = truthy_text(entry, "source_project") {
@@ -309,11 +325,63 @@ fn usage_text(usage: Usage) -> &'static str {
     match usage {
         Usage::Add => "Usage: djf global add \"your pattern here\" [--tag python]\n",
         Usage::AddGotcha => {
-            "Usage: djf global add-gotcha --library sqlalchemy \"gotcha text\" [--tag python]\n"
+            "Usage: djf global add-gotcha \"<text>\" --library <name> --keyword <phrase> --keyword <phrase> [--versions <range>]\nWrite one lesson in English, 30 to 600 characters, without project details; give 2 to 8 keywords.\n"
+        }
+        Usage::Upgrade => {
+            "Usage: djf global upgrade --export <file> | djf global upgrade --apply <file>\n"
+        }
+        Usage::Edit => {
+            "Usage: djf global edit <id> [--library <name>] [--keyword <phrase>...] [--versions <range>] [--alias <library>=<alias>]\n"
         }
         Usage::Remove => "Usage: djf global remove <id>\n",
         Usage::Import => "Usage: djf global import <file.json>\n",
     }
+}
+
+fn gotcha_added(tag: &str, id: &str, library: &str, text: &str, warnings: &[String]) -> String {
+    let mut out = format!("{tag} Gotcha added: {id}\n  [{library}] {text}\n");
+    for warning in warnings {
+        let _ = writeln!(out, "  Warning: {warning}");
+    }
+    out
+}
+
+fn detected(
+    name: &str,
+    stack: &Stack,
+    inherited: (usize, usize),
+    json: bool,
+    palette: Palette,
+) -> String {
+    if json {
+        detect_json(name, stack)
+    } else {
+        detect_text(name, stack, inherited, palette)
+    }
+}
+
+fn upgrade_invalid(problems: &[String]) -> String {
+    let mut out = String::from("Draft file not applied, nothing was written:\n");
+    for problem in problems {
+        let _ = writeln!(out, "  {problem}");
+    }
+    out
+}
+
+fn upgrade_applied(
+    tag: &str,
+    replaced: usize,
+    dropped: usize,
+    kept: &[(String, Vec<String>)],
+) -> String {
+    let mut out = format!(
+        "{tag} Upgrade: {replaced} replaced, {dropped} dropped, {} kept\n",
+        kept.len()
+    );
+    for (id, reasons) in kept {
+        let _ = writeln!(out, "  {id}: {}", reasons.join("; "));
+    }
+    out
 }
 
 #[must_use]
@@ -354,9 +422,35 @@ pub fn global_report(outcome: &GlobalOutcome, color: bool) -> String {
         GlobalOutcome::PatternAdded { id, text } => {
             format!("{tag} Pattern added: {id}\n  {text}\n")
         }
-        GlobalOutcome::GotchaAdded { id, library, text } => {
-            format!("{tag} Gotcha added: {id}\n  [{library}] {text}\n")
+        GlobalOutcome::GotchaAdded {
+            id,
+            library,
+            text,
+            warnings,
+        } => gotcha_added(&tag, id, library, text, warnings),
+        GlobalOutcome::GotchaRejected { failures, warnings } => refused_text(failures, warnings),
+        GlobalOutcome::Reply(text) => format!("{text}\n"),
+        GlobalOutcome::Edited {
+            id,
+            aliases,
+            warnings,
+        } => edited_text(id.as_deref(), aliases, warnings, &tag),
+        GlobalOutcome::EditRefused(reasons) => format!("Not changed: {}.\n", reasons.join("; ")),
+        GlobalOutcome::UpgradeExported { file, drafts } => {
+            format!(
+                "{tag} Drafts written: {drafts} records to {file}\n  Let the agent fill them, review them, then: djf global upgrade --apply {file}\n"
+            )
         }
+        GlobalOutcome::UpgradeExists(file) => {
+            format!("Not written: {file} already exists; move it away or choose another name.\n")
+        }
+        GlobalOutcome::UpgradeMissing(file) => format!("File not found: {file}\n"),
+        GlobalOutcome::UpgradeInvalid(problems) => upgrade_invalid(problems),
+        GlobalOutcome::UpgradeApplied {
+            replaced,
+            dropped,
+            kept,
+        } => upgrade_applied(&tag, *replaced, *dropped, kept),
         GlobalOutcome::Removed(id) => format!("{tag} Removed: {id}\n"),
         GlobalOutcome::NotFound(id) => format!("Entry not found: {id}\n"),
         GlobalOutcome::Exported(value) => json_text(value),
@@ -378,20 +472,65 @@ pub fn global_report(outcome: &GlobalOutcome, color: bool) -> String {
             inherited_patterns,
             inherited_gotchas,
             json,
-        } => {
-            if *json {
-                detect_json(name, stack)
-            } else {
-                detect_text(
-                    name,
-                    stack,
-                    (*inherited_patterns, *inherited_gotchas),
-                    palette,
-                )
-            }
-        }
+        } => detected(
+            name,
+            stack,
+            (*inherited_patterns, *inherited_gotchas),
+            *json,
+            palette,
+        ),
         GlobalOutcome::Unknown(action) => {
             format!("Unknown action: {action}\nAvailable: {AVAILABLE}\n")
         }
     }
+}
+
+#[must_use]
+pub fn add_reply(outcome: &AddOutcome) -> String {
+    match outcome {
+        AddOutcome::Added {
+            id,
+            library,
+            warnings,
+        } => {
+            let mut reply = format!("Added global gotcha {id} ({library}).");
+            for warning in warnings {
+                let _ = write!(reply, "\nWarning: {warning}.");
+            }
+            reply
+        }
+        AddOutcome::Rejected(report) => {
+            let failures: Vec<String> = report.failures.iter().map(ToString::to_string).collect();
+            let mut reply = format!("Not added: {}.", failures.join("; "));
+            for warning in &report.warnings {
+                let _ = write!(reply, "\nWarning: {warning}.");
+            }
+            reply
+        }
+    }
+}
+
+fn edited_text(id: Option<&str>, aliases: &[String], warnings: &[String], tag: &str) -> String {
+    let mut out = String::new();
+    if let Some(id) = id {
+        let _ = writeln!(out, "{tag} Gotcha edited: {id}");
+    }
+    for alias in aliases {
+        let _ = writeln!(out, "{tag} Alias added: {alias}");
+    }
+    if out.is_empty() {
+        out.push_str("Nothing to change.\n");
+    }
+    for warning in warnings {
+        let _ = writeln!(out, "  Warning: {warning}");
+    }
+    out
+}
+
+fn refused_text(failures: &[String], warnings: &[String]) -> String {
+    let mut out = format!("Not added: {}.\n", failures.join("; "));
+    for warning in warnings {
+        let _ = writeln!(out, "  Warning: {warning}");
+    }
+    out
 }

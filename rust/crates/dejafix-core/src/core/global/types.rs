@@ -1,5 +1,7 @@
 use serde_json::{Map, Value};
 
+use crate::core::rank::Index;
+
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Stack {
     pub tags: Vec<String>,
@@ -61,7 +63,24 @@ pub enum GlobalAction {
     AddGotcha {
         library: Option<String>,
         text: Option<String>,
-        tag: Option<String>,
+        keywords: Vec<String>,
+        versions: Option<String>,
+    },
+    Query {
+        text: Option<String>,
+        library: Option<String>,
+        budget: u32,
+    },
+    Upgrade {
+        export: Option<String>,
+        apply: Option<String>,
+    },
+    Edit {
+        id: Option<String>,
+        library: Option<String>,
+        keywords: Vec<String>,
+        versions: Option<String>,
+        aliases: Vec<String>,
     },
     Remove(Option<String>),
     Export,
@@ -80,6 +99,8 @@ pub enum GlobalAction {
 pub enum Usage {
     Add,
     AddGotcha,
+    Edit,
+    Upgrade,
     Remove,
     Import,
 }
@@ -108,6 +129,30 @@ pub enum GlobalOutcome {
         id: String,
         library: String,
         text: String,
+        warnings: Vec<String>,
+    },
+    GotchaRejected {
+        failures: Vec<String>,
+        warnings: Vec<String>,
+    },
+    Reply(String),
+    Edited {
+        id: Option<String>,
+        aliases: Vec<String>,
+        warnings: Vec<String>,
+    },
+    EditRefused(Vec<String>),
+    UpgradeExported {
+        file: String,
+        drafts: usize,
+    },
+    UpgradeExists(String),
+    UpgradeMissing(String),
+    UpgradeInvalid(Vec<String>),
+    UpgradeApplied {
+        replaced: usize,
+        dropped: usize,
+        kept: Vec<(String, Vec<String>)>,
     },
     Removed(String),
     NotFound(String),
@@ -130,4 +175,151 @@ pub enum GlobalOutcome {
         json: bool,
     },
     Unknown(String),
+}
+
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct GotchaV2 {
+    pub id: String,
+    pub library: String,
+    pub keywords: Vec<String>,
+    pub versions: Option<String>,
+    pub gotcha: String,
+    pub source_project: Option<String>,
+    pub discovered: Option<String>,
+    pub reviewed: Option<String>,
+    pub extra: Entry,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum StoredGotcha {
+    V2(GotchaV2),
+    V1(Entry),
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Libraries(pub(super) Vec<(String, Vec<String>)>);
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct GotchaInput {
+    pub library: String,
+    pub keywords: Vec<String>,
+    pub gotcha: String,
+    pub versions: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum CheckFailure {
+    #[error("the text is not English ({0})")]
+    NotEnglish(String),
+    #[error("the library must be a package name in lower case: letters, digits and @ / . _ -")]
+    Library,
+    #[error("give 2 to 8 keywords, not {0}")]
+    KeywordCount(usize),
+    #[error("a keyword is empty")]
+    EmptyKeyword,
+    #[error("the keyword '{0}' has more than 4 words")]
+    LongKeyword(String),
+    #[error("the gotcha must be 30 to 600 characters long, not {0}")]
+    Length(usize),
+    #[error("it names a project path ({0})")]
+    ProjectPath(String),
+    #[error("it names a ticket number ({0})")]
+    Ticket(String),
+    #[error("it names an internal host ({0})")]
+    InternalHost(String),
+    #[error("it repeats {0}, which already holds this lesson")]
+    Duplicate(String),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum CheckWarning {
+    #[error("it does not look like English")]
+    Doubtful,
+    #[error("it names the project '{0}'")]
+    ProjectName(String),
+    #[error("it reads like a run status ('{0}')")]
+    RunStatus(String),
+    #[error("{0}")]
+    Redacted(String),
+    #[error("it may name a project path ({0})")]
+    PossiblePath(String),
+    #[error("it may name a ticket number ({0})")]
+    PossibleTicket(String),
+    #[error("it may name an internal host ({0})")]
+    PossibleHost(String),
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct CheckReport {
+    pub failures: Vec<CheckFailure>,
+    pub warnings: Vec<CheckWarning>,
+    pub duplicate_of: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct GlobalDoc<'r> {
+    pub record: &'r StoredGotcha,
+    pub canonical: &'r str,
+    pub aliases: &'r [String],
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AddOutcome {
+    Added {
+        id: String,
+        library: String,
+        warnings: Vec<CheckWarning>,
+    },
+    Rejected(CheckReport),
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct GlobalIndex {
+    pub(super) index: Index,
+    pub(super) records: Vec<StoredGotcha>,
+    pub(super) canonical: Vec<Box<str>>,
+    pub(super) libraries: Libraries,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Draft {
+    pub id: String,
+    pub input: GotchaInput,
+    pub drop: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum DraftError {
+    #[error("line {line}: not valid JSON ({message})")]
+    Json { line: usize, message: String },
+    #[error("line {line}: not a JSON object")]
+    NotObject { line: usize },
+    #[error("line {line}: the id is missing")]
+    MissingId { line: usize },
+    #[error("line {line}: the field '{field}' has the wrong type")]
+    WrongType { line: usize, field: &'static str },
+    #[error("line {line}: the id {id} is already used by an earlier line")]
+    DuplicateId { line: usize, id: String },
+}
+
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct UpgradeOutcome {
+    pub replaced: usize,
+    pub dropped: usize,
+    pub kept: Vec<(String, Vec<String>)>,
+    pub lines: Vec<String>,
+    pub libraries: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(super) enum Verdict {
+    Replace(Box<GotchaV2>),
+    Drop,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GlobalHint {
+    None,
+    NamedLibrary,
+    AnyLibrary,
 }

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use dejafix_core::{McpState, OsIds, Outcome, ToolCall, ToolReply, WriteCall};
+use dejafix_core::{GotchaInput, McpState, OsIds, Outcome, ToolCall, ToolReply, WriteCall};
 use rmcp::ErrorData;
 use rmcp::handler::server::ServerHandler;
 use rmcp::model::{
@@ -14,7 +14,8 @@ use serde_json::{Value, json};
 use super::schema::instructions;
 use super::types::{
     ArgumentError, AttemptArgs, ContextArgs, DecisionArgs, DejafixServer, FileArgs, FilesArgs,
-    FixArgs, GotchaArgs, IssueArgs, ProjectArgs, SearchArgs, WriteArgs,
+    FixArgs, GlobalGotchaArgs, GlobalQueryArgs, GotchaArgs, IssueArgs, ProjectArgs, SearchArgs,
+    WriteArgs,
 };
 
 const SERVER_NAME: &str = "dejafix";
@@ -39,6 +40,40 @@ fn within(
 fn write(arguments: &Value) -> Result<(String, Option<String>), ArgumentError> {
     let WriteArgs { summary, location } = parse(arguments)?;
     Ok((summary, location))
+}
+
+fn global_query_call(arguments: &Value) -> Result<ToolCall, ArgumentError> {
+    let GlobalQueryArgs {
+        query,
+        library,
+        budget,
+    } = parse(arguments)?;
+    let budget = within(
+        budget,
+        500..=8_000,
+        "budget",
+        "greater than or equal to 500 and less than or equal to 8000",
+    )?;
+    Ok(ToolCall::GlobalQuery {
+        query,
+        library,
+        budget: u32::try_from(budget).unwrap_or(2_000),
+    })
+}
+
+fn add_global_call(arguments: &Value) -> Result<ToolCall, ArgumentError> {
+    let GlobalGotchaArgs {
+        library,
+        keywords,
+        gotcha,
+        versions,
+    } = parse(arguments)?;
+    Ok(ToolCall::AddGlobalGotcha(GotchaInput {
+        library,
+        keywords,
+        gotcha,
+        versions,
+    }))
 }
 
 fn tool_call(name: &str, arguments: &Value) -> Result<ToolCall, ArgumentError> {
@@ -82,6 +117,8 @@ fn tool_call(name: &str, arguments: &Value) -> Result<ToolCall, ArgumentError> {
             }
         }
         "get_global_gotchas" => ToolCall::GetGlobalGotchas(parse::<GotchaArgs>(arguments)?.library),
+        "global_query" => global_query_call(arguments)?,
+        "add_global_gotcha" => add_global_call(arguments)?,
         "log_issue" => {
             let (summary, location) = write(arguments)?;
             ToolCall::Write(WriteCall::LogIssue { summary, location })
