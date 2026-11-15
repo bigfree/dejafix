@@ -5,14 +5,20 @@ use std::path::{Path, PathBuf};
 
 use super::git;
 use super::types::HooksLocation;
-use crate::adapters::fs::{StoreError, read_optional_text};
+use crate::adapters::fs::{StoreError, identity, read_optional_text};
 use crate::core::hooks::shell_path;
 
 pub(crate) fn same_file(left: &Path, right: &Path) -> bool {
-    matches!(
-        (fs::canonicalize(left), fs::canonicalize(right)),
-        (Ok(left), Ok(right)) if left == right
-    )
+    matches!((identity(left), identity(right)), (Some(left), Some(right)) if left == right)
+}
+
+fn owns_git_dir(root: &Path, git_dir: &Path) -> bool {
+    let dot_git = root.join(".git");
+    same_file(git_dir, &dot_git)
+        || read_optional_text(&git_dir.join("gitdir"))
+            .ok()
+            .flatten()
+            .is_some_and(|backlink| same_file(Path::new(backlink.trim()), &dot_git))
 }
 
 #[must_use]
@@ -23,6 +29,7 @@ pub fn hooks_location(root: &Path) -> HooksLocation {
         &[
             "rev-parse",
             "--show-toplevel",
+            "--absolute-git-dir",
             "--git-common-dir",
             "--git-path",
             "hooks",
@@ -34,10 +41,12 @@ pub fn hooks_location(root: &Path) -> HooksLocation {
         return fallback;
     };
     let mut lines = text.lines().map(str::trim);
-    let (Some(top), Some(common), Some(hooks)) = (lines.next(), lines.next(), lines.next()) else {
+    let (Some(top), Some(git_dir), Some(common), Some(hooks)) =
+        (lines.next(), lines.next(), lines.next(), lines.next())
+    else {
         return fallback;
     };
-    if !same_file(Path::new(top), root) {
+    if !same_file(Path::new(top), root) || !owns_git_dir(root, Path::new(git_dir)) {
         return fallback;
     }
     let hooks = root.join(hooks);

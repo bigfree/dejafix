@@ -145,6 +145,25 @@ fn core_hooks_path_is_reported_relative_or_absolute() {
 }
 
 #[test]
+fn a_git_file_pointing_at_another_repository_keeps_the_old_folder() {
+    let dir = tempfile::tempdir().unwrap();
+    let base = canonical(dir.path());
+    let other = base.join("other");
+    committed_repository(&other);
+    let root = base.join("unpacked");
+    fs::create_dir_all(&root).unwrap();
+    fs::write(
+        root.join(".git"),
+        format!("gitdir: {}\n", other.join(".git").display()),
+    )
+    .unwrap();
+    assert_eq!(
+        hooks_location(&root),
+        HooksLocation::Folder(root.join(".git").join("hooks"))
+    );
+}
+
+#[test]
 fn outside_a_repository_or_in_a_subfolder_the_old_folder_is_kept() {
     let dir = tempfile::tempdir().unwrap();
     let root = canonical(dir.path());

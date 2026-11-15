@@ -399,3 +399,21 @@ fn install_with_core_hooks_path_writes_nothing_and_prints_the_lines() -> TestRes
     assert_eq!(hook(&repo, "pre-commit"), "");
     Ok(())
 }
+
+#[test]
+fn with_core_hooks_path_init_prints_the_lines_and_unknown_actions_are_named() -> TestResult {
+    let repo = Repo::bare()?;
+    let output = git(&repo, &["config", "core.hooksPath", ".husky/_"])?;
+    assert!(output.status.success(), "{output:?}");
+    let init = repo.stdout(&["init", "--no-mcp-config"])?;
+    assert!(init.contains("core.hooksPath points git at "), "{init}");
+    assert!(init.contains("\npost-commit:\n"), "{init}");
+    assert!(!repo.root.join(".husky").exists());
+    let uninstall = repo.stdout(&["hooks", "uninstall"])?;
+    assert!(uninstall.ends_with("Remove the dejafix blocks from the hooks there by hand.\n"));
+    assert_eq!(
+        repo.stdout(&["hooks", "instal"])?,
+        "Unknown action: instal\n"
+    );
+    Ok(())
+}

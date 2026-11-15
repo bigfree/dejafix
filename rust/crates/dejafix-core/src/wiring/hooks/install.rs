@@ -18,9 +18,10 @@ pub fn hooks_action(root: &Path, action: HooksAction) -> Result<HooksOutcome, St
     let directory = match hooks_location(root) {
         HooksLocation::Folder(directory) => directory,
         HooksLocation::Configured(path) => {
-            let snippets = match &action {
-                HooksAction::Install { djf } => configured_snippets(djf),
-                HooksAction::Uninstall | HooksAction::Unknown(_) => Vec::new(),
+            let snippets = match action {
+                HooksAction::Install { djf } => configured_snippets(&djf),
+                HooksAction::Uninstall => Vec::new(),
+                HooksAction::Unknown(action) => return Ok(HooksOutcome::Unknown(action)),
             };
             return Ok(HooksOutcome::Configured { path, snippets });
         }
