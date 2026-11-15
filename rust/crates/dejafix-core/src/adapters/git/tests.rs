@@ -782,3 +782,57 @@ fn a_logged_glob_counts_only_the_file_of_that_name() {
     assert_eq!(super::run::LITERAL, "--literal-pathspecs");
     assert_eq!(super::run::NO_OPTIONAL_LOCKS, "--no-optional-locks");
 }
+
+fn private_repository() -> (tempfile::TempDir, tempfile::TempDir, PathBuf) {
+    let dir = tempfile::tempdir().unwrap();
+    let config = tempfile::tempdir().unwrap();
+    let excludes = config.path().join("ignore");
+    fs::write(&excludes, "").unwrap();
+    git(dir.path(), &["init", "-q"]);
+    git(
+        dir.path(),
+        &["config", "core.excludesFile", &excludes.to_string_lossy()],
+    );
+    fs::create_dir(dir.path().join(".dejafix")).unwrap();
+    (dir, config, excludes)
+}
+
+#[test]
+fn a_memory_dir_ignored_by_info_exclude_or_the_excludes_file_is_ignored() {
+    let (dir, _config, excludes) = private_repository();
+    let root = dir.path();
+    assert!(!super::is_ignored(root, ".dejafix/"));
+    fs::write(root.join(".git/info/exclude"), ".dejafix/\n").unwrap();
+    assert!(super::is_ignored(root, ".dejafix/"));
+    fs::write(root.join(".git/info/exclude"), "").unwrap();
+    fs::write(&excludes, "/.dejafix/\n").unwrap();
+    assert!(super::is_ignored(root, ".dejafix/"));
+}
+
+#[test]
+fn a_pattern_anchored_at_the_repository_root_misses_a_nested_project() {
+    let (dir, _config, _excludes) = private_repository();
+    let nested = dir.path().join("app");
+    fs::create_dir_all(nested.join(".dejafix")).unwrap();
+    fs::write(dir.path().join(".git/info/exclude"), "/.dejafix/\n").unwrap();
+    assert!(!super::is_ignored(&nested, ".dejafix/"));
+    fs::write(dir.path().join(".git/info/exclude"), ".dejafix/\n").unwrap();
+    assert!(super::is_ignored(&nested, ".dejafix/"));
+}
+
+#[test]
+fn a_memory_dir_with_tracked_files_is_not_ignored() {
+    let (dir, _config, _excludes) = private_repository();
+    let root = dir.path();
+    fs::write(root.join(".git/info/exclude"), ".dejafix/\n").unwrap();
+    fs::write(root.join(".dejafix/plan.md"), "x\n").unwrap();
+    git(root, &["add", "--force", ".dejafix/plan.md"]);
+    assert!(!super::is_ignored(root, ".dejafix/"));
+}
+
+#[test]
+fn nothing_is_ignored_outside_a_repository() {
+    let dir = tempfile::tempdir().unwrap();
+    fs::create_dir(dir.path().join(".dejafix")).unwrap();
+    assert!(!super::is_ignored(dir.path(), ".dejafix/"));
+}

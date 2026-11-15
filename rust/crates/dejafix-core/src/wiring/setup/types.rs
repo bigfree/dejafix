@@ -62,12 +62,18 @@ pub enum UpdateStatus {
     Latest,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum IgnoreFile {
+    Gitignore,
+    Exclude,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct Plan {
     pub rename: bool,
     pub stale: Vec<PathBuf>,
     pub instructions: bool,
-    pub gitignore: bool,
+    pub ignores: Vec<IgnoreFile>,
     pub bridges: Vec<&'static str>,
     pub hooks: Vec<&'static str>,
 }

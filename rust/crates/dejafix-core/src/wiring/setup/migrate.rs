@@ -3,13 +3,15 @@ use std::io;
 use std::ops::ControlFlow;
 use std::path::{Path, PathBuf};
 
-use super::types::{Halt, LegacyProject, MigrateEvent, MigrateOptions, Plan, ProjectState};
+use super::types::{
+    Halt, IgnoreFile, LegacyProject, MigrateEvent, MigrateOptions, Plan, ProjectState,
+};
 use crate::adapters::fs::{
     RegistryFiles, StoreError, clear_destination, client_configs, files_with_legacy_paths,
     holds_data, is_symlink, live_watcher, move_entry, points_outside, project_name, read_universal,
     resolve_path, write_atomic,
 };
-use crate::adapters::git::hooks_dir;
+use crate::adapters::git::{exclude_file, hooks_dir};
 use crate::core::hooks::HookKind;
 use crate::core::migrate::{
     BRIDGE_BLOCK, Block, HOOK_BLOCK, LEGACY_DIR, MigrateStep, convert_block, has_legacy_path,
@@ -164,6 +166,24 @@ fn read_inside(path: &Path, root: &Path) -> Option<String> {
     read_universal(path)
 }
 
+impl IgnoreFile {
+    const ALL: [Self; 2] = [Self::Gitignore, Self::Exclude];
+
+    fn path(self, root: &Path) -> PathBuf {
+        match self {
+            Self::Gitignore => root.join(GITIGNORE),
+            Self::Exclude => exclude_file(root),
+        }
+    }
+
+    const fn step(self) -> MigrateStep {
+        match self {
+            Self::Gitignore => MigrateStep::Gitignore,
+            Self::Exclude => MigrateStep::Exclude,
+        }
+    }
+}
+
 fn has_old_block(path: &Path, root: &Path, block: &Block) -> bool {
     read_inside(path, root).is_some_and(|text| text.contains(block.old_start))
 }
@@ -197,9 +217,7 @@ impl Plan {
         if self.instructions {
             steps.push(MigrateStep::Instructions);
         }
-        if self.gitignore {
-            steps.push(MigrateStep::Gitignore);
-        }
+        steps.extend(self.ignores.iter().map(|file| file.step()));
         if !self.bridges.is_empty() {
             steps.push(MigrateStep::Bridges(self.bridges.clone()));
         }
@@ -236,8 +254,12 @@ fn plan(root: &Path, legacy: &Path, target: &Path) -> Plan {
         stale: files_with_legacy_paths(memory),
         instructions: read_universal(&memory.join(INSTRUCTIONS_FILE))
             .is_some_and(|text| instructions_version(&text) < INSTRUCTIONS_VERSION),
-        gitignore: read_inside(&root.join(GITIGNORE), root)
-            .is_some_and(|text| has_legacy_path(&text)),
+        ignores: IgnoreFile::ALL
+            .into_iter()
+            .filter(|file| {
+                read_inside(&file.path(root), root).is_some_and(|text| has_legacy_path(&text))
+            })
+            .collect(),
         bridges: RULE_FILES
             .into_iter()
             .filter(|file| has_old_block(&root.join(file), root, &BRIDGE_BLOCK))
@@ -265,8 +287,8 @@ fn apply_plan(
     for relative in &plan.stale {
         rewrite_paths(&target.join(relative), root)?;
     }
-    if plan.gitignore {
-        rewrite_paths(&root.join(GITIGNORE), root)?;
+    for file in &plan.ignores {
+        rewrite_paths(&file.path(root), root)?;
     }
     if plan.instructions {
         refresh_instructions(root)?;

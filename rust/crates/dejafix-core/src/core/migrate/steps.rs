@@ -14,6 +14,7 @@ impl fmt::Display for MigrateStep {
                 formatter.write_str("refresh AI_INSTRUCTIONS.md (previous copy kept as .bak)")
             }
             Self::Gitignore => formatter.write_str("update .gitignore entries"),
+            Self::Exclude => formatter.write_str("update .git/info/exclude entries"),
             Self::Bridges(files) => {
                 write!(
                     formatter,

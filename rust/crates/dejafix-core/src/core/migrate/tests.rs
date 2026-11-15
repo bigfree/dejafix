@@ -86,6 +86,7 @@ fn each_step_reads_as_python_prints_it() {
         MigrateStep::Paths(2),
         MigrateStep::Instructions,
         MigrateStep::Gitignore,
+        MigrateStep::Exclude,
         MigrateStep::Bridges(vec!["CLAUDE.md", "AGENTS.md"]),
         MigrateStep::Hooks(vec!["post-commit", "pre-commit"]),
     ]
@@ -99,6 +100,7 @@ fn each_step_reads_as_python_prints_it() {
             "update .projectmem paths recorded in 2 memory files",
             "refresh AI_INSTRUCTIONS.md (previous copy kept as .bak)",
             "update .gitignore entries",
+            "update .git/info/exclude entries",
             "replace the bridge block in CLAUDE.md, AGENTS.md",
             "reinstall git hooks: post-commit, pre-commit",
         ]
