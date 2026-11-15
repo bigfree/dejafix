@@ -124,6 +124,8 @@ const LIBRARY_MCP: &str = "  - User mentions a library → call get_global_gotch
 const GLOBAL_HINT: &str = "If this applies beyond this project, also call add_global_gotcha(";
 const PROMOTED_STORE: &str = "home/.dejafix/global/library_gotchas.jsonl";
 const PROMOTION_CACHE: &str = "home/.dejafix/global/.promotable.json";
+const GLOBAL_DIR: &str = "home/.dejafix/global/";
+const LOCK_FILE: &str = ".jsonl.lock";
 
 pub fn without_language_rules(text: &str) -> String {
     text.replace(LANGUAGE_SECTION, "")
@@ -211,6 +213,9 @@ pub fn approved_departures(
         } else if path == PROMOTED_STORE {
             *text = promoted_during(text, since);
         }
+    }
+    if matches!(implementation, Implementation::Rust) {
+        files.retain(|path, _| !(path.starts_with(GLOBAL_DIR) && path.ends_with(LOCK_FILE)));
     }
     if matches!(implementation, Implementation::Python) {
         files.remove(PROMOTION_CACHE);

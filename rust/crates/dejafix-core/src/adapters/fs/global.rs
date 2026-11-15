@@ -1,6 +1,6 @@
 use std::collections::HashSet;
-use std::fs::{self, File, OpenOptions};
-use std::io::{Read, Write};
+use std::fs::{self, OpenOptions};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use jiff::tz::TimeZone;
@@ -18,7 +18,7 @@ const GOTCHAS_FILE: &str = "library_gotchas.jsonl";
 const PREFERENCES_FILE: &str = "stack_preferences.md";
 const LIBRARIES_FILE: &str = "libraries.json";
 const BACKUP_FILE: &str = "library_gotchas.v1.jsonl";
-const LOCK_ATTEMPTS: usize = 16;
+const LOCK_SUFFIX: &str = ".lock";
 
 fn write_error(path: &Path) -> impl Fn(std::io::Error) -> StoreError + '_ {
     move |source| StoreError::Write {
@@ -60,22 +60,22 @@ fn invalid_store(path: &Path) -> StoreError {
     }
 }
 
-#[cfg(unix)]
-fn same_file(file: &File, path: &Path) -> bool {
-    use std::os::unix::fs::MetadataExt;
-    match (file.metadata(), fs::metadata(path)) {
-        (Ok(open), Ok(named)) => open.dev() == named.dev() && open.ino() == named.ino(),
-        _ => false,
-    }
-}
-
-#[cfg(not(unix))]
-fn same_file(file: &File, path: &Path) -> bool {
-    match (file.metadata(), fs::metadata(path)) {
-        (Ok(open), Ok(named)) => {
-            open.len() == named.len() && open.modified().ok() == named.modified().ok()
+fn apply(path: &Path, write: GotchaWrite) -> Result<(), StoreError> {
+    match write {
+        GotchaWrite::Keep => Ok(()),
+        GotchaWrite::Append(lines) => {
+            let text = joined_lines(&lines);
+            OpenOptions::new()
+                .append(true)
+                .create(true)
+                .open(path)
+                .and_then(|mut file| file.write_all(platform_newlines(&text).as_bytes()))
+                .map_err(write_error(path))
         }
-        _ => false,
+        GotchaWrite::Replace(lines) => {
+            let text = joined_lines(&lines);
+            write_atomic(path, platform_newlines(&text).as_bytes())
+        }
     }
 }
 
@@ -190,73 +190,35 @@ impl GlobalStore {
     ) -> Result<Option<T>, StoreError> {
         self.ensure()?;
         let path = self.path(name);
-        let read_error = |source| StoreError::Read {
+        let lock_path = self.path(&format!("{name}{LOCK_SUFFIX}"));
+        let lock = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .open(&lock_path)
+            .map_err(write_error(&lock_path))?;
+        lock.lock().map_err(|source| StoreError::Lock {
             path: path.clone(),
             source,
+        })?;
+        let text = match fs::read_to_string(&path) {
+            Ok(text) => text,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound && !create => {
+                return Ok(None);
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => String::new(),
+            Err(source) => {
+                return Err(StoreError::Read {
+                    path: path.clone(),
+                    source,
+                });
+            }
         };
-        let lock_error = |source| StoreError::Lock {
-            path: path.clone(),
-            source,
-        };
-        for _ in 0..LOCK_ATTEMPTS {
-            let mut created = false;
-            let mut file = match OpenOptions::new().read(true).append(true).open(&path) {
-                Ok(file) => file,
-                Err(error) if error.kind() == std::io::ErrorKind::NotFound && !create => {
-                    return Ok(None);
-                }
-                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-                    match OpenOptions::new()
-                        .read(true)
-                        .append(true)
-                        .create_new(true)
-                        .open(&path)
-                    {
-                        Ok(file) => {
-                            created = true;
-                            file
-                        }
-                        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
-                            continue;
-                        }
-                        Err(error) => return Err(write_error(&path)(error)),
-                    }
-                }
-                Err(error) => return Err(read_error(error)),
-            };
-            file.lock().map_err(lock_error)?;
-            if !same_file(&file, &path) {
-                continue;
-            }
-            let mut text = String::new();
-            file.read_to_string(&mut text).map_err(read_error)?;
-            let entries =
-                parse_entries(&universal_newlines(&text)).ok_or_else(|| invalid_store(&path))?;
-            let (write, value) = decide(entries);
-            if created && text.is_empty() && matches!(write, GotchaWrite::Keep) {
-                fs::remove_file(&path).map_err(write_error(&path))?;
-                return Ok(Some(value));
-            }
-            self.apply(&path, &mut file, write)?;
-            return Ok(Some(value));
-        }
-        Err(lock_error(std::io::Error::new(
-            std::io::ErrorKind::WouldBlock,
-            "the file kept being replaced while waiting for its lock",
-        )))
-    }
-
-    fn apply(&self, path: &Path, file: &mut File, write: GotchaWrite) -> Result<(), StoreError> {
-        match write {
-            GotchaWrite::Keep => Ok(()),
-            GotchaWrite::Append(lines) => file
-                .write_all(platform_newlines(&joined_lines(&lines)).as_bytes())
-                .map_err(write_error(path)),
-            GotchaWrite::Replace(lines) => {
-                self.ensure()?;
-                write_atomic(path, platform_newlines(&joined_lines(&lines)).as_bytes())
-            }
-        }
+        let entries =
+            parse_entries(&universal_newlines(&text)).ok_or_else(|| invalid_store(&path))?;
+        let (write, value) = decide(entries);
+        apply(&path, write)?;
+        Ok(Some(value))
     }
 
     fn retain_locked(
