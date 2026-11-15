@@ -15,7 +15,7 @@ pub struct Config {
     pub color: bool,
     pub zone: TimeZone,
     pub path_var: Option<OsString>,
-    pub exe_dir: Option<PathBuf>,
+    pub exe: Option<PathBuf>,
     pub legacy_env: Vec<String>,
 }
 

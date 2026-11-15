@@ -167,7 +167,7 @@ fn the_djf_next_to_the_executable_beats_path() {
     let adjacent = fake_binary(&dir.path().join("venv").join("bin"), "djf", 0o755);
     fake_binary(&dir.path().join("other"), "djf", 0o755);
     let path_var = path_of(&dir.path().join("other"));
-    let resolved = resolve_djf_binary(adjacent.parent(), Some(&path_var), false);
+    let resolved = resolve_djf_binary(Some(&adjacent), Some(&path_var), false);
     assert_eq!(resolved, shell_path(&adjacent.to_string_lossy()));
 }
 
@@ -175,7 +175,7 @@ fn the_djf_next_to_the_executable_beats_path() {
 fn the_dejafix_alias_is_the_second_choice_next_to_the_executable() {
     let dir = tempfile::tempdir().unwrap();
     let alias = fake_binary(dir.path(), "dejafix", 0o755);
-    let resolved = resolve_djf_binary(Some(dir.path()), None, false);
+    let resolved = resolve_djf_binary(Some(&alias), None, false);
     assert_eq!(resolved, shell_path(&alias.to_string_lossy()));
 }
 
@@ -186,7 +186,7 @@ fn a_djf_that_is_not_executable_is_skipped() {
     let adjacent = fake_binary(&dir.path().join("venv"), "djf", 0o644);
     let on_path = fake_binary(&dir.path().join("local"), "djf", 0o755);
     let path_var = path_of(on_path.parent().unwrap());
-    let resolved = resolve_djf_binary(adjacent.parent(), Some(&path_var), false);
+    let resolved = resolve_djf_binary(Some(&adjacent), Some(&path_var), false);
     assert_eq!(resolved, shell_path(&on_path.to_string_lossy()));
 }
 
@@ -196,7 +196,11 @@ fn path_answers_when_nothing_is_adjacent() {
     fs::create_dir_all(dir.path().join("venv")).unwrap();
     let on_path = fake_binary(&dir.path().join("local"), "djf", 0o755);
     let path_var = path_of(on_path.parent().unwrap());
-    let resolved = resolve_djf_binary(Some(&dir.path().join("venv")), Some(&path_var), false);
+    let resolved = resolve_djf_binary(
+        Some(&dir.path().join("venv").join("running")),
+        Some(&path_var),
+        false,
+    );
     assert_eq!(resolved, shell_path(&on_path.to_string_lossy()));
 }
 
@@ -218,7 +222,7 @@ fn nothing_found_is_the_bare_name() {
     let dir = tempfile::tempdir().unwrap();
     let path_var = path_of(dir.path());
     assert_eq!(
-        resolve_djf_binary(Some(dir.path()), Some(&path_var), false),
+        resolve_djf_binary(Some(&dir.path().join("running")), Some(&path_var), false),
         "djf"
     );
     assert_eq!(resolve_djf_binary(None, None, false), "djf");
@@ -228,14 +232,17 @@ fn nothing_found_is_the_bare_name() {
 fn a_directory_named_djf_is_not_a_binary() {
     let dir = tempfile::tempdir().unwrap();
     fs::create_dir_all(dir.path().join("djf")).unwrap();
-    assert_eq!(resolve_djf_binary(Some(dir.path()), None, false), "djf");
+    assert_eq!(
+        resolve_djf_binary(Some(&dir.path().join("running")), None, false),
+        "djf"
+    );
 }
 
 #[test]
 fn windows_finds_scripts_djf_exe_with_forward_slashes() {
     let dir = tempfile::tempdir().unwrap();
     let binary = fake_binary(&dir.path().join("venv").join("Scripts"), "djf.exe", 0o644);
-    let resolved = resolve_djf_binary(binary.parent(), None, true);
+    let resolved = resolve_djf_binary(Some(&binary), None, true);
     assert!(resolved.ends_with("/Scripts/djf.exe"));
     assert!(!resolved.contains('\\'));
     assert_eq!(resolved, binary.to_string_lossy().replace('\\', "/"));
@@ -903,4 +910,25 @@ fn nothing_is_ignored_outside_a_repository() {
     let dir = tempfile::tempdir().unwrap();
     fs::create_dir(dir.path().join(".dejafix")).unwrap();
     assert!(!super::is_ignored(dir.path(), ".dejafix/"));
+}
+
+#[cfg(unix)]
+#[test]
+fn a_path_entry_linked_to_the_running_binary_is_baked_by_its_path_spelling() {
+    let dir = tempfile::tempdir().unwrap();
+    let real = fake_binary(&dir.path().join("Cellar/dejafix/1.0.0/bin"), "djf", 0o755);
+    let bin = dir.path().join("bin");
+    fs::create_dir_all(&bin).unwrap();
+    std::os::unix::fs::symlink(&real, bin.join("djf")).unwrap();
+    let resolved = resolve_djf_binary(Some(&real), Some(&path_of(&bin)), false);
+    assert_eq!(resolved, shell_path(&bin.join("djf").to_string_lossy()));
+}
+
+#[test]
+fn an_unrelated_djf_on_path_does_not_beat_the_running_binary() {
+    let dir = tempfile::tempdir().unwrap();
+    let real = fake_binary(&dir.path().join("venv/bin"), "djf", 0o755);
+    let other = fake_binary(&dir.path().join("other"), "djf", 0o755);
+    let resolved = resolve_djf_binary(Some(&real), Some(&path_of(other.parent().unwrap())), false);
+    assert_eq!(resolved, shell_path(&real.to_string_lossy()));
 }

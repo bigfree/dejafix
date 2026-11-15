@@ -64,9 +64,7 @@ impl Config {
             color: std::io::stdout().is_terminal(),
             zone: jiff::tz::TimeZone::system(),
             path_var: env::var_os("PATH"),
-            exe_dir: env::current_exe()
-                .ok()
-                .and_then(|exe| exe.parent().map(std::path::Path::to_path_buf)),
+            exe: env::current_exe().ok(),
             legacy_env: legacy_env(),
         })
     }

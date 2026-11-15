@@ -89,14 +89,16 @@ fn found_on_path(path_var: &OsStr, windows: bool) -> Option<PathBuf> {
 }
 
 #[must_use]
-pub fn resolve_djf_binary(
-    exe_dir: Option<&Path>,
-    path_var: Option<&OsStr>,
-    windows: bool,
-) -> String {
-    let found = exe_dir
-        .and_then(|directory| found_in_exe_dir(directory, windows))
-        .or_else(|| path_var.and_then(|var| found_on_path(var, windows)));
+pub fn resolve_djf_binary(exe: Option<&Path>, path_var: Option<&OsStr>, windows: bool) -> String {
+    let on_path = path_var.and_then(|var| found_on_path(var, windows));
+    let found = on_path
+        .clone()
+        .filter(|candidate| exe.is_some_and(|exe| same_file(candidate, exe)))
+        .or_else(|| {
+            exe.and_then(Path::parent)
+                .and_then(|directory| found_in_exe_dir(directory, windows))
+        })
+        .or(on_path);
     match found {
         Some(path) => shell_path(&path.to_string_lossy()),
         None => "djf".to_owned(),

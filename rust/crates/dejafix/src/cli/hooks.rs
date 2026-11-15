@@ -16,7 +16,7 @@ const RESET: &str = "\x1b[0m";
 
 pub fn djf_binary(config: &Config) -> String {
     resolve_djf_binary(
-        config.exe_dir.as_deref(),
+        config.exe.as_deref(),
         config.path_var.as_deref(),
         cfg!(windows),
     )
