@@ -33,6 +33,20 @@ pub struct Recorded {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub enum IssueScope {
+    All,
+    Touched(Vec<String>),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Regenerated {
+    pub path: PathBuf,
+    pub removed: usize,
+    pub not_removed: Vec<String>,
+    pub unreadable: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SearchOutput {
     Matches(Vec<String>),
     Nothing(&'static str),

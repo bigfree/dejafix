@@ -102,11 +102,11 @@ pub use crate::core::write::{
 pub use crate::wiring::{
     BridgeOutcome, CaptureOutcome, CorruptLog, DoctorOptions, DoctorReport, EditHookRun,
     FoundProject, HooksAction, HooksOutcome, HooksReport, InitHooks, InitOptions, InitReport,
-    ListedProject, MemoryFile, PrecheckOutcome, PrecheckRequest, Project, Recorded, RegistryOp,
-    RegistryReply, ScanReport, SearchOutput, Settings, UpgradeNotice, WiringError, add_gotcha,
-    add_plan_idea, auto_capture, brief, doctor, edit_hook, global, hooks_action, init_project,
-    other_projects, precheck, read_memory_file, record, regenerate, register_project, registry_op,
-    scan_projects, search_project, show, upgrade_notice,
+    IssueScope, ListedProject, MemoryFile, PrecheckOutcome, PrecheckRequest, Project, Recorded,
+    Regenerated, RegistryOp, RegistryReply, ScanReport, SearchOutput, Settings, UpgradeNotice,
+    WiringError, add_gotcha, add_plan_idea, auto_capture, brief, doctor, edit_hook, global,
+    hooks_action, init_project, other_projects, precheck, read_memory_file, record, regenerate,
+    register_project, registry_op, scan_projects, search_project, show, upgrade_notice,
 };
 pub use crate::wiring::{CachedLog, McpSettings, McpState, ToolCall, ToolReply, WriteCall};
 pub use crate::wiring::{

@@ -36,11 +36,20 @@ pub fn search(
 pub fn rebuild(
     project: &Project,
     out: &mut impl Write,
+    err: &mut impl Write,
 ) -> Result<Result<(), WiringError>, io::Error> {
-    match regenerate(project) {
-        Ok(path) => writeln!(out, "Regenerated {}", path.display()).map(Ok),
-        Err(error) => Ok(Err(error)),
+    let report = match regenerate(project) {
+        Ok(report) => report,
+        Err(error) => return Ok(Err(error)),
+    };
+    writeln!(out, "Regenerated {}", report.path.display())?;
+    if report.removed > 0 {
+        writeln!(out, "Removed {} renamed issue file(s).", report.removed)?;
     }
+    for line in &report.not_removed {
+        writeln!(err, "{line}")?;
+    }
+    Ok(Ok(()))
 }
 
 pub fn memory_file(

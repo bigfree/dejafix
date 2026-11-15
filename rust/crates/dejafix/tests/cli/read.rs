@@ -144,3 +144,21 @@ fn bad_arguments_exit_two_and_help_exits_zero() -> TestResult {
     repo.djf(&["--help"]).assert().success();
     Ok(())
 }
+
+#[test]
+fn regenerate_removes_a_renamed_issue_file_and_says_so() -> TestResult {
+    let repo = Repo::new()?;
+    repo.djf(&["log", "token expiry bug"]).assert().success();
+    let issues = repo.mem().join("issues");
+    let stale = issues.join("0001-old-title.md");
+    fs::write(&stale, "# #0001 old title\n")?;
+    let notes = issues.join("0001-my-notes.md");
+    fs::write(&notes, "my own notes\n")?;
+    let out = repo.stdout(&["regenerate"])?;
+    assert!(out.ends_with("Removed 1 renamed issue file(s).\n"));
+    assert!(!stale.exists() && notes.exists());
+    assert!(issues.join("0001-token-expiry-bug.md").exists());
+    let again = repo.stdout(&["regenerate"])?;
+    assert!(!again.contains("Removed"));
+    Ok(())
+}
