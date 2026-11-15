@@ -783,7 +783,9 @@ fn rewritten_files_keep_their_line_endings() {
         b"{\"location\": \".dejafix/a.md\"}\r\n{\"location\": \".dejafix/b.md\"}\r\n"
     );
     assert!(
-        read(&machine.root.join(".gitignore")).contains("node_modules/\n.dejafix/events.jsonl\n")
+        read(&machine.root.join(".gitignore"))
+            .replace("\r\n", "\n")
+            .contains("node_modules/\n.dejafix/events.jsonl\n")
     );
 }
 

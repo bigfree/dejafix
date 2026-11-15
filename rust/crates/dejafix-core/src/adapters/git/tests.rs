@@ -87,7 +87,7 @@ fn path_of(directory: &Path) -> OsString {
 }
 
 fn canonical(path: &Path) -> PathBuf {
-    fs::canonicalize(path).unwrap()
+    crate::canonical_path(path).unwrap()
 }
 
 fn committed_repository(root: &Path) {
