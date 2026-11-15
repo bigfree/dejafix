@@ -152,7 +152,10 @@ Everything stays on your machine: there is no cloud service and no telemetry.
 By default, the distilled files are committed so that your teammates' agents
 inherit them: `summary.md`, `PROJECT_MAP.md`, `AI_INSTRUCTIONS.md` and
 `issues/`. The raw log and the runtime files are gitignored. To keep all of it
-private, add `.dejafix/` to `.gitignore`.
+private, add `.dejafix/` to `.gitignore`. To keep it private to your own clone
+without touching the shared `.gitignore`, add `.dejafix/` (and the bridge files
+`CLAUDE.md` and `AGENTS.md`, if you like) to `.git/info/exclude` or to your
+global excludes file. `djf init` then leaves `.gitignore` alone.
 
 Secrets are redacted from recorded events. Set `DEJAFIX_NO_REDACT=1` to turn
 that off. See [SECURITY.md](SECURITY.md).
