@@ -128,6 +128,9 @@ const GLOBAL_DIR: &str = "home/.dejafix/global/";
 const LOCK_FILE: &str = ".jsonl.lock";
 
 pub fn without_language_rules(text: &str) -> String {
+    if text.contains("\r\n") {
+        return without_language_rules(&text.replace("\r\n", "\n")).replace('\n', "\r\n");
+    }
     text.replace(LANGUAGE_SECTION, "")
         .replace(LANGUAGE_BRIDGE, "")
         .replace(LANGUAGE_MCP, LIBRARY_MCP)
