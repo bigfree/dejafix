@@ -67,15 +67,15 @@ pub fn print_report(
             names(&report.refreshed)
         )?;
     }
-    if let Some(path) = &report.folder {
-        writeln!(out, "  Hooks folder: {}", path.display())?;
-    }
     if report.installed.is_empty()
         && report.refreshed.is_empty()
         && report.skipped.is_empty()
         && report.unreadable.is_empty()
     {
         writeln!(out, "dejafix git hooks already installed.")?;
+    }
+    if let Some(path) = &report.folder {
+        writeln!(out, "  Hooks folder: {}", path.display())?;
     }
     Ok(())
 }

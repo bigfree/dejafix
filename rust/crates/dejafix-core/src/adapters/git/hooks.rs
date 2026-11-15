@@ -12,13 +12,22 @@ pub(crate) fn same_file(left: &Path, right: &Path) -> bool {
     matches!((identity(left), identity(right)), (Some(left), Some(right)) if left == right)
 }
 
-fn owns_git_dir(root: &Path, git_dir: &Path) -> bool {
+fn owns_git_dir(root: &Path, git_dir: &Path, common: &Path) -> bool {
     let dot_git = root.join(".git");
-    same_file(git_dir, &dot_git)
-        || read_optional_text(&git_dir.join("gitdir"))
+    if same_file(git_dir, &dot_git) {
+        return true;
+    }
+    let linked = git_dir
+        .parent()
+        .is_some_and(|parent| same_file(parent, &common.join("worktrees")));
+    linked
+        && read_optional_text(&git_dir.join("gitdir"))
             .ok()
             .flatten()
-            .is_some_and(|backlink| same_file(Path::new(backlink.trim()), &dot_git))
+            .is_some_and(|backlink| {
+                let backlink = Path::new(backlink.trim());
+                backlink.is_absolute() && same_file(backlink, &dot_git)
+            })
 }
 
 #[must_use]
@@ -46,11 +55,12 @@ pub fn hooks_location(root: &Path) -> HooksLocation {
     else {
         return fallback;
     };
-    if !same_file(Path::new(top), root) || !owns_git_dir(root, Path::new(git_dir)) {
+    let common = root.join(common);
+    if !same_file(Path::new(top), root) || !owns_git_dir(root, Path::new(git_dir), &common) {
         return fallback;
     }
     let hooks = root.join(hooks);
-    if hooks == root.join(common).join("hooks") {
+    if hooks == common.join("hooks") {
         HooksLocation::Folder(hooks)
     } else {
         HooksLocation::Configured(hooks)

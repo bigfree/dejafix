@@ -164,6 +164,29 @@ fn a_git_file_pointing_at_another_repository_keeps_the_old_folder() {
 }
 
 #[test]
+fn a_fake_worktree_folder_inside_the_project_keeps_the_old_folder() {
+    let dir = tempfile::tempdir().unwrap();
+    let base = canonical(dir.path());
+    let other = base.join("other");
+    committed_repository(&other);
+    let root = base.join("unpacked");
+    let fake = root.join(".fake");
+    fs::create_dir_all(&fake).unwrap();
+    fs::write(root.join(".git"), "gitdir: .fake\n").unwrap();
+    fs::write(fake.join("HEAD"), "ref: refs/heads/main\n").unwrap();
+    fs::write(fake.join("commondir"), "../../other/.git\n").unwrap();
+    fs::write(
+        fake.join("gitdir"),
+        format!("{}\n", root.join(".git").display()),
+    )
+    .unwrap();
+    assert_eq!(
+        hooks_location(&root),
+        HooksLocation::Folder(root.join(".git").join("hooks"))
+    );
+}
+
+#[test]
 fn outside_a_repository_or_in_a_subfolder_the_old_folder_is_kept() {
     let dir = tempfile::tempdir().unwrap();
     let root = canonical(dir.path());
