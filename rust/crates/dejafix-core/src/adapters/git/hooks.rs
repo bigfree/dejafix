@@ -112,7 +112,9 @@ pub fn resolve_djf_binary(exe: Option<&Path>, path_var: Option<&OsStr>, windows:
     let on_path = path_var.and_then(|var| found_on_path(var, windows));
     let found = on_path
         .clone()
-        .filter(|candidate| exe.is_some_and(|exe| same_file(candidate, exe)))
+        .filter(|candidate| {
+            candidate.is_absolute() && exe.is_some_and(|exe| same_file(candidate, exe))
+        })
         .or_else(|| {
             exe.and_then(Path::parent)
                 .and_then(|directory| found_in_exe_dir(directory, windows))

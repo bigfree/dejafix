@@ -974,3 +974,19 @@ fn an_unrelated_djf_on_path_does_not_beat_the_running_binary() {
     let resolved = resolve_djf_binary(Some(&real), Some(&path_of(other.parent().unwrap())), false);
     assert_eq!(resolved, shell_path(&real.to_string_lossy()));
 }
+
+#[cfg(unix)]
+#[test]
+fn a_relative_path_entry_to_the_running_binary_is_not_baked() {
+    let dir = tempfile::tempdir().unwrap();
+    let real = fake_binary(&dir.path().join("venv/bin"), "djf", 0o755);
+    let bin = dir.path().join("bin");
+    fs::create_dir_all(&bin).unwrap();
+    std::os::unix::fs::symlink(&real, bin.join("djf")).unwrap();
+    let cwd = std::env::current_dir().unwrap();
+    let up = "../".repeat(cwd.components().count() - 1);
+    let relative = PathBuf::from(up).join(bin.strip_prefix("/").unwrap());
+    assert!(relative.is_relative() && relative.join("djf").is_file());
+    let resolved = resolve_djf_binary(Some(&real), Some(&path_of(&relative)), false);
+    assert_eq!(resolved, shell_path(&real.to_string_lossy()));
+}
