@@ -23,7 +23,7 @@ pub use crate::core::capture::{
     meets_threshold, merge_event, parse_name_status, pick_location,
 };
 pub use crate::core::context::{ContextInput, generate_context};
-pub use crate::core::doctor::{Reverted, SeenConfig, is_newer, track_pins, version_key};
+pub use crate::core::doctor::{Reverted, SeenConfig, is_newer, track_pins};
 pub use crate::core::event::{
     CaptureSource, Confidence, Event, EventId, EventKind, Extra, IssueId, LineError, Origin,
     Outcome, Summary,
