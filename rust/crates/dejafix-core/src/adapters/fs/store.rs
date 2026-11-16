@@ -7,7 +7,7 @@ use super::types::{MemoryDir, StoreError};
 use crate::core::text::universal_newlines;
 
 pub(crate) const MEMORY_DIR: &str = ".dejafix";
-const CONFIG_FILE: &str = "config.toml";
+pub(crate) const CONFIG_FILE: &str = "config.toml";
 
 fn is_project_memory(candidate: &Path) -> bool {
     candidate.is_dir() && candidate.join(CONFIG_FILE).exists()

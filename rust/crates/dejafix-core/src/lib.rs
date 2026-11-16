@@ -102,6 +102,7 @@ pub use crate::core::write::{
     WritePlan, checks_marker, issue_exists, marker_state, next_issue_id, plan_command,
     sole_open_issue,
 };
+pub use crate::wiring::links_listing;
 pub use crate::wiring::{
     BridgeOutcome, CaptureOutcome, CorruptLog, DoctorOptions, DoctorReport, EditHookRun,
     FoundProject, HooksAction, HooksOutcome, HooksReport, InitHooks, InitOptions, InitReport,

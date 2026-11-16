@@ -1,6 +1,7 @@
 mod events;
 mod global;
 mod legacy;
+mod links;
 mod manifest;
 mod marker;
 mod registry;
@@ -19,6 +20,7 @@ pub(crate) use legacy::{
     clear_destination, files_with_legacy_paths, holds_data, is_symlink, live_watcher, move_entry,
     read_universal,
 };
+pub use links::{read_origin, read_project_links};
 pub use manifest::manifest_info;
 pub use marker::{
     clear_marker, read_marker, read_snooze, remove_snooze, write_marker, write_snooze,
