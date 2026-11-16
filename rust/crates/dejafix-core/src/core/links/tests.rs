@@ -566,3 +566,17 @@ fn an_unlinked_duplicate_is_not_reported() {
     );
     assert_eq!(alone.duplicates, Vec::<String>::new());
 }
+
+#[test]
+fn a_link_may_name_the_registry_id() {
+    let mut renamed = project("inventory-service", "github.com/org/inventory", &[]);
+    renamed.folder = "inventory_service".to_owned();
+    let own = project(
+        "portal",
+        "github.com/org/portal",
+        &[("Inventory-Service", "")],
+    );
+    let resolution = resolve_links(&own, &[renamed]);
+    assert_eq!(resolution.links[0].id, "inventory-service");
+    assert_eq!(resolution.unresolved, Vec::<String>::new());
+}

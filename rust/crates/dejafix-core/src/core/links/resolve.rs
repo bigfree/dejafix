@@ -4,6 +4,7 @@ pub const MAX_LINKS: usize = 10;
 
 fn names(value: &str, project: &Registered) -> bool {
     value.eq_ignore_ascii_case(&project.identity)
+        || value.eq_ignore_ascii_case(&project.id)
         || value.eq_ignore_ascii_case(&project.folder)
         || project
             .alias
