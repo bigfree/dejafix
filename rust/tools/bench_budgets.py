@@ -6,6 +6,7 @@ MS = 1_000_000
 
 BUDGETS = [
     ("process/edit_hook_3000", 10 * MS, "edit hook, whole process, 3 000 events"),
+    ("process/edit_hook_boundary_3000x2", 30 * MS, "edit hook on the boundary, 2 linked logs of 3 000 events"),
     ("process/precheck_3000", 30 * MS, "djf precheck, whole process, 3 000 events"),
     ("mcp/precheck_file_warm_cited_3000", 5 * MS, "precheck_file warm, cited file"),
     ("mcp/precheck_file_warm_uncited_3000", 5 * MS, "precheck_file warm, uncited file"),

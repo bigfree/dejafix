@@ -15,6 +15,7 @@ struct Hook {
     root: PathBuf,
     base: PathBuf,
     temp: PathBuf,
+    home: PathBuf,
     log: Option<PathBuf>,
 }
 
@@ -45,6 +46,7 @@ impl Hook {
         Ok(Self {
             _dir: dir,
             root,
+            home: base.join("home/.dejafix"),
             base,
             temp,
             log: None,
@@ -62,6 +64,7 @@ impl Hook {
         for name in ["TMPDIR", "TEMP", "TMP"] {
             command.env(name, &self.temp);
         }
+        command.env("DEJAFIX_HOME", &self.home);
         if let Some(log) = &self.log {
             command.env("DJF_EDIT_HOOK_LOG", log);
         }
@@ -106,7 +109,39 @@ impl Hook {
         }
         payload
     }
+
+    fn link(&self) -> Result<PathBuf, Box<dyn std::error::Error>> {
+        fs::write(
+            self.root.join(".dejafix/config.toml"),
+            "boundary = [\"src/api/**\"]\n\n[[links]]\nproject = \"github.com/org/inventory\"\nrelation = \"reads device ports\"\n",
+        )?;
+        fs::create_dir_all(self.root.join("src/api/backend"))?;
+        fs::write(self.root.join("src/api/backend/ports.ts"), "x\n")?;
+        fs::write(self.root.join("src/api/health.ts"), "x\n")?;
+        let inventory = self.base.join("inventory");
+        fs::create_dir_all(inventory.join(".git"))?;
+        fs::write(
+            inventory.join(".git/config"),
+            "[remote \"origin\"]\n\turl = https://github.com/org/inventory\n",
+        )?;
+        write_events(&inventory, &[LINKED_ISSUE])?;
+        fs::write(
+            inventory.join(".dejafix/config.toml"),
+            "boundary = [\"src/Api/**\"]\n",
+        )?;
+        fs::create_dir_all(&self.home)?;
+        fs::write(
+            self.home.join("projects.json"),
+            serde_json::to_string(&[
+                self.root.display().to_string(),
+                inventory.display().to_string(),
+            ])?,
+        )?;
+        Ok(inventory)
+    }
 }
+
+const LINKED_ISSUE: &str = r#"{"type": "issue", "issue_id": "0001", "summary": "port allocation races with the nightly sync", "location": "src/Api/Ports.php"}"#;
 
 fn patch(cwd: &Path, headers: &[&str]) -> Value {
     let mut lines = vec!["*** Begin Patch"];
@@ -393,6 +428,87 @@ fn a_writer_holding_the_log_lock_never_blocks_an_edit() -> TestResult {
         assert_eq!(context, "");
     } else {
         assert!(context.contains("token refresh race"));
+    }
+    log.unlock()?;
+    Ok(())
+}
+
+#[test]
+fn a_boundary_edit_shows_the_linked_projects_lesson_once() -> TestResult {
+    let hook = Hook::new()?;
+    let inventory = hook.link()?;
+    let edit = hook.edit("src/api/backend/ports.ts", "s1", "");
+    assert_eq!(
+        hook.context(&edit)?.lines().collect::<Vec<_>>(),
+        [
+            "dejafix lessons from linked projects for src/api/backend/ports.ts:",
+            "  inventory (\"reads device ports\"):",
+            "    - open #0001 port allocation races with the nightly sync [src/Api/Ports.php]",
+        ]
+    );
+    assert_eq!(hook.context(&edit)?, "");
+    write_events(
+        &inventory,
+        &[
+            r#"{"type": "decision", "id": "d9", "summary": "released ports are never reused", "location": "src/Api/Ports.php"}"#,
+        ],
+    )?;
+    assert!(
+        hook.context(&edit)?
+            .contains("released ports are never reused")
+    );
+    assert_eq!(hook.context(&edit)?, "");
+    hook.context(&json!({"session_id": "s1", "hook_event_name": "PostCompact"}))?;
+    assert_ne!(hook.context(&edit)?, "");
+    assert_eq!(hook.context(&hook.edit("src/api/health.ts", "s1", ""))?, "");
+    assert_eq!(hook.context(&hook.edit("src/b.py", "s1", ""))?, "");
+    Ok(())
+}
+
+#[test]
+fn own_and_linked_lessons_form_one_report_in_a_codex_patch() -> TestResult {
+    let hook = Hook::new()?;
+    hook.link()?;
+    write_events(
+        &hook.root,
+        &[
+            r#"{"type": "issue", "issue_id": "0002", "summary": "ports list flickers", "location": "src/api/backend/ports.ts"}"#,
+        ],
+    )?;
+    let context = hook.context(&patch(
+        &hook.root,
+        &[
+            "*** Update File: src/a.py",
+            "*** Update File: src/api/backend/ports.ts",
+            "*** Update File: src/api/health.ts",
+        ],
+    ))?;
+    assert!(
+        context.starts_with("dejafix lessons for src/a.py:"),
+        "{context}"
+    );
+    assert!(
+        context.contains("\n\ndejafix lessons for src/api/backend/ports.ts:\n  Open issues on this file:\n    - #0002 ports list flickers\n\ndejafix lessons from linked projects for src/api/backend/ports.ts:\n  inventory"),
+        "{context}"
+    );
+    assert!(!context.contains("health"), "{context}");
+    Ok(())
+}
+
+#[test]
+fn a_writer_holding_a_linked_log_lock_never_blocks_an_edit() -> TestResult {
+    let hook = Hook::new()?;
+    let inventory = hook.link()?;
+    let log = fs::OpenOptions::new()
+        .read(true)
+        .append(true)
+        .open(inventory.join(".dejafix/events.jsonl"))?;
+    log.lock()?;
+    let context = hook.context(&hook.edit("src/api/backend/ports.ts", "locked", ""))?;
+    if cfg!(windows) {
+        assert_eq!(context, "");
+    } else {
+        assert!(context.contains("port allocation races"), "{context}");
     }
     log.unlock()?;
     Ok(())

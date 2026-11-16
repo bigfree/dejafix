@@ -7,6 +7,7 @@ pub mod global;
 pub mod hooks;
 pub(crate) mod json;
 pub mod lessons;
+pub mod links;
 pub mod log;
 pub mod migrate;
 pub mod path;

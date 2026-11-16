@@ -242,6 +242,37 @@ fn write_retired_patterns(
     Ok(())
 }
 
+fn write_link_problems(
+    report: &DoctorReport,
+    out: &mut impl Write,
+    color: bool,
+) -> io::Result<usize> {
+    if report.link_problems.is_empty() {
+        return Ok(0);
+    }
+    secho(
+        out,
+        &format!("\n  {WARN} Some project links could not be resolved"),
+        Style::Yellow,
+        color,
+    )?;
+    for problem in report.link_problems.iter().take(LISTED) {
+        writeln!(out, "      {}", printable_text(problem))?;
+    }
+    if report.link_problems.len() > LISTED {
+        writeln!(
+            out,
+            "      … and {} more",
+            report.link_problems.len() - LISTED
+        )?;
+    }
+    writeln!(
+        out,
+        "      Run `djf links` in a project to see how its links resolve."
+    )?;
+    Ok(0)
+}
+
 fn write_version(status: &UpdateStatus, out: &mut impl Write, color: bool) -> io::Result<()> {
     match status {
         UpdateStatus::Offline => {
@@ -306,7 +337,8 @@ fn write_report(
     let problems = write_missing(report, fix, out, color)?
         + write_stale(report, fix, out, color)?
         + write_configs(report, out, color)?
-        + write_corrupt(report, out, color)?;
+        + write_corrupt(report, out, color)?
+        + write_link_problems(report, out, color)?;
     write_retired_patterns(report, out, color)?;
     write_version(status, out, color)?;
     writeln!(out)?;

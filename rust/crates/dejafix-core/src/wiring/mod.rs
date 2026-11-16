@@ -2,6 +2,7 @@ mod files;
 mod global;
 mod hooks;
 mod init;
+mod links;
 mod mcp;
 mod memory;
 mod project;
@@ -19,6 +20,7 @@ pub use hooks::{
     PrecheckRequest, auto_capture, edit_hook, hooks_action, precheck,
 };
 pub use init::{init_project, other_projects};
+pub use links::links_listing;
 pub use mcp::{CachedLog, McpSettings, McpState, ToolCall, ToolReply, WriteCall};
 pub use memory::{brief, global};
 pub use read::{search_project, show};

@@ -8,6 +8,7 @@ pub struct BriefInput<'i, 'a> {
     pub log: &'i EventLog<'a>,
     pub stale: &'i [Stale<'i, 'a>],
     pub gotchas: &'i [&'i Entry],
+    pub links: &'i str,
     pub now: jiff::Timestamp,
     pub color: bool,
 }

@@ -60,6 +60,7 @@ fn render(
         log: &log,
         stale: &stale,
         gotchas: &gotchas,
+        links: "",
         now: clock.now,
         color,
     })
@@ -350,4 +351,20 @@ fn warnings_keep_the_four_busiest_files_and_a_stable_order() {
         .map(|line| line.split(' ').nth(3).unwrap_or(""))
         .collect();
     assert_eq!(shown, ["e.py", "b.py", "c.py", "a.py"]);
+}
+
+#[test]
+fn linked_projects_sit_between_gotchas_and_the_score() {
+    let clock = fixed_clock();
+    let log = EventLog::parse(b"", &clock, &context(), &NoResolve);
+    let links = "Linked projects (read their memory with project=\"<name>\"):\n  - inventory (github.com/org/inventory), links here: \"reads device ports\". 1 open issue(s) on its boundary.";
+    insta::assert_snapshot!(render_brief(&BriefInput {
+        name: "demo",
+        log: &log,
+        stale: &[],
+        gotchas: &[],
+        links,
+        now: clock.now,
+        color: false,
+    }));
 }

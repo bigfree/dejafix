@@ -6,6 +6,7 @@ mod types;
 
 pub use capture::auto_capture;
 pub use edit::edit_hook;
+pub(crate) use edit::relative_within;
 pub use install::hooks_action;
 pub(crate) use install::{configured_snippets, install};
 pub(crate) use precheck::analyze_files;

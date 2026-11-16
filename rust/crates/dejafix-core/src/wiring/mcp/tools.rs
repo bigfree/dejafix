@@ -6,7 +6,9 @@ use super::errors::io_error;
 use super::types::{
     GitMemo, LogCache, McpSettings, McpState, MemoGit, ToolCall, ToolError, ToolReply,
 };
-use crate::adapters::fs::{FsResolver, MEMORY_DIR, checked_events_path, read_text_within};
+use crate::adapters::fs::{
+    FsResolver, MEMORY_DIR, canonical_path, checked_events_path, read_text_within, resolve_path,
+};
 use crate::adapters::git::{GitHistory, status_files};
 use crate::core::context::{ContextInput, generate_context};
 use crate::core::event::IssueId;
@@ -22,7 +24,8 @@ use crate::core::text::{is_python_word, python_strip};
 use crate::core::time::Clock;
 use crate::core::write::Ids;
 use crate::wiring::global::{add_gotcha, registry_names};
-use crate::wiring::hooks::analyze_files;
+use crate::wiring::hooks::{analyze_files, relative_within};
+use crate::wiring::links::{boundary_reports, links_text};
 use crate::wiring::registry::load_registry;
 use crate::wiring::types::FsProbe;
 use crate::wiring::types::Settings;
@@ -217,6 +220,11 @@ impl McpState {
             &stripped(root, "plan.md")?,
             &stripped(root, "PROJECT_MAP.md")?,
         );
+        let links = links_text(&self.settings.dejafix_home, root);
+        if !links.is_empty() {
+            reply.push_str("\n\n");
+            reply.push_str(&links);
+        }
         let unreadable = self
             .cached_log(root, clock)
             .map_or(0, |cached| cached.log.skipped().len());
@@ -245,12 +253,16 @@ impl McpState {
                 now: clock.now,
             },
         );
-        Ok(precheck_report(
-            paths,
-            &warnings,
-            &cached.context,
-            &FsResolver,
-        ))
+        let mut reply = precheck_report(paths, &warnings, &cached.context, &FsResolver);
+        let relatives: Vec<String> = paths
+            .iter()
+            .filter_map(|raw| relative_in(root, raw))
+            .collect();
+        for (_, block) in boundary_reports(&self.settings.dejafix_home, root, &relatives) {
+            reply.push_str("\n\n");
+            reply.push_str(&block);
+        }
+        Ok(reply)
     }
 
     fn add_global(
@@ -345,4 +357,12 @@ fn score(root: &Path) -> Result<String, ToolError> {
     let raw = raw_events(&text).map_err(|error| ToolError::Json(error.to_string()))?;
     let events: Vec<_> = raw.iter().map(score_event).collect();
     Ok(score_reply(&calculate_score(&events)))
+}
+
+fn relative_in(root: &Path, raw: &str) -> Option<String> {
+    let absolute = resolve_path(raw, None, root)?;
+    let base = canonical_path(root).unwrap_or_else(|| root.to_path_buf());
+    relative_within(&absolute, &base)
+        .or_else(|| relative_within(&absolute, root))
+        .filter(|relative| !relative.is_empty())
 }

@@ -24,6 +24,7 @@ pub struct HookConfig {
     pub cwd: PathBuf,
     pub temp: PathBuf,
     pub log: Option<PathBuf>,
+    pub dejafix_home: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone)]

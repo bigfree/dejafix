@@ -9,13 +9,14 @@ use crate::adapters::fs::{
     report_is_new, resolve_path,
 };
 use crate::core::lessons::{Memory, edited_paths, hook_output, is_skipped, main_checkout, records};
+use crate::wiring::links::boundary_reports;
 use crate::wiring::python::python_io_error;
 
 const RESET_EVENTS: [&str; 2] = ["SessionStart", "PostCompact"];
 const ERROR_CHARS: usize = 300;
 
 #[must_use]
-pub fn edit_hook(raw: &[u8], cwd: &Path, temp: &Path) -> EditHookRun {
+pub fn edit_hook(raw: &[u8], cwd: &Path, temp: &Path, dejafix_home: Option<&Path>) -> EditHookRun {
     let payload = payload(raw);
     let text = |key: &str| {
         payload
@@ -43,7 +44,7 @@ pub fn edit_hook(raw: &[u8], cwd: &Path, temp: &Path) -> EditHookRun {
     } else {
         PathBuf::from(&run.cwd)
     };
-    match lessons(&paths, &base, temp, &run.session, &run.agent) {
+    match lessons(&paths, &base, temp, &run.session, &run.agent, dejafix_home) {
         Ok(context) if !context.is_empty() => run.output = hook_output(&context),
         Ok(_) => {}
         Err(error) => run.error = error.chars().take(ERROR_CHARS).collect(),
@@ -65,6 +66,7 @@ fn lessons(
     temp: &Path,
     session: &str,
     agent: &str,
+    dejafix_home: Option<&Path>,
 ) -> Result<String, String> {
     let mut reports = Vec::new();
     for (root, relatives) in by_project(paths, cwd)? {
@@ -82,8 +84,20 @@ fn lessons(
         let found = records(&text);
         let root_posix = posix(&root);
         let memory = Memory::new(&found, &root_posix, &FsResolver);
-        for relative in relatives {
-            let report = memory.report(&relative);
+        let linked = dejafix_home
+            .map(|home| boundary_reports(home, &root, &relatives))
+            .unwrap_or_default();
+        for relative in &relatives {
+            let own = memory.report(relative);
+            let extra = linked
+                .iter()
+                .find(|(path, _)| path == relative)
+                .map_or("", |(_, text)| text.as_str());
+            let report = [own.as_str(), extra]
+                .into_iter()
+                .filter(|part| !part.is_empty())
+                .collect::<Vec<_>>()
+                .join("\n\n");
             if !report.is_empty()
                 && report_is_new(
                     temp,
@@ -140,8 +154,14 @@ fn locate(path: &Path) -> Option<(PathBuf, String)> {
             .skip(1)
             .find(|ancestor| events_path(&ancestor.join(MEMORY_DIR)).is_file())?
             .to_path_buf();
-        let relative = candidate
-            .strip_prefix(&root)
+        let relative = relative_within(&candidate, &root)?;
+        Some((root, relative))
+    })
+}
+
+pub(crate) fn relative_within(path: &Path, root: &Path) -> Option<String> {
+    Some(
+        path.strip_prefix(root)
             .ok()?
             .components()
             .filter_map(|component| match component {
@@ -149,9 +169,8 @@ fn locate(path: &Path) -> Option<(PathBuf, String)> {
                 _ => None,
             })
             .collect::<Vec<_>>()
-            .join("/");
-        Some((root, relative))
-    })
+            .join("/"),
+    )
 }
 
 fn python_error(error: &io::Error, path: &Path) -> String {

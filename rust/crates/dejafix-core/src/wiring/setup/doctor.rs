@@ -13,6 +13,7 @@ use crate::core::doctor::{SeenConfig, track_pins};
 use crate::core::log::skipped_lines;
 use crate::core::registry::{RegisterResult, Registry, RegistryError, same_path};
 use crate::wiring::init::MEMORY_DIR;
+use crate::wiring::links::link_problems;
 use crate::wiring::registry::{has_memory, now_text};
 use crate::wiring::types::{
     CorruptLog, DoctorOptions, DoctorReport, FoundProject, ScanReport, Settings, WiringError,
@@ -178,6 +179,7 @@ pub fn doctor(
     check_configs(settings, &files, paths, cwd, &mut report);
     report.corrupt = corrupt_logs(settings, &registry);
     report.retired_patterns = GlobalStore::new(&settings.dejafix_home).retired_patterns();
+    report.link_problems = link_problems(&settings.dejafix_home);
     Ok(report)
 }
 

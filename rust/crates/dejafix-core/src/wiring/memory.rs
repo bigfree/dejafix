@@ -4,6 +4,7 @@ use std::path::Path;
 use serde_json::Value;
 
 use super::global::{add_action, edit_action, global_query, non_empty, upgrade_action};
+use super::links::links_text;
 use super::types::{Project, Settings, WiringError};
 use crate::adapters::fs::{
     FsResolver, GlobalStore, detect_stack, path_context, project_name, read_events_file,
@@ -40,11 +41,13 @@ pub fn brief(cwd: &Path, settings: &Settings, color: bool) -> Result<String, Wir
         .as_deref()
         .map_or_else(Vec::new, |stored| relevant_entries(&stack, None, stored));
     let name = project_name(cwd);
+    let links = links_text(&settings.dejafix_home, &project.memory.root);
     Ok(render_brief(&BriefInput {
         name: &name,
         log: &log,
         stale: &stale,
         gotchas: &gotchas,
+        links: &links,
         now: settings.clock.now,
         color,
     }))

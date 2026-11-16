@@ -9,7 +9,8 @@ pub use keys::{
 };
 pub use record::records;
 pub use report::mention;
-pub use types::{LessonKind, Memory, Record};
+pub(crate) use report::{clip, issue_label, provenance};
+pub use types::{Lesson, LessonKind, Memory, Record};
 
 #[cfg(test)]
 mod tests;
