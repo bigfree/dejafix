@@ -16,7 +16,12 @@ pub fn main() -> ExitCode {
     let config = HookConfig::from_env();
     let mut raw = Vec::new();
     let _ = io::stdin().lock().read_to_end(&mut raw);
-    let run = edit_hook(&raw, &config.cwd, &config.temp);
+    let run = edit_hook(
+        &raw,
+        &config.cwd,
+        &config.temp,
+        config.dejafix_home.as_deref(),
+    );
     if !run.output.is_empty() {
         let mut stdout = io::stdout().lock();
         let _ = writeln!(stdout, "{}", run.output);

@@ -34,6 +34,12 @@ fn non_empty(name: &str) -> Option<OsString> {
     env::var_os(name).filter(|value| !value.is_empty())
 }
 
+fn dejafix_home(home: Option<&Path>) -> Option<PathBuf> {
+    non_empty("DEJAFIX_HOME")
+        .map(PathBuf::from)
+        .or_else(|| home.map(|home| home.join(".dejafix")))
+}
+
 impl Config {
     pub fn client_paths(&self) -> Option<ClientPaths> {
         Some(ClientPaths {
@@ -47,9 +53,7 @@ impl Config {
     pub fn from_env() -> std::io::Result<Self> {
         let cwd = env::current_dir()?;
         let home = env::home_dir();
-        let dejafix_home = non_empty("DEJAFIX_HOME")
-            .map(PathBuf::from)
-            .or_else(|| home.as_ref().map(|home| home.join(".dejafix")));
+        let dejafix_home = dejafix_home(home.as_deref());
         let redact = env::var("DEJAFIX_NO_REDACT").map_or(true, |value| {
             !NO_REDACT_VALUES.contains(&dejafix_core::python_strip(&value))
         });
@@ -76,6 +80,7 @@ impl HookConfig {
             cwd: env::current_dir().unwrap_or_default(),
             temp: env::temp_dir(),
             log: non_empty("DJF_EDIT_HOOK_LOG").map(PathBuf::from),
+            dejafix_home: dejafix_home(env::home_dir().as_deref()),
         }
     }
 
