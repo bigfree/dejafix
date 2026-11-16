@@ -310,3 +310,24 @@ fn doctor_says_a_patterns_file_is_no_longer_used() -> TestResult {
     );
     Ok(())
 }
+
+#[test]
+fn doctor_lists_links_it_cannot_resolve() -> TestResult {
+    let repo = Repo::new()?;
+    fs::write(
+        repo.mem().join("config.toml"),
+        "[[links]]\nproject = \"billing\"\n",
+    )?;
+    repo.djf(&["project", "register"]).assert().success();
+    let empty = repo.home.join("nothing").display().to_string();
+    let out = repo.stdout(&["doctor", "-p", &empty])?;
+    assert!(
+        out.contains("\n  ⚠ Some project links could not be resolved\n"),
+        "{out}"
+    );
+    assert!(
+        out.contains("      repo: billing is not registered on this machine\n"),
+        "{out}"
+    );
+    Ok(())
+}

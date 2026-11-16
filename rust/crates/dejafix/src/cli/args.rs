@@ -172,6 +172,8 @@ pub enum Commands {
         about = "One-screen session-start briefing: warnings, stale memories, open issues, recent decisions, stack gotchas, and the prevention score."
     )]
     Brief,
+    #[command(about = "Show the projects linked to this one and how their links resolve.")]
+    Links,
     #[command(name = "global", about = "Manage cross-project global memory.")]
     Global(GlobalArgs),
 }

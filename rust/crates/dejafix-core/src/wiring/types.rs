@@ -179,6 +179,7 @@ pub struct DoctorReport {
     pub reverted: Vec<Reverted>,
     pub corrupt: Vec<CorruptLog>,
     pub retired_patterns: Option<PathBuf>,
+    pub link_problems: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

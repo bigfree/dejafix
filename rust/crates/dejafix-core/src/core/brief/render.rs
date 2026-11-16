@@ -220,6 +220,17 @@ fn gotchas(out: &mut String, input: &BriefInput<'_, '_>, codes: Codes) {
     }
 }
 
+fn links(out: &mut String, input: &BriefInput<'_, '_>, codes: Codes) {
+    let mut lines = input.links.lines();
+    let Some(first) = lines.next() else {
+        return;
+    };
+    line(out, &format!("{}🔗 {first}{}", codes.teal, codes.reset));
+    for text in lines {
+        line(out, &format!(" {text}"));
+    }
+}
+
 fn score(out: &mut String, input: &BriefInput<'_, '_>, codes: Codes) {
     let events: Vec<ScoreEvent<'_>> = input.log.events().iter().map(score_event_of).collect();
     let week_ago = ago(input.now, WEEK_HOURS);
@@ -265,6 +276,7 @@ pub fn render_brief(input: &BriefInput<'_, '_>) -> String {
     open_issues(&mut out, input, codes);
     decisions(&mut out, input, codes);
     gotchas(&mut out, input, codes);
+    links(&mut out, input, codes);
     score(&mut out, input, codes);
     line(&mut out, &rule);
     line(&mut out, "");

@@ -1,0 +1,17 @@
+---
+source: crates/dejafix-core/src/core/brief/tests.rs
+expression: "render_brief(&BriefInput\n{\n    name: \"demo\", log: &log, stale: &[], gotchas: &[], links, now: clock.now,\n    color: false,\n})"
+---
+
+dejafix brief — demo
+────────────────────────────────────────────────────────────
+⚠ Active warnings
+   none — no failed attempts in 30 days
+📋 Open issues
+   none open
+🕑 Recent decisions
+   none logged yet
+🔗 Linked projects (read their memory with project="<name>"):
+   - inventory (github.com/org/inventory), links here: "reads device ports". 1 open issue(s) on its boundary.
+📈 Score  F (0/100) — unchanged this week
+────────────────────────────────────────────────────────────
