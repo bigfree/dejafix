@@ -19,12 +19,15 @@
 - **`djf project scan` no longer registers a project twice.** A folder that is registered under another spelling, for example through a symlink or with different letter case, is recognised as already registered.
 - **`djf migrate` keeps line endings.** Files with CRLF line endings keep them when `.projectmem` paths are rewritten, so the migration changes only the paths.
 - **Two writes to a fresh project no longer fail with `points outside the project; refusing to use it`.** When two writers, for example a hook and an MCP tool, wrote at the same time and `events.jsonl` did not exist yet, one of them could see the log appear halfway through the containment check and refuse it as a link out of the project. A file created or removed during the check is now judged by its folder. Links out of the project are still refused.
+- **Registering a project no longer adds it twice.** `djf init` and `djf project register` recognise a folder that the registry already holds under another spelling, for example through a symlink or with different letter case, and keep its record instead of adding a second one.
+- **Hooks are never written outside the repository.** `djf init`, `djf hooks install` and `djf migrate` leave a hook that links to a file outside the repository alone and print `Warning: .git/hooks/<name> links outside the repository, so it was left alone.` They write nothing into a hooks folder or a `.git` that leads out of the repository, or into another repository named by `.git/commondir`, and print the lines to add instead. Links inside the repository are written through as before.
 
 ### Changed
 
 - **Writes rewrite only the issue files they touch.** A write renders the files of the issues its events belong to, plus any issue file that is missing. `summary.md` is still rebuilt on every write. A hand-edited file of another issue is restored by `djf regenerate`, not by the next write. At 3 000 events, one `djf note` takes about 18 ms instead of 29 ms.
 - **`djf init` leaves `.gitignore` alone when git already ignores `.dejafix/`**, for example through `.git/info/exclude` or your global excludes file. In that case `.gitignore` is neither changed nor created, so dejafix can stay private to one clone. The instructions refresh in `djf migrate` follows the same rule.
 - **`djf migrate` also updates `.git/info/exclude`**, rewriting `.projectmem` entries to `.dejafix`, so a checkout that was private before the rename stays private.
+- **`djf doctor` on Windows looks only at fixed drives.** Without `--path` it skips network, removable and optical drives, so an offline network drive no longer stalls it. This is what Python 0.4.x did.
 
 ## 1.0.0-rc.3
 
