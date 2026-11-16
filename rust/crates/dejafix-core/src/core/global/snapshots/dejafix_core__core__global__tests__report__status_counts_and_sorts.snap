@@ -8,15 +8,14 @@ expression: "global_report(&outcome, false)"
   ================================================
   Location: /home/x/.dejafix/global
 
-    Patterns:           2
     Library gotchas:     2
     Stack preferences:   yes
-    Unique tags:         2
+    Unique tags:         1
     Libraries tracked:   1
-    Source projects:     2
+    Source projects:     1
     Not upgraded:        2
 
-  Tags: python, web
+  Tags: python
   Libraries: sqlalchemy
-  Projects: alpha, beta
+  Projects: beta
   ================================================

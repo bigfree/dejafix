@@ -2,30 +2,7 @@ use std::collections::HashSet;
 
 use serde_json::Value;
 
-use super::types::{Entry, Relevant, Stack};
-
-fn pattern_matches(entry: &Entry, project_tags: &HashSet<&str>) -> bool {
-    match entry.get("tags") {
-        None => true,
-        Some(Value::Array(tags)) => {
-            tags.is_empty()
-                || tags
-                    .iter()
-                    .filter_map(Value::as_str)
-                    .any(|tag| project_tags.contains(tag))
-        }
-        Some(Value::String(tags)) => {
-            tags.is_empty()
-                || tags
-                    .chars()
-                    .any(|tag| project_tags.contains(&*tag.encode_utf8(&mut [0; 4])))
-        }
-        Some(Value::Object(tags)) => {
-            tags.is_empty() || tags.keys().any(|tag| project_tags.contains(tag.as_str()))
-        }
-        Some(Value::Null | Value::Bool(_) | Value::Number(_)) => false,
-    }
-}
+use super::types::{Entry, Stack};
 
 fn gotcha_matches(entry: &Entry, libraries: &HashSet<&str>, project_tags: &HashSet<&str>) -> bool {
     let library = match entry.get("library") {
@@ -40,24 +17,17 @@ fn gotcha_matches(entry: &Entry, libraries: &HashSet<&str>, project_tags: &HashS
 pub fn relevant_entries<'e>(
     stack: &Stack,
     filter_tags: Option<&[String]>,
-    patterns: &'e [Entry],
     gotchas: &'e [Entry],
-) -> Relevant<'e> {
+) -> Vec<&'e Entry> {
     let project_tags: HashSet<&str> = match filter_tags {
         Some(tags) if !tags.is_empty() => tags.iter().map(String::as_str).collect(),
         _ => stack.tags.iter().map(String::as_str).collect(),
     };
     let libraries: HashSet<&str> = stack.libraries.iter().map(String::as_str).collect();
-    Relevant {
-        patterns: patterns
-            .iter()
-            .filter(|entry| pattern_matches(entry, &project_tags))
-            .collect(),
-        gotchas: gotchas
-            .iter()
-            .filter(|entry| gotcha_matches(entry, &libraries, &project_tags))
-            .collect(),
-    }
+    gotchas
+        .iter()
+        .filter(|entry| gotcha_matches(entry, &libraries, &project_tags))
+        .collect()
 }
 
 pub(crate) fn is_truthy(value: &Value) -> bool {

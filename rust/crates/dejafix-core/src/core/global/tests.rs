@@ -174,15 +174,7 @@ fn web_stack() -> Stack {
 }
 
 #[test]
-fn patterns_match_by_tag_and_gotchas_by_library() {
-    let patterns = vec![
-        entry(&json!({"pattern": "everywhere", "tags": []})),
-        entry(&json!({"pattern": "untagged"})),
-        entry(&json!({"pattern": "react only", "tags": ["react"]})),
-        entry(&json!({"pattern": "python only", "tags": ["python"]})),
-        entry(&json!({"pattern": "odd tags", "tags": [1]})),
-        entry(&json!({"pattern": "null tags", "tags": null})),
-    ];
+fn gotchas_match_by_library_or_project_tag() {
     let gotchas = vec![
         entry(&json!({"library": "React", "gotcha": "a"})),
         entry(&json!({"library": "vite", "gotcha": "b"})),
@@ -190,41 +182,30 @@ fn patterns_match_by_tag_and_gotchas_by_library() {
         entry(&json!({"library": 5, "gotcha": "d"})),
         entry(&json!({"gotcha": "no library"})),
     ];
-    let relevant = relevant_entries(&web_stack(), None, &patterns, &gotchas);
-    let names: Vec<&str> = relevant
-        .patterns
-        .iter()
-        .map(|p| p["pattern"].as_str().unwrap())
-        .collect();
-    assert_eq!(names, ["everywhere", "untagged", "react only"]);
-    let libraries: Vec<&str> = relevant
-        .gotchas
+    let names: Vec<&str> = relevant_entries(&web_stack(), None, &gotchas)
         .iter()
         .map(|g| g["gotcha"].as_str().unwrap())
         .collect();
-    assert_eq!(libraries, ["a", "b"]);
+    assert_eq!(names, ["a", "b"]);
 }
 
 #[test]
 fn filter_tags_replace_the_project_tags() {
-    let patterns = vec![
-        entry(&json!({"pattern": "react only", "tags": ["react"]})),
-        entry(&json!({"pattern": "python only", "tags": ["python"]})),
-        entry(&json!({"pattern": "chars", "tags": "py"})),
-        entry(&json!({"pattern": "keys", "tags": {"python": 1}})),
+    let gotchas = vec![
+        entry(&json!({"library": "python", "gotcha": "tag match"})),
+        entry(&json!({"library": "javascript", "gotcha": "stack tag"})),
     ];
-    let gotchas = vec![entry(&json!({"library": "python", "gotcha": "tag match"}))];
-    let filter = libs(&["python", "p"]);
-    let relevant = relevant_entries(&web_stack(), Some(&filter), &patterns, &gotchas);
-    let names: Vec<&str> = relevant
-        .patterns
+    let filter = libs(&["python"]);
+    let names: Vec<&str> = relevant_entries(&web_stack(), Some(&filter), &gotchas)
         .iter()
-        .map(|p| p["pattern"].as_str().unwrap())
+        .map(|g| g["gotcha"].as_str().unwrap())
         .collect();
-    assert_eq!(names, ["python only", "chars", "keys"]);
-    assert_eq!(relevant.gotchas.len(), 1);
-    let unfiltered = relevant_entries(&web_stack(), Some(&[]), &patterns, &gotchas);
-    assert_eq!(unfiltered.patterns.len(), 1);
+    assert_eq!(names, ["tag match"]);
+    let unfiltered: Vec<&str> = relevant_entries(&web_stack(), Some(&[]), &gotchas)
+        .iter()
+        .map(|g| g["gotcha"].as_str().unwrap())
+        .collect();
+    assert_eq!(unfiltered, ["stack tag"]);
 }
 
 mod report {
@@ -239,13 +220,6 @@ mod report {
             .collect()
     }
 
-    fn patterns() -> Vec<Entry> {
-        entries(&[
-            json!({"id": "pat_1", "pattern": "keep it small", "tags": ["python", "web"], "source_project": "alpha", "confidence": "high"}),
-            json!({"id": "pat_2", "pattern": "bare", "tags": [], "source_project": null}),
-        ])
-    }
-
     fn gotchas() -> Vec<Entry> {
         entries(&[
             json!({"id": "got_1", "library": "sqlalchemy", "gotcha": "close sessions", "tags": ["python"], "source_project": "beta", "version_range": ">=2"}),
@@ -254,10 +228,8 @@ mod report {
     }
 
     fn list(tag: Option<&str>, library: Option<&str>, json: bool) -> GlobalOutcome {
-        let (patterns, gotchas) = filtered(patterns(), gotchas(), tag, library);
         GlobalOutcome::List {
-            patterns,
-            gotchas,
+            gotchas: filtered(gotchas(), tag, library),
             tag: tag.map(str::to_owned),
             library: library.map(str::to_owned),
             json,
@@ -268,7 +240,6 @@ mod report {
     fn status_counts_and_sorts() {
         let outcome = GlobalOutcome::Status {
             location: "/home/x/.dejafix/global".to_owned(),
-            patterns: patterns(),
             gotchas: gotchas(),
             preferences: true,
         };
@@ -280,7 +251,6 @@ mod report {
     fn status_of_nothing_omits_the_lists() {
         let outcome = GlobalOutcome::Status {
             location: "/g".to_owned(),
-            patterns: Vec::new(),
             gotchas: Vec::new(),
             preferences: false,
         };
@@ -299,18 +269,16 @@ mod report {
     #[test]
     fn list_json_is_python_indent_two() {
         let out = global_report(&list(None, None, true), false);
-        assert!(out.starts_with("{\n  \"patterns\": [\n    {\n      \"id\": \"pat_1\","));
+        assert!(out.starts_with("{\n  \"gotchas\": [\n    {\n      \"id\": \"got_1\","));
+        assert!(!out.contains("\"patterns\""));
         assert!(out.ends_with("  ]\n}\n"));
     }
 
     #[test]
     fn filters_by_tag_case_insensitively_and_by_library_substring() {
-        let (patterns, gotchas) = filtered(self::patterns(), self::gotchas(), Some("PYTHON"), None);
-        assert_eq!((patterns.len(), gotchas.len()), (1, 1));
-        let (patterns, gotchas) = filtered(self::patterns(), self::gotchas(), None, Some("ALCH"));
-        assert_eq!((patterns.len(), gotchas.len()), (2, 1));
-        let (patterns, gotchas) = filtered(self::patterns(), self::gotchas(), Some(""), Some(""));
-        assert_eq!((patterns.len(), gotchas.len()), (2, 2));
+        assert_eq!(filtered(gotchas(), Some("PYTHON"), None).len(), 1);
+        assert_eq!(filtered(gotchas(), None, Some("ALCH")).len(), 1);
+        assert_eq!(filtered(gotchas(), Some(""), Some("")).len(), 2);
     }
 
     #[test]
@@ -318,7 +286,7 @@ mod report {
         let out = global_report(&list(Some("zzz"), None, false), false);
         assert_eq!(
             out,
-            "No entries found. (filter: tag=zzz, library=None)\n  Add patterns:  djf global add \"your pattern here\"\n  Add gotchas:   djf global add-gotcha \"gotcha text\" --library <library> --keyword <phrase> --keyword <phrase>\n"
+            "No entries found. (filter: tag=zzz, library=None)\n  Add gotchas:   djf global add-gotcha \"gotcha text\" --library <library> --keyword <phrase> --keyword <phrase>\n"
         );
         let bare = global_report(&list(Some("zzz"), Some("nothing"), false), false);
         assert!(bare.starts_with("No entries found. (filter: tag=zzz, library=nothing)\n"));
@@ -328,13 +296,6 @@ mod report {
     fn short_messages_match_python() {
         let green = "\u{1b}[32m[global]\u{1b}[0m";
         let cases = [
-            (
-                GlobalOutcome::PatternAdded {
-                    id: "pat_1".into(),
-                    text: "t".into(),
-                },
-                format!("{green} Pattern added: pat_1\n  t\n"),
-            ),
             (
                 GlobalOutcome::GotchaAdded {
                     id: "got_1".into(),
@@ -359,10 +320,19 @@ mod report {
             ),
             (
                 GlobalOutcome::Imported {
-                    patterns: 2,
                     gotchas: 1,
+                    skipped_patterns: 0,
                 },
-                format!("{green} Imported: 2 patterns, 1 gotchas\n"),
+                format!("{green} Imported: 1 gotchas\n"),
+            ),
+            (
+                GlobalOutcome::Imported {
+                    gotchas: 0,
+                    skipped_patterns: 2,
+                },
+                format!(
+                    "{green} Imported: 0 gotchas\n  Skipped 2 cross-project pattern(s); dejafix no longer keeps them.\n"
+                ),
             ),
             (
                 GlobalOutcome::Pruned {
@@ -407,10 +377,6 @@ mod report {
     fn usage_and_unknown_lines() {
         let usage = |usage| global_report(&GlobalOutcome::Usage(usage), true);
         assert_eq!(
-            usage(Usage::Add),
-            "Usage: djf global add \"your pattern here\" [--tag python]\n"
-        );
-        assert_eq!(
             usage(Usage::AddGotcha),
             "Usage: djf global add-gotcha \"<text>\" --library <name> --keyword <phrase> --keyword <phrase> [--versions <range>]\nWrite one lesson in English, 30 to 600 characters, without project details; give 2 to 8 keywords.\n"
         );
@@ -443,11 +409,10 @@ mod report {
         }
     }
 
-    fn detected(stack: Stack, patterns: usize, gotchas: usize, json: bool) -> GlobalOutcome {
+    fn detected(stack: Stack, gotchas: usize, json: bool) -> GlobalOutcome {
         GlobalOutcome::Detected {
             name: "demo".into(),
             stack,
-            inherited_patterns: patterns,
             inherited_gotchas: gotchas,
             json,
         }
@@ -455,13 +420,13 @@ mod report {
 
     #[test]
     fn detect_text_clips_libraries_at_fifteen() {
-        insta::assert_snapshot!(global_report(&detected(stack(), 2, 1, false), false));
-        insta::assert_snapshot!(global_report(&detected(stack(), 2, 1, false), true));
+        insta::assert_snapshot!(global_report(&detected(stack(), 1, false), false));
+        insta::assert_snapshot!(global_report(&detected(stack(), 1, false), true));
     }
 
     #[test]
     fn detect_of_an_empty_project_says_so() {
-        let out = global_report(&detected(Stack::default(), 0, 0, false), false);
+        let out = global_report(&detected(Stack::default(), 0, false), false);
         assert_eq!(
             out,
             "\nDetected Stack: demo\n──────────────────────────────────────────────────\n  Tags:       (none detected)\n  Libraries:  (none detected)\n  Manifests:  \n\n  No matching global entries for this stack.\n\n"
@@ -470,7 +435,7 @@ mod report {
 
     #[test]
     fn detect_json_leads_with_the_name() {
-        let out = global_report(&detected(stack(), 0, 0, true), false);
+        let out = global_report(&detected(stack(), 0, true), false);
         assert!(out.starts_with("{\n  \"name\": \"demo\",\n  \"tags\": [\n    \"python\","));
         assert!(out.contains(
             "  \"manifest_files\": [\n    \"pyproject.toml\",\n    \"Dockerfile\"\n  ]\n}\n"

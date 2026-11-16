@@ -35,15 +35,10 @@ pub fn brief(cwd: &Path, settings: &Settings, color: bool) -> Result<String, Wir
     );
     let stack = detect_stack(cwd);
     let store = GlobalStore::new(&settings.dejafix_home);
-    let stored = store
-        .load_patterns()
-        .and_then(|patterns| store.load_gotchas().map(|gotchas| (patterns, gotchas)))
-        .ok();
+    let stored = store.load_gotchas().ok();
     let gotchas: Vec<&Entry> = stored
-        .as_ref()
-        .map_or_else(Vec::new, |(patterns, gotchas)| {
-            relevant_entries(&stack, None, patterns, gotchas).gotchas
-        });
+        .as_deref()
+        .map_or_else(Vec::new, |stored| relevant_entries(&stack, None, stored));
     let name = project_name(cwd);
     Ok(render_brief(&BriefInput {
         name: &name,
@@ -55,30 +50,17 @@ pub fn brief(cwd: &Path, settings: &Settings, color: bool) -> Result<String, Wir
     }))
 }
 
-fn entry_of<const N: usize>(fields: [(&str, Value); N]) -> Entry {
-    fields
-        .into_iter()
-        .map(|(key, value)| (key.to_owned(), value))
-        .collect()
-}
-
-fn tags_of(tag: Option<String>) -> Value {
-    Value::Array(
-        tag.filter(|tag| !tag.is_empty())
-            .map(Value::String)
-            .into_iter()
-            .collect(),
-    )
-}
-
 fn import(store: &GlobalStore, cwd: &Path, file: &str) -> Result<GlobalOutcome, WiringError> {
     let Some(text) = read_json_text(&cwd.join(file))? else {
         return Ok(GlobalOutcome::FileNotFound(file.to_owned()));
     };
     match serde_json::from_str::<Value>(&text) {
         Ok(Value::Object(data)) => {
-            let (patterns, gotchas) = store.import(&data)?;
-            Ok(GlobalOutcome::Imported { patterns, gotchas })
+            let (gotchas, skipped_patterns) = store.import(&data)?;
+            Ok(GlobalOutcome::Imported {
+                gotchas,
+                skipped_patterns,
+            })
         }
         Ok(_) => Ok(GlobalOutcome::InvalidJson(
             "top-level value is not an object".to_owned(),
@@ -96,34 +78,17 @@ pub fn global(
     let store = GlobalStore::new(&settings.dejafix_home);
     let project = project_name(cwd);
     match action {
-        GlobalAction::Status => {
-            let patterns = store.load_patterns()?;
-            let gotchas = store.load_gotchas()?;
-            Ok(GlobalOutcome::Status {
-                location: store.dir.display().to_string(),
-                patterns,
-                gotchas,
-                preferences: store.has_preferences(),
-            })
-        }
-        GlobalAction::List { tag, library, json } => {
-            let (patterns, gotchas) = filtered(
-                store.load_patterns()?,
-                store.load_gotchas()?,
-                tag.as_deref(),
-                library.as_deref(),
-            );
-            Ok(GlobalOutcome::List {
-                patterns,
-                gotchas,
-                tag,
-                library,
-                json,
-            })
-        }
-        GlobalAction::Add { text, tag } => {
-            add_pattern(&store, &project, settings, non_empty(text), tag, ids)
-        }
+        GlobalAction::Status => Ok(GlobalOutcome::Status {
+            location: store.dir.display().to_string(),
+            gotchas: store.load_gotchas()?,
+            preferences: store.has_preferences(),
+        }),
+        GlobalAction::List { tag, library, json } => Ok(GlobalOutcome::List {
+            gotchas: filtered(store.load_gotchas()?, tag.as_deref(), library.as_deref()),
+            tag,
+            library,
+            json,
+        }),
         GlobalAction::AddGotcha {
             library,
             text,
@@ -176,40 +141,13 @@ pub fn global(
     }
 }
 
-fn add_pattern(
-    store: &GlobalStore,
-    project: &str,
-    settings: &Settings,
-    text: Option<String>,
-    tag: Option<String>,
-    ids: &mut impl Ids,
-) -> Result<GlobalOutcome, WiringError> {
-    let Some(text) = text else {
-        return Ok(GlobalOutcome::Usage(Usage::Add));
-    };
-    let id = ids.entry_id("pat");
-    store.append_pattern(&entry_of([
-        ("id", Value::String(id.clone())),
-        ("pattern", Value::String(text.clone())),
-        ("tags", tags_of(tag)),
-        ("source_project", Value::String(project.to_owned())),
-        ("confidence", Value::String("medium".to_owned())),
-        ("times_encountered", Value::from(1)),
-        ("created", Value::String(iso_micros(&settings.clock))),
-    ]))?;
-    Ok(GlobalOutcome::PatternAdded { id, text })
-}
-
 fn detect(store: &GlobalStore, cwd: &Path, json: bool) -> Result<GlobalOutcome, WiringError> {
     let stack = detect_stack(cwd);
-    let patterns = store.load_patterns()?;
     let gotchas = store.load_gotchas()?;
-    let relevant = relevant_entries(&stack, None, &patterns, &gotchas);
-    let (inherited_patterns, inherited_gotchas) = (relevant.patterns.len(), relevant.gotchas.len());
+    let inherited_gotchas = relevant_entries(&stack, None, &gotchas).len();
     Ok(GlobalOutcome::Detected {
         name: project_name(cwd),
         stack,
-        inherited_patterns,
         inherited_gotchas,
         json,
     })
