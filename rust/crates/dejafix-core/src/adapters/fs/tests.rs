@@ -950,7 +950,9 @@ fn an_import_into_a_fresh_home_without_gotchas_writes_preferences() {
         store.import(data.as_object().unwrap()).unwrap();
     }
     assert_eq!(
-        fs::read_to_string(store.path("stack_preferences.md")).unwrap(),
+        fs::read_to_string(store.path("stack_preferences.md"))
+            .unwrap()
+            .replace("\r\n", "\n"),
         "use uv\n"
     );
     assert!(!store.path("patterns.jsonl").exists());
