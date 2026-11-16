@@ -51,12 +51,23 @@ fn add_gotcha_carries_keywords_and_versions() {
 }
 
 #[test]
-fn add_with_an_empty_library_stays_a_pattern() {
+fn add_is_always_add_gotcha() {
     assert_eq!(
         action_of(args("add", Some("x"), Some(""))),
-        GlobalAction::Add {
+        GlobalAction::AddGotcha {
+            library: Some(String::new()),
             text: Some("x".to_owned()),
-            tag: None,
+            keywords: Vec::new(),
+            versions: None,
+        }
+    );
+    assert_eq!(
+        action_of(args("add", Some("x"), None)),
+        GlobalAction::AddGotcha {
+            library: None,
+            text: Some("x".to_owned()),
+            keywords: Vec::new(),
+            versions: None,
         }
     );
 }

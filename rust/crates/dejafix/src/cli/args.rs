@@ -180,12 +180,12 @@ pub enum Commands {
 pub struct GlobalArgs {
     #[arg(
         default_value = "status",
-        help = "Action: status, list, add, add-gotcha, query, edit, upgrade, remove, export, import, prune, detect."
+        help = "Action: status, list, add-gotcha (or add), query, edit, upgrade, remove, export, import, prune, detect."
     )]
     pub action: String,
-    #[arg(help = "Pattern text, gotcha text, entry ID, or import file path.")]
+    #[arg(help = "Gotcha text, query text, entry ID, or import file path.")]
     pub text: Option<String>,
-    #[arg(long, help = "Filter or tag entries.")]
+    #[arg(long, help = "Filter list by tag.")]
     pub tag: Option<String>,
     #[arg(long, help = "Filter by or specify library.")]
     pub library: Option<String>,
@@ -196,7 +196,10 @@ pub struct GlobalArgs {
         help = "Days threshold for prune."
     )]
     pub older_than: i64,
-    #[arg(long, help = "Confidence filter for prune.")]
+    #[arg(
+        long,
+        help = "Prune only records with this confidence; library gotchas carry none, so this matches nothing."
+    )]
     pub confidence: Option<String>,
     #[arg(
         long = "keyword",
