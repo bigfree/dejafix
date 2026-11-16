@@ -18,6 +18,7 @@
 - **The registry keeps settings it does not own.** Registering a project no longer drops the version stamp or the remembered update check from `~/.dejafix/projects.meta.json`.
 - **`djf project scan` no longer registers a project twice.** A folder that is registered under another spelling, for example through a symlink or with different letter case, is recognised as already registered.
 - **`djf migrate` keeps line endings.** Files with CRLF line endings keep them when `.projectmem` paths are rewritten, so the migration changes only the paths.
+- **Two writes to a fresh project no longer fail with `points outside the project; refusing to use it`.** When two writers, for example a hook and an MCP tool, wrote at the same time and `events.jsonl` did not exist yet, one of them could see the log appear halfway through the containment check and refuse it as a link out of the project. A file created or removed during the check is now judged by its folder. Links out of the project are still refused.
 
 ### Changed
 

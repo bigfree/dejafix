@@ -780,6 +780,53 @@ mod containment {
         assert!(points_outside(&base.path().join("other/x"), &root));
         assert!(MemoryDir::at(&root).is_ok());
     }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_file_created_or_removed_while_it_is_checked_stays_inside() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        use std::thread;
+        const FILES: usize = 2000;
+        let base = tempfile::tempdir().unwrap();
+        let root = base.path().join("repo");
+        let memory = root.join(".dejafix");
+        fs::create_dir_all(&memory).unwrap();
+        let file = |index: usize| memory.join(format!("{index}.jsonl"));
+        let steps = AtomicUsize::new(0);
+        let (failed, refused) = thread::scope(|scope| {
+            let checkers: Vec<_> = (0..4)
+                .map(|_| {
+                    scope.spawn(|| {
+                        let mut refused = 0;
+                        for index in 1..=FILES {
+                            let path = file(index);
+                            loop {
+                                let done = steps.load(Ordering::Acquire) >= 2 * index;
+                                refused += usize::from(points_outside(&path, &root));
+                                if done {
+                                    break;
+                                }
+                            }
+                        }
+                        refused
+                    })
+                })
+                .collect();
+            let mut failed = 0;
+            for index in 1..=FILES {
+                failed += usize::from(fs::write(file(index), "").is_err());
+                steps.store(2 * index - 1, Ordering::Release);
+                failed += usize::from(fs::remove_file(file(index)).is_err());
+                steps.store(2 * index, Ordering::Release);
+            }
+            let refused: usize = checkers
+                .into_iter()
+                .map(|checker| checker.join().unwrap())
+                .sum();
+            (failed, refused)
+        });
+        assert_eq!((failed, refused), (0, 0));
+    }
 }
 
 #[test]
