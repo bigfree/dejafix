@@ -20,10 +20,19 @@ pub struct RepoState {
     pub(super) tables: Option<String>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UnmanagedReason {
+    HooksPath,
+    OutsideGitDir,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum HooksLocation {
     Folder(PathBuf),
-    Configured(PathBuf),
+    Unmanaged {
+        path: PathBuf,
+        reason: UnmanagedReason,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

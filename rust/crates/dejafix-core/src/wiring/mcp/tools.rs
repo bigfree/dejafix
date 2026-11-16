@@ -4,11 +4,9 @@ use std::sync::{Mutex, OnceLock};
 
 use super::errors::io_error;
 use super::types::{
-    FsProbe, GitMemo, LogCache, McpSettings, McpState, MemoGit, ToolCall, ToolError, ToolReply,
+    GitMemo, LogCache, McpSettings, McpState, MemoGit, ToolCall, ToolError, ToolReply,
 };
-use crate::adapters::fs::{
-    FsResolver, MEMORY_DIR, checked_events_path, read_text_within, resolve_path,
-};
+use crate::adapters::fs::{FsResolver, MEMORY_DIR, checked_events_path, read_text_within};
 use crate::adapters::git::{GitHistory, status_files};
 use crate::core::context::{ContextInput, generate_context};
 use crate::core::event::IssueId;
@@ -26,6 +24,7 @@ use crate::core::write::Ids;
 use crate::wiring::global::{add_gotcha, registry_names};
 use crate::wiring::hooks::analyze_files;
 use crate::wiring::registry::load_registry;
+use crate::wiring::types::FsProbe;
 use crate::wiring::types::Settings;
 
 const CONTEXT_RECENT_DAYS: i64 = 30;
@@ -279,14 +278,14 @@ impl McpState {
 
     fn list_projects(&self, clock: &Clock) -> Result<String, ToolError> {
         if let Some(pinned) = self.pinned() {
-            return Ok(projects_reply(&Registry::default(), Some(pinned), |_| None));
+            return Ok(projects_reply(
+                &Registry::default(),
+                Some(pinned),
+                &|_: &str| -> Option<PathBuf> { None },
+            ));
         }
         let registry = self.registry(clock)?;
-        let home = self.settings.home.as_deref();
-        let cwd = self.settings.cwd.as_path();
-        Ok(projects_reply(&registry, None, |text| {
-            resolve_path(text, home, cwd)
-        }))
+        Ok(projects_reply(&registry, None, &self.probe()))
     }
 }
 

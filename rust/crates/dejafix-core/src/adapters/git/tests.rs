@@ -5,9 +5,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use super::{
-    HooksLocation, git_dirs, head_short, hooks_location, last_changes, last_message, read_hook,
-    remove_hook, repository_state, resolve_djf_binary, staged_files, status_files, working_files,
-    write_hook,
+    HooksLocation, UnmanagedReason, git_dirs, head_short, hook_leads_outside, hooks_location,
+    last_changes, last_message, read_hook, remove_hook, repository_state, resolve_djf_binary,
+    staged_files, status_files, working_files, write_hook,
 };
 use crate::core::capture::Change;
 use crate::core::hooks::shell_path;
@@ -134,14 +134,23 @@ fn core_hooks_path_is_reported_relative_or_absolute() {
     git(&root, &["config", "core.hooksPath", ".husky/_"]);
     assert_eq!(
         hooks_location(&root),
-        HooksLocation::Configured(root.join(".husky/_"))
+        HooksLocation::Unmanaged {
+            path: root.join(".husky/_"),
+            reason: UnmanagedReason::HooksPath
+        }
     );
     let shared = root.join("shared-hooks");
     git(
         &root,
         &["config", "core.hooksPath", shared.to_str().unwrap()],
     );
-    assert_eq!(hooks_location(&root), HooksLocation::Configured(shared));
+    assert_eq!(
+        hooks_location(&root),
+        HooksLocation::Unmanaged {
+            path: shared,
+            reason: UnmanagedReason::HooksPath
+        }
+    );
 }
 
 #[test]
@@ -183,6 +192,65 @@ fn a_fake_worktree_folder_inside_the_project_keeps_the_old_folder() {
     assert_eq!(
         hooks_location(&root),
         HooksLocation::Folder(root.join(".git").join("hooks"))
+    );
+}
+
+#[test]
+fn a_commondir_pointing_at_another_repository_keeps_the_old_folder() {
+    let dir = tempfile::tempdir().unwrap();
+    let base = canonical(dir.path());
+    let other = base.join("other");
+    committed_repository(&other);
+    let root = base.join("unpacked");
+    committed_repository(&root);
+    fs::write(
+        root.join(".git").join("commondir"),
+        format!("{}\n", other.join(".git").display()),
+    )
+    .unwrap();
+    assert_eq!(
+        hooks_location(&root),
+        HooksLocation::Folder(root.join(".git").join("hooks"))
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn a_hooks_folder_linked_out_of_the_repository_is_not_managed() {
+    let dir = tempfile::tempdir().unwrap();
+    let base = canonical(dir.path());
+    let root = base.join("repo");
+    committed_repository(&root);
+    let elsewhere = base.join("elsewhere");
+    fs::create_dir_all(&elsewhere).unwrap();
+    let hooks = root.join(".git").join("hooks");
+    fs::remove_dir_all(&hooks).unwrap();
+    std::os::unix::fs::symlink(&elsewhere, &hooks).unwrap();
+    assert_eq!(
+        hooks_location(&root),
+        HooksLocation::Unmanaged {
+            path: hooks,
+            reason: UnmanagedReason::OutsideGitDir
+        }
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn a_dot_git_linked_to_another_repository_is_not_managed() {
+    let dir = tempfile::tempdir().unwrap();
+    let base = canonical(dir.path());
+    let other = base.join("other");
+    committed_repository(&other);
+    let root = base.join("unpacked");
+    fs::create_dir_all(&root).unwrap();
+    std::os::unix::fs::symlink(other.join(".git"), root.join(".git")).unwrap();
+    assert_eq!(
+        hooks_location(&root),
+        HooksLocation::Unmanaged {
+            path: root.join(".git").join("hooks"),
+            reason: UnmanagedReason::OutsideGitDir
+        }
     );
 }
 
@@ -989,4 +1057,31 @@ fn a_relative_path_entry_to_the_running_binary_is_not_baked() {
     assert!(relative.is_relative() && relative.join("djf").is_file());
     let resolved = resolve_djf_binary(Some(&real), Some(&path_of(&relative)), false);
     assert_eq!(resolved, shell_path(&real.to_string_lossy()));
+}
+
+#[cfg(unix)]
+#[test]
+fn a_hook_leads_outside_only_through_a_link_out_of_the_project() {
+    let dir = tempfile::tempdir().unwrap();
+    let base = canonical(dir.path());
+    let root = base.join("repo");
+    let folder = root.join(".git").join("hooks");
+    fs::create_dir_all(&folder).unwrap();
+    fs::create_dir_all(root.join("scripts")).unwrap();
+    fs::write(root.join("scripts").join("pre-commit"), "").unwrap();
+    fs::write(base.join("zshrc"), "").unwrap();
+    fs::write(folder.join("post-commit"), "").unwrap();
+    std::os::unix::fs::symlink(
+        root.join("scripts").join("pre-commit"),
+        folder.join("pre-commit"),
+    )
+    .unwrap();
+    std::os::unix::fs::symlink(base.join("zshrc"), folder.join("post-merge")).unwrap();
+    std::os::unix::fs::symlink(base.join("missing"), folder.join("pre-push")).unwrap();
+    let outside = |name: &str| hook_leads_outside(&folder.join(name), &root, &folder);
+    assert!(!outside("post-commit"));
+    assert!(!outside("pre-commit"));
+    assert!(!outside("absent"));
+    assert!(outside("post-merge"));
+    assert!(outside("pre-push"));
 }

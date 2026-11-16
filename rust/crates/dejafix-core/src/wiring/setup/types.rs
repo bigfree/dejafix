@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use crate::adapters::fs::{ClientPaths, StoreError};
-use crate::adapters::git::HooksLocation;
+use crate::adapters::git::{HooksLocation, UnmanagedReason};
 use crate::core::hooks::HookKind;
 use crate::core::migrate::MigrateStep;
 use crate::wiring::hooks::HooksReport;
@@ -49,8 +49,9 @@ pub enum MigrateEvent {
     },
     Bridge(&'static str, BridgeOutcome),
     Hooks(HooksReport),
-    HooksConfigured {
+    HooksUnmanaged {
         path: PathBuf,
+        reason: UnmanagedReason,
         snippets: Vec<(HookKind, String)>,
     },
     Leftovers {

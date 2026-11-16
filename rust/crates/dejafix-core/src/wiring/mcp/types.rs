@@ -166,8 +166,3 @@ pub(super) enum ToolError {
     #[error("RegistryError: {0}")]
     Registry(String),
 }
-
-pub(super) struct FsProbe<'s> {
-    pub(super) cwd: &'s std::path::Path,
-    pub(super) home: Option<&'s std::path::Path>,
-}

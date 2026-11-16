@@ -12,7 +12,7 @@ use crate::adapters::fs::{
     holds_data, is_symlink, live_watcher, move_entry, points_outside, project_name, read_universal,
     resolve_path, write_atomic,
 };
-use crate::adapters::git::{HooksLocation, exclude_file, hooks_location};
+use crate::adapters::git::{HooksLocation, UnmanagedReason, exclude_file, hooks_location};
 use crate::core::hooks::HookKind;
 use crate::core::migrate::{
     BRIDGE_BLOCK, Block, HOOK_BLOCK, LEGACY_DIR, MigrateStep, convert_block, has_legacy_path,
@@ -251,7 +251,7 @@ impl Plan {
         if !self.hooks.is_empty() {
             steps.push(match self.hooks_folder {
                 HooksLocation::Folder(_) => MigrateStep::Hooks(self.hooks.clone()),
-                HooksLocation::Configured(_) => MigrateStep::ManagedHooks(self.hooks.clone()),
+                HooksLocation::Unmanaged { .. } => MigrateStep::ManagedHooks(self.hooks.clone()),
             });
         }
         steps
@@ -280,7 +280,15 @@ fn plan(root: &Path, legacy: &Path, target: &Path) -> Plan {
     let memory = if rename { legacy } else { target };
     let hooks_folder = hooks_location(root);
     let folder = match &hooks_folder {
-        HooksLocation::Folder(folder) | HooksLocation::Configured(folder) => folder.clone(),
+        HooksLocation::Folder(folder)
+        | HooksLocation::Unmanaged {
+            path: folder,
+            reason: UnmanagedReason::HooksPath,
+        } => Some(folder.clone()),
+        HooksLocation::Unmanaged {
+            reason: UnmanagedReason::OutsideGitDir,
+            ..
+        } => None,
     };
     Plan {
         rename,
@@ -297,11 +305,13 @@ fn plan(root: &Path, legacy: &Path, target: &Path) -> Plan {
             .into_iter()
             .filter(|file| has_old_block(&root.join(file), &[root], &BRIDGE_BLOCK))
             .collect(),
-        hooks: HookKind::ALL
-            .into_iter()
-            .map(HookKind::file_name)
-            .filter(|name| has_old_block(&folder.join(name), &[&folder, root], &HOOK_BLOCK))
-            .collect(),
+        hooks: folder.map_or_else(Vec::new, |folder| {
+            HookKind::ALL
+                .into_iter()
+                .map(HookKind::file_name)
+                .filter(|name| has_old_block(&folder.join(name), &[&folder, root], &HOOK_BLOCK))
+                .collect()
+        }),
         hooks_folder,
     }
 }
@@ -343,10 +353,11 @@ fn apply_plan(
                 }
                 emit(sink, MigrateEvent::Hooks(install(root, directory, djf)?))?;
             }
-            HooksLocation::Configured(path) => emit(
+            HooksLocation::Unmanaged { path, reason } => emit(
                 sink,
-                MigrateEvent::HooksConfigured {
+                MigrateEvent::HooksUnmanaged {
                     path: path.clone(),
+                    reason: *reason,
                     snippets: configured_snippets(djf),
                 },
             )?,

@@ -7,7 +7,7 @@ use super::{
     other_projects, read_memory_file, record, regenerate, register_project, registry_op,
     scan_projects, search_project, show, upgrade_notice,
 };
-use crate::adapters::fs::{ClientPaths, canonical_path};
+use crate::adapters::fs::{ClientPaths, RegistryFiles, canonical_path};
 use crate::core::event::Outcome;
 use crate::core::registry::RegistryError;
 use crate::core::scaffold::{INSTRUCTIONS_VERSION, ai_instructions, instructions_version};
@@ -608,6 +608,84 @@ fn the_upgrade_notice_fires_once_and_never_on_a_first_run() {
     )
     .unwrap();
     assert!(upgrade_notice(&settings, "1.0.1").is_some());
+}
+
+fn register_spelled(settings: &Settings, stored: &Path) {
+    let files = RegistryFiles::new(&settings.dejafix_home);
+    let mut registry = files.load("2026-01-01T00:00:00Z").unwrap();
+    registry
+        .register(
+            stored.to_path_buf(),
+            None,
+            "2026-01-01T00:00:00Z",
+            &|_: &str| -> Option<std::path::PathBuf> { None },
+        )
+        .unwrap();
+    files.save(&registry).unwrap();
+}
+
+fn registered_paths(settings: &Settings) -> Vec<std::path::PathBuf> {
+    RegistryFiles::new(&settings.dejafix_home)
+        .load("2026-01-01T00:00:00Z")
+        .unwrap()
+        .projects
+        .into_iter()
+        .map(|record| record.path)
+        .collect()
+}
+
+#[cfg(unix)]
+#[test]
+fn registering_a_folder_stored_through_a_symlink_finds_its_record() {
+    let alpha = initialised("alpha");
+    let settings = settings(&alpha.home);
+    fs::create_dir_all(alpha.root.join(".dejafix")).unwrap();
+    let link = alpha.root.with_file_name("alpha-link");
+    std::os::unix::fs::symlink(&alpha.root, &link).unwrap();
+    register_spelled(&settings, &link);
+    let record = register_project(&settings, &alpha.root, None, ".", None).unwrap();
+    assert_eq!(record.path, link);
+    assert_eq!(registered_paths(&settings), [link]);
+}
+
+#[cfg(unix)]
+#[test]
+fn a_record_stored_through_a_symlink_names_the_bridge_and_is_found_by_path() {
+    let alpha = initialised("alpha");
+    let settings = settings(&alpha.home);
+    fs::create_dir_all(alpha.root.join(".dejafix")).unwrap();
+    let link = alpha.root.with_file_name("alpha-link");
+    std::os::unix::fs::symlink(&alpha.root, &link).unwrap();
+    register_spelled(&settings, &link);
+    init_project(&alpha.root, None, &settings, &options()).unwrap();
+    assert!(read(alpha.root.join("CLAUDE.md")).contains("**alpha-link**"));
+    assert_eq!(registered_paths(&settings), [link]);
+    let reply = registry_op(
+        &settings,
+        &alpha.root,
+        None,
+        RegistryOp::Use(Some(alpha.root.to_string_lossy().into_owned())),
+    )
+    .unwrap();
+    assert!(
+        matches!(reply, RegistryReply::Activated(Some(ref record)) if record.id == "alpha-link"),
+        "{reply:?}"
+    );
+}
+
+#[test]
+fn registering_a_folder_stored_in_other_letter_case_finds_its_record() {
+    let alpha = initialised("alpha");
+    let upper = alpha.root.with_file_name("ALPHA");
+    if !upper.exists() {
+        return;
+    }
+    let settings = settings(&alpha.home);
+    fs::create_dir_all(alpha.root.join(".dejafix")).unwrap();
+    register_spelled(&settings, &upper);
+    let record = register_project(&settings, &alpha.root, None, ".", None).unwrap();
+    assert_eq!(record.path, upper);
+    assert_eq!(registered_paths(&settings), [upper]);
 }
 
 #[cfg(unix)]

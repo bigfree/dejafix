@@ -48,7 +48,7 @@ fn register_all(
             .ok_or_else(|| RegistryError::Unresolvable(project.display().to_string()))
             .and_then(|resolved| {
                 registry
-                    .register(resolved, None, now)
+                    .register(resolved, None, now, &|_: &str| -> Option<PathBuf> { None })
                     .map(|(result, _)| result)
             });
         match registered {

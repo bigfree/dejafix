@@ -1,7 +1,8 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use super::hooks::HooksReport;
 use crate::adapters::fs::{ClientConfig, MemoryDir, StoreError};
+use crate::adapters::git::UnmanagedReason;
 use crate::core::doctor::Reverted;
 use crate::core::hooks::HookKind;
 use crate::core::log::Skipped;
@@ -82,8 +83,9 @@ pub struct InitOptions {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum InitHooks {
     Installed(HooksReport),
-    Configured {
+    Unmanaged {
         path: PathBuf,
+        reason: UnmanagedReason,
         snippets: Vec<(HookKind, String)>,
     },
     NoGit,
@@ -199,4 +201,9 @@ pub(super) struct GotchaChanges {
     pub(super) library: Option<String>,
     pub(super) keywords: Vec<String>,
     pub(super) versions: Option<String>,
+}
+
+pub(crate) struct FsProbe<'s> {
+    pub(crate) cwd: &'s Path,
+    pub(crate) home: Option<&'s Path>,
 }

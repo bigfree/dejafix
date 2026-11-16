@@ -1,11 +1,12 @@
 use std::path::{Path, PathBuf};
 
-pub trait Probe {
+use crate::core::registry::PathLookup;
+
+pub trait Probe: PathLookup {
     fn has_memory(&self, path: &Path) -> bool;
     fn is_dir(&self, path: &Path) -> bool;
     fn expand_user(&self, text: &str) -> PathBuf;
     fn resolve(&self, path: &Path) -> Option<PathBuf>;
-    fn lookup(&self, text: &str) -> Option<PathBuf>;
     fn discover(&self) -> Option<PathBuf>;
 }
 
