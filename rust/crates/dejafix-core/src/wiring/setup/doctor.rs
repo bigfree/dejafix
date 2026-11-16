@@ -5,8 +5,9 @@ use std::path::{Path, PathBuf};
 use jiff::tz::TimeZone;
 
 use crate::adapters::fs::{
-    ClientPaths, ConfigState, RegistryFiles, canonical_path, dedupe_paths, default_roots,
-    events_path, find_projects, identity, read_events_file, resolve_path, scan_client_configs,
+    ClientPaths, ConfigState, GlobalStore, RegistryFiles, canonical_path, dedupe_paths,
+    default_roots, events_path, find_projects, identity, read_events_file, resolve_path,
+    scan_client_configs,
 };
 use crate::core::doctor::{SeenConfig, track_pins};
 use crate::core::log::skipped_lines;
@@ -176,6 +177,7 @@ pub fn doctor(
     }
     check_configs(settings, &files, paths, cwd, &mut report);
     report.corrupt = corrupt_logs(settings, &registry);
+    report.retired_patterns = GlobalStore::new(&settings.dejafix_home).retired_patterns();
     Ok(report)
 }
 

@@ -222,6 +222,26 @@ fn write_corrupt(report: &DoctorReport, out: &mut impl Write, color: bool) -> io
     Ok(usize::from(!report.corrupt.is_empty()))
 }
 
+fn write_retired_patterns(
+    report: &DoctorReport,
+    out: &mut impl Write,
+    color: bool,
+) -> io::Result<()> {
+    if let Some(path) = &report.retired_patterns {
+        secho(
+            out,
+            &format!("\n  {WARN} {} is no longer used", printable(path)),
+            Style::Yellow,
+            color,
+        )?;
+        writeln!(
+            out,
+            "      dejafix stopped keeping cross-project patterns; remove the file when you no longer need it."
+        )?;
+    }
+    Ok(())
+}
+
 fn write_version(status: &UpdateStatus, out: &mut impl Write, color: bool) -> io::Result<()> {
     match status {
         UpdateStatus::Offline => {
@@ -287,6 +307,7 @@ fn write_report(
         + write_stale(report, fix, out, color)?
         + write_configs(report, out, color)?
         + write_corrupt(report, out, color)?;
+    write_retired_patterns(report, out, color)?;
     write_version(status, out, color)?;
     writeln!(out)?;
     if problems == 0 {

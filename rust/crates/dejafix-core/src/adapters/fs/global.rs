@@ -17,6 +17,7 @@ const GOTCHAS_FILE: &str = "library_gotchas.jsonl";
 const PREFERENCES_FILE: &str = "stack_preferences.md";
 const LIBRARIES_FILE: &str = "libraries.json";
 const BACKUP_FILE: &str = "library_gotchas.v1.jsonl";
+const RETIRED_PATTERNS_FILE: &str = "patterns.jsonl";
 const LOCK_SUFFIX: &str = ".lock";
 
 fn write_error(path: &Path) -> impl Fn(std::io::Error) -> StoreError + '_ {
@@ -143,6 +144,12 @@ impl GlobalStore {
 
     pub fn load_gotchas(&self) -> Result<Vec<Entry>, StoreError> {
         self.load(GOTCHAS_FILE)
+    }
+
+    #[must_use]
+    pub fn retired_patterns(&self) -> Option<PathBuf> {
+        let path = self.path(RETIRED_PATTERNS_FILE);
+        path.is_file().then_some(path)
     }
 
     #[must_use]
