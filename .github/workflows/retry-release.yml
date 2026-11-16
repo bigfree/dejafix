@@ -2,8 +2,10 @@ name: Retry release
 
 # GitHub sometimes cannot find a hosted runner for a release job, most often a
 # macOS arm64 one, and cancels the job after about 15 minutes. This workflow
-# reruns such jobs, up to three times, when the release failed only because of
-# that. Any other failure is left alone.
+# reruns such jobs when the release failed only because of that, until the
+# release run reaches its fourth attempt. The cap counts the release run's own
+# attempts, so it holds across invocations of this workflow and manual reruns.
+# Any other failure is left alone.
 
 on:
   workflow_run: # zizmor: ignore[dangerous-triggers] reads only the metadata of the triggering run; checks out nothing and runs no code or artifact from it
@@ -20,6 +22,7 @@ jobs:
   retry:
     if: >-
       github.event.workflow_run.conclusion == 'failure' &&
+      github.event.workflow_run.run_attempt < 4 &&
       github.event.workflow_run.event == 'push' &&
       github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-latest
@@ -50,12 +53,18 @@ jobs:
             done
           }
 
-          for attempt in 1 2 3; do
+          max_attempts=4
+          while :; do
             if ! only_runner_misses; then
               echo "The release did not fail only on missing runners; nothing to retry."
               exit 0
             fi
-            echo "Waiting 10 minutes before retry $attempt of 3."
+            attempt=$(gh run view "$RUN_ID" --json attempt --jq .attempt)
+            if [ "$attempt" -ge "$max_attempts" ]; then
+              echo "::error::The release still had no runner after $attempt attempts."
+              exit 1
+            fi
+            echo "Waiting 10 minutes before attempt $((attempt + 1)) of $max_attempts."
             sleep 600
             gh run rerun "$RUN_ID" --failed
             sleep 30
@@ -71,9 +80,7 @@ jobs:
               exit 0
             fi
             if [ "$(gh run view "$RUN_ID" --json conclusion --jq .conclusion)" = success ]; then
-              echo "The release succeeded on retry $attempt."
+              echo "The release succeeded on attempt $((attempt + 1))."
               exit 0
             fi
           done
-          echo "::error::The release still had no runner after 3 retries."
-          exit 1
