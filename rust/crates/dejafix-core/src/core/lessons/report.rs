@@ -3,7 +3,7 @@ use std::sync::LazyLock;
 
 use regex::Regex;
 
-use super::types::{Candidate, Found, LessonKind, Memory, Normalizer, Record};
+use super::types::{Candidate, Found, Lesson, LessonKind, Memory, Normalizer, Record};
 use crate::core::path::{PathResolver, normpath};
 use crate::core::text::{char_len, char_prefix, collapse_whitespace, is_python_word, python_strip};
 
@@ -61,6 +61,25 @@ impl<'r, 'a> Memory<'r, 'a> {
             })
             .collect();
         Self { candidates }
+    }
+
+    pub fn lessons_where(&self, keep: impl Fn(&str) -> bool) -> Vec<Lesson<'r, 'a>> {
+        self.candidates
+            .iter()
+            .filter_map(|candidate| {
+                let file = candidate
+                    .files
+                    .iter()
+                    .filter(|file| keep(file))
+                    .min()?
+                    .clone();
+                Some(Lesson {
+                    kind: candidate.kind,
+                    record: candidate.record,
+                    file,
+                })
+            })
+            .collect()
     }
 
     fn lessons(&self, relative: &str) -> Found<'r, 'a> {
@@ -221,7 +240,7 @@ fn safe_id<'r>(record: &'r Record<'_>) -> &'r str {
     }
 }
 
-fn issue_label(record: &Record<'_>) -> String {
+pub(crate) fn issue_label(record: &Record<'_>) -> String {
     let issue = safe_id(record);
     if issue.is_empty() {
         String::new()
@@ -230,7 +249,7 @@ fn issue_label(record: &Record<'_>) -> String {
     }
 }
 
-fn provenance(record: &Record<'_>, with_issue: bool) -> String {
+pub(crate) fn provenance(record: &Record<'_>, with_issue: bool) -> String {
     let issue = if with_issue { safe_id(record) } else { "" };
     let date = char_prefix(&record.timestamp, 10);
     let issue = if issue.is_empty() {
@@ -272,7 +291,7 @@ fn overflow_line(entries: &[&Record<'_>]) -> Option<String> {
     Some(format!("    ... and {} more{source}", hidden.len()))
 }
 
-fn clip(text: &str) -> String {
+pub(crate) fn clip(text: &str) -> String {
     let flat = collapse_whitespace(text);
     if char_len(&flat) <= TEXT_CHARS {
         return flat.into_owned();

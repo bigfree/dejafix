@@ -22,6 +22,13 @@ pub enum LessonKind {
     Decision,
 }
 
+#[derive(Debug, Clone)]
+pub struct Lesson<'r, 'a> {
+    pub kind: LessonKind,
+    pub record: &'r Record<'a>,
+    pub file: String,
+}
+
 #[derive(Debug)]
 pub struct Candidate<'r, 'a> {
     pub(super) kind: LessonKind,
