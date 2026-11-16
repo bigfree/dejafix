@@ -110,6 +110,46 @@ a library behaves in a given version. It lives in `~/.dejafix/global/`.
   written by older versions: it exports a draft, which an agent fills and you
   review before applying it.
 
+## Linked projects
+
+Projects that depend on each other, for example a backend and the portal that
+calls its API, or two systems sharing one database, can declare it in the
+committed `.dejafix/config.toml`:
+
+```toml
+boundary = ["src/Api/**", "db/migrations/**", "openapi.yaml"]
+
+[[links]]
+project = "github.com/org/inventory"
+relation = "shares the database; creates device ports this project reads"
+```
+
+- **`boundary`** lists the paths, as globs relative to the repository root,
+  that other projects depend on. Start each glob with the folder it covers:
+  the rest of an edited file's path is what linked lessons are matched
+  against.
+- **`[[links]]`** names a linked project by its `origin` remote without the
+  scheme, user, port and `.git`, so the value is the same on every machine. A
+  project without a remote is named by its folder. A registry id or alias
+  works too. `relation` is optional and is shown to the agent.
+- **One side is enough.** A link declared in one project is seen from both.
+- **Local only.** A link resolves only to projects registered on this machine
+  (`djf project register`). dejafix reads a linked project's local memory and
+  never writes to it.
+
+What the agent sees:
+
+- **At session start**, `start_session` and `djf brief` list the linked
+  projects with the name that reads their memory through the `project`
+  argument of the MCP tools.
+- **Before editing a file on its own boundary**, the edit hook and
+  `precheck_file` show the linked projects' open issues, failed or partial
+  attempts and decisions on their boundary that match the edited file, at most
+  three per project. An unrelated edit shows nothing.
+
+`djf links` shows how this project's links resolve, and `djf doctor` names
+links to projects this machine does not have.
+
 ## Edit hook (Claude Code and Codex)
 
 `djf-edit-hook` shows a file's lessons right before the agent edits that file:
@@ -142,7 +182,7 @@ To log every hook call, set `DJF_EDIT_HOOK_LOG=/path/to/calls.jsonl`.
 |---|---|
 | Memory | `log`, `attempt`, `fix`, `decision`, `note`, `show`, `search`, `regenerate` |
 | Judgment | `precheck`, `brief` |
-| Projects | `init`, `project`, `doctor`, `hooks`, `migrate` |
+| Projects | `init`, `project`, `links`, `doctor`, `hooks`, `migrate` |
 | Global memory | `global` (`query`, `add-gotcha`, `list`, `edit`, `upgrade`, …) |
 | Views | `instructions`, `map`, `plan` |
 
