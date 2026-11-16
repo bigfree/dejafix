@@ -27,7 +27,7 @@ fn folder_name(path: &Path) -> String {
 
 fn find<'r>(registry: &'r Registry, text: &str, probe: &impl Probe) -> Option<&'r ProjectRecord> {
     registry
-        .find(text, |path| probe.lookup(path))
+        .find(text, probe)
         .and_then(|index| registry.projects.get(index))
 }
 

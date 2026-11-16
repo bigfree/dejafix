@@ -3,8 +3,8 @@ use std::path::{Path, PathBuf};
 use serde_json::{Map, Value, json};
 
 use super::{
-    Loaded, RegisterResult, Registry, RegistryError, is_slug, list_payload, load, meta_payload,
-    normalize_path, same_path, slugify, unique_id,
+    Loaded, PathLookup, RegisterResult, Registry, RegistryError, is_slug, list_payload, load,
+    meta_payload, normalize_path, slugify, unique_id,
 };
 
 const NOW: &str = "2027-01-15T08:00:00Z";
@@ -185,10 +185,21 @@ fn register_text(
     alias: Option<&str>,
     now: &str,
 ) -> Result<(RegisterResult, String), RegistryError> {
-    let path = PathBuf::from(p(path));
     registry
-        .register(path.clone(), alias, now, |stored| same_path(stored, &path))
+        .register(PathBuf::from(p(path)), alias, now, &no_resolve)
         .map(|(result, record)| (result, record.id.clone()))
+}
+
+struct Always;
+
+impl PathLookup for Always {
+    fn locate(&self, _: &str) -> Option<PathBuf> {
+        None
+    }
+
+    fn same_folder(&self, _: &Path, _: &Path) -> bool {
+        true
+    }
 }
 
 #[test]
@@ -196,16 +207,14 @@ fn registering_uses_the_caller_s_matching_rule() {
     let mut registry = registry_of(&["/code/alpha"]);
     let other = PathBuf::from(p("/elsewhere/link"));
     let (result, record) = registry
-        .register(other.clone(), None, LATER, |_| true)
+        .register(other.clone(), None, LATER, &Always)
         .unwrap();
     assert_eq!(
         (result, record.id.as_str()),
         (RegisterResult::Existing, "alpha")
     );
     assert_eq!(registry.projects[0].path, PathBuf::from(p("/code/alpha")));
-    let (result, _) = registry
-        .register(other, Some("a"), LATER, |_| true)
-        .unwrap();
+    let (result, _) = registry.register(other, Some("a"), LATER, &Always).unwrap();
     assert_eq!(result, RegisterResult::Realiased);
     assert_eq!(ids(&registry), ["alpha"]);
 }
@@ -249,7 +258,7 @@ fn registering_is_idempotent_by_path() {
 fn lookup_is_case_insensitive_and_accepts_a_path() {
     let mut registry = registry_of(&["/code/MatilyRec", "/code/other"]);
     registry
-        .set_alias("matilyrec", "mrec", NOW, no_resolve)
+        .set_alias("matilyrec", "mrec", NOW, &no_resolve)
         .unwrap();
     for name in [
         "matilyrec",
@@ -259,59 +268,59 @@ fn lookup_is_case_insensitive_and_accepts_a_path() {
         "MRec",
         " mrec ",
     ] {
-        assert_eq!(registry.find(name, no_resolve), Some(0), "{name}");
+        assert_eq!(registry.find(name, &no_resolve), Some(0), "{name}");
     }
     assert_eq!(
-        registry.find("", |_| Some(PathBuf::from(p("/code/other")))),
+        registry.find("", &|_: &str| Some(PathBuf::from(p("/code/other")))),
         None
     );
     assert_eq!(
-        registry.find("./x", |_| Some(PathBuf::from(p("/code/other")))),
+        registry.find("./x", &|_: &str| Some(PathBuf::from(p("/code/other")))),
         Some(1)
     );
-    assert_eq!(registry.find("nope", no_resolve), None);
+    assert_eq!(registry.find("nope", &no_resolve), None);
 }
 
 #[test]
 fn aliases_and_tags_are_validated_and_stamped() {
     let mut registry = registry_of(&["/code/alpha", "/code/beta"]);
     assert_eq!(
-        registry.set_alias("nope", "x", LATER, no_resolve),
+        registry.set_alias("nope", "x", LATER, &no_resolve),
         Err(RegistryError::NotFound("nope".to_owned()))
     );
     assert_eq!(
-        registry.set_alias("alpha", "Bad", LATER, no_resolve),
+        registry.set_alias("alpha", "Bad", LATER, &no_resolve),
         Err(RegistryError::BadAlias("Bad".to_owned()))
     );
     assert_eq!(
         registry
-            .set_alias("alpha", "beta", LATER, no_resolve)
+            .set_alias("alpha", "beta", LATER, &no_resolve)
             .unwrap_err()
             .to_string(),
         format!("Alias 'beta' is already used by {}.", p("/code/beta"))
     );
     assert_eq!(
         registry
-            .set_alias("alpha", "alpha", LATER, no_resolve)
+            .set_alias("alpha", "alpha", LATER, &no_resolve)
             .map(|record| record.alias.clone()),
         Ok(Some("alpha".to_owned()))
     );
     assert_eq!(
         registry
-            .add_tag("alpha", "Web App", LATER, no_resolve)
+            .add_tag("alpha", "Web App", LATER, &no_resolve)
             .map(|(record, changed)| (record.tags.clone(), changed)),
         Ok((vec!["web-app".to_owned()], true))
     );
     assert_eq!(
         registry
-            .add_tag("alpha", "web-app", LATER, no_resolve)
+            .add_tag("alpha", "web-app", LATER, &no_resolve)
             .map(|(record, changed)| (record.id.clone(), changed)),
         Ok(("alpha".to_owned(), false))
     );
     assert_eq!(registry.projects[0].tags, ["web-app"]);
     assert_eq!(
         registry
-            .remove_tag("alpha", "WEB app", NOW, no_resolve)
+            .remove_tag("alpha", "WEB app", NOW, &no_resolve)
             .map(|record| record.tags.len()),
         Ok(0)
     );
@@ -324,29 +333,29 @@ fn the_active_project_is_set_cleared_and_dropped_on_removal() {
     let mut registry = registry_of(&["/code/alpha", "/code/beta"]);
     assert_eq!(
         registry
-            .set_active(Some("beta"), no_resolve)
+            .set_active(Some("beta"), &no_resolve)
             .map(|record| record.map(|record| record.id.clone())),
         Ok(Some("beta".to_owned()))
     );
     assert_eq!(registry.active_project.as_deref(), Some("beta"));
     assert_eq!(
         registry
-            .set_active(Some("x"), no_resolve)
+            .set_active(Some("x"), &no_resolve)
             .unwrap_err()
             .to_string(),
         "No project 'x'. Registered: alpha, beta"
     );
     assert_eq!(
-        registry.unregister("alpha", no_resolve).unwrap().id,
+        registry.unregister("alpha", &no_resolve).unwrap().id,
         "alpha"
     );
     assert_eq!(registry.active_project.as_deref(), Some("beta"));
-    assert_eq!(registry.unregister("BETA", no_resolve).unwrap().id, "beta");
+    assert_eq!(registry.unregister("BETA", &no_resolve).unwrap().id, "beta");
     assert_eq!(registry.active_project, None);
     assert_eq!(registry.known_names(), "none registered");
-    assert_eq!(registry.set_active(None, no_resolve), Ok(None));
+    assert_eq!(registry.set_active(None, &no_resolve), Ok(None));
     assert_eq!(
-        registry.unregister("beta", no_resolve),
+        registry.unregister("beta", &no_resolve),
         Err(RegistryError::NotFound("beta".to_owned()))
     );
 }
@@ -354,14 +363,14 @@ fn the_active_project_is_set_cleared_and_dropped_on_removal() {
 #[test]
 fn an_older_dejafix_can_only_append_a_path() {
     let mut registry = registry_of(&["/code/alpha"]);
-    registry.set_alias("alpha", "a", NOW, no_resolve).unwrap();
+    registry.set_alias("alpha", "a", NOW, &no_resolve).unwrap();
     let meta = meta_payload(&registry, &Map::new());
     let Loaded::Dirty(appended) = loaded(&json!([p("/code/alpha"), p("/code/beta")]), Some(&meta))
     else {
         panic!("not dirty");
     };
     assert_eq!(ids(&appended), ["alpha", "beta"]);
-    assert_eq!(appended.find("a", no_resolve), Some(0));
+    assert_eq!(appended.find("a", &no_resolve), Some(0));
     assert_eq!(appended.projects[0].created_at, NOW);
 }
 
@@ -369,7 +378,7 @@ fn an_older_dejafix_can_only_append_a_path() {
 fn remove_id_removes_only_that_record_and_clears_it_as_active() {
     let mut registry = registry_of(&["/code/api", "/code/web"]);
     registry
-        .set_alias("web", "api-old", LATER, no_resolve)
+        .set_alias("web", "api-old", LATER, &no_resolve)
         .unwrap();
     registry.active_project = Some("web".to_owned());
     assert_eq!(

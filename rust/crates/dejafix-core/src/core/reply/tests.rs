@@ -65,10 +65,12 @@ fn precheck_names_a_memory_file_instead_of_clearing_it() {
 fn registry(active: Option<&str>) -> Registry {
     let mut registry = Registry::default();
     for name in ["alpha", "beta", "gamma"] {
-        let path = PathBuf::from(format!("/work/{name}"));
-        let _ = registry.register(path.clone(), None, "2026-01-01T00:00:00Z", |stored| {
-            stored == path.as_path()
-        });
+        let _ = registry.register(
+            PathBuf::from(format!("/work/{name}")),
+            None,
+            "2026-01-01T00:00:00Z",
+            &|_: &str| -> Option<PathBuf> { None },
+        );
     }
     if let Some(record) = registry.projects.get_mut(2) {
         record.alias = Some("g".to_owned());
@@ -84,7 +86,7 @@ fn lookup(text: &str) -> Option<PathBuf> {
 #[test]
 fn list_projects_leads_with_the_active_project() {
     assert_eq!(
-        projects_reply(&registry(Some("beta")), None, lookup),
+        projects_reply(&registry(Some("beta")), None, &lookup),
         "ACTIVE: beta — /work/beta\nCalls that omit `project` go here. You do not need to pass it.\n\n3 project(s) — pass one as `project`:\n  alpha — /work/alpha\n  beta (active) — /work/beta\n  gamma / g — /work/gamma"
     );
 }
@@ -92,15 +94,15 @@ fn list_projects_leads_with_the_active_project() {
 #[test]
 fn list_projects_without_an_active_project_says_calls_will_fail() {
     assert_eq!(
-        projects_reply(&registry(None), None, lookup),
+        projects_reply(&registry(None), None, &lookup),
         "3 project(s) — pass one as `project`:\n  alpha — /work/alpha\n  beta — /work/beta\n  gamma / g — /work/gamma\n\nNo active project: calls that omit `project` will fail rather than guess. Set one with `djf project use <name>`."
     );
     assert_eq!(
-        projects_reply(&Registry::default(), None, lookup),
+        projects_reply(&Registry::default(), None, &lookup),
         "No projects registered. Run `djf init` in a repo (it registers automatically), or `djf project register <path>`."
     );
     assert_eq!(
-        projects_reply(&registry(None), Some(Path::new("/work/alpha")), lookup),
+        projects_reply(&registry(None), Some(Path::new("/work/alpha")), &lookup),
         "This server is pinned to a single project: alpha (/work/alpha).\nThe `project` parameter is ignored."
     );
 }

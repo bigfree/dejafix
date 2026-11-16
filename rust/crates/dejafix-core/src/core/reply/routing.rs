@@ -1,14 +1,14 @@
 use std::fmt::Write as _;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
-use crate::core::registry::Registry;
+use crate::core::registry::{PathLookup, Registry};
 use crate::core::resolve::Resolution;
 
 #[must_use]
 pub fn projects_reply(
     registry: &Registry,
     pinned: Option<&Path>,
-    lookup: impl Fn(&str) -> Option<PathBuf>,
+    lookup: &impl PathLookup,
 ) -> String {
     if let Some(pinned) = pinned {
         let name = pinned
@@ -26,7 +26,7 @@ pub fn projects_reply(
     let active = registry
         .active_project
         .as_deref()
-        .and_then(|active| registry.find(active, &lookup))
+        .and_then(|active| registry.find(active, lookup))
         .and_then(|index| registry.projects.get(index));
     if let Some(active) = active {
         lines.push(format!(

@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
 use super::{Probe, Resolution, ResolveError, Source, resolve};
-use crate::core::registry::Registry;
+use crate::core::registry::{PathLookup, Registry, same_path};
 
 #[derive(Default)]
 struct Fake {
@@ -40,22 +40,30 @@ impl Probe for Fake {
         Some(path.to_path_buf())
     }
 
-    fn lookup(&self, text: &str) -> Option<PathBuf> {
+    fn discover(&self) -> Option<PathBuf> {
+        self.cwd_project.clone()
+    }
+}
+
+impl PathLookup for Fake {
+    fn locate(&self, text: &str) -> Option<PathBuf> {
         Path::new(text).is_absolute().then(|| PathBuf::from(text))
     }
 
-    fn discover(&self) -> Option<PathBuf> {
-        self.cwd_project.clone()
+    fn same_folder(&self, stored: &Path, wanted: &Path) -> bool {
+        same_path(stored, wanted)
     }
 }
 
 fn registry(names: &[&str], active: Option<&str>) -> Registry {
     let mut registry = Registry::default();
     for name in names {
-        let path = PathBuf::from(format!("/work/{name}"));
-        let _ = registry.register(path.clone(), None, "2026-01-01T00:00:00Z", |stored| {
-            stored == path.as_path()
-        });
+        let _ = registry.register(
+            PathBuf::from(format!("/work/{name}")),
+            None,
+            "2026-01-01T00:00:00Z",
+            &Fake::default(),
+        );
     }
     registry.active_project = active.map(str::to_owned);
     registry
@@ -308,13 +316,19 @@ impl Probe for Watching {
         self.inner.resolve(path)
     }
 
-    fn lookup(&self, text: &str) -> Option<PathBuf> {
-        self.saw(text);
-        self.inner.lookup(text)
-    }
-
     fn discover(&self) -> Option<PathBuf> {
         self.inner.discover()
+    }
+}
+
+impl PathLookup for Watching {
+    fn locate(&self, text: &str) -> Option<PathBuf> {
+        self.saw(text);
+        self.inner.locate(text)
+    }
+
+    fn same_folder(&self, stored: &Path, wanted: &Path) -> bool {
+        self.inner.same_folder(stored, wanted)
     }
 }
 

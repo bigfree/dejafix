@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use super::hooks::HooksReport;
 use crate::adapters::fs::{ClientConfig, MemoryDir, StoreError};
@@ -201,4 +201,9 @@ pub(super) struct GotchaChanges {
     pub(super) library: Option<String>,
     pub(super) keywords: Vec<String>,
     pub(super) versions: Option<String>,
+}
+
+pub(crate) struct FsProbe<'s> {
+    pub(crate) cwd: &'s Path,
+    pub(crate) home: Option<&'s Path>,
 }

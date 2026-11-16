@@ -4,10 +4,12 @@ use serde_json::Value;
 
 use super::init::MEMORY_DIR;
 use super::types::{
-    ListedProject, RegistryOp, RegistryReply, Settings, UpgradeNotice, WiringError,
+    FsProbe, ListedProject, RegistryOp, RegistryReply, Settings, UpgradeNotice, WiringError,
 };
 use crate::adapters::fs::{RegistryFiles, StoreError, identity, resolve_path};
-use crate::core::registry::{ProjectRecord, RegisterResult, Registry, RegistryError, same_path};
+use crate::core::registry::{
+    PathLookup, ProjectRecord, RegisterResult, Registry, RegistryError, same_path,
+};
 use crate::core::time::Timestamp;
 
 pub(super) fn now_text(settings: &Settings) -> String {
@@ -22,13 +24,14 @@ pub(super) fn has_memory(path: &Path) -> bool {
     path.join(MEMORY_DIR).is_dir()
 }
 
-pub(super) fn same_folder(root: &Path) -> impl Fn(&Path) -> bool + '_ {
-    let wanted = identity(root);
-    move |stored| {
-        same_path(stored, root)
-            || wanted
-                .as_ref()
-                .is_some_and(|wanted| identity(stored).as_ref() == Some(wanted))
+impl PathLookup for FsProbe<'_> {
+    fn locate(&self, text: &str) -> Option<PathBuf> {
+        resolve_path(text, self.home, self.cwd)
+    }
+
+    fn same_folder(&self, stored: &Path, wanted: &Path) -> bool {
+        same_path(stored, wanted)
+            || identity(wanted).is_some_and(|wanted| identity(stored) == Some(wanted))
     }
 }
 
@@ -47,7 +50,7 @@ pub fn register_project(
         return Err(RegistryError::NoMemory { root }.into());
     }
     let mut registry = files.load(&now)?;
-    let (result, record) = registry.register(root.clone(), alias, &now, same_folder(&root))?;
+    let (result, record) = registry.register(root, alias, &now, &FsProbe { cwd, home })?;
     let record = record.clone();
     if result != RegisterResult::Existing {
         files.save(&registry)?;
@@ -63,7 +66,7 @@ pub fn registry_op(
 ) -> Result<RegistryReply, WiringError> {
     let files = RegistryFiles::new(&settings.dejafix_home);
     let now = now_text(settings);
-    let resolve = |path: &str| -> Option<PathBuf> { resolve_path(path, home, cwd) };
+    let lookup = FsProbe { cwd, home };
     let mut registry = files.load(&now)?;
     let (reply, changed) = match op {
         RegistryOp::List => {
@@ -80,15 +83,15 @@ pub fn registry_op(
             });
         }
         RegistryOp::Use(identifier) => {
-            let record = registry.set_active(identifier.as_deref(), resolve)?;
+            let record = registry.set_active(identifier.as_deref(), &lookup)?;
             (RegistryReply::Activated(record.cloned()), true)
         }
         RegistryOp::Remove(identifier) => (
-            RegistryReply::Removed(registry.unregister(&identifier, resolve)?),
+            RegistryReply::Removed(registry.unregister(&identifier, &lookup)?),
             true,
         ),
         RegistryOp::Alias { identifier, alias } => {
-            let record = registry.set_alias(&identifier, &alias, &now, resolve)?;
+            let record = registry.set_alias(&identifier, &alias, &now, &lookup)?;
             (RegistryReply::Aliased(record.clone()), true)
         }
         RegistryOp::Tag {
@@ -96,7 +99,7 @@ pub fn registry_op(
             tag,
             remove: true,
         } => {
-            let record = registry.remove_tag(&identifier, &tag, &now, resolve)?;
+            let record = registry.remove_tag(&identifier, &tag, &now, &lookup)?;
             (RegistryReply::Tagged(record.clone()), true)
         }
         RegistryOp::Tag {
@@ -104,7 +107,7 @@ pub fn registry_op(
             tag,
             remove: false,
         } => {
-            let (record, changed) = registry.add_tag(&identifier, &tag, &now, resolve)?;
+            let (record, changed) = registry.add_tag(&identifier, &tag, &now, &lookup)?;
             (RegistryReply::Tagged(record.clone()), changed)
         }
     };

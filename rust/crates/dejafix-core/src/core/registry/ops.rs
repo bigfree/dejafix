@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use super::load::DEFAULT_BRAIN;
 use super::slug::{is_slug, slugify, unique_id};
-use super::types::{ProjectRecord, RegisterResult, Registry, RegistryError};
+use super::types::{PathLookup, ProjectRecord, RegisterResult, Registry, RegistryError};
 use crate::core::text::python_strip;
 
 #[must_use]
@@ -11,6 +11,16 @@ pub fn same_path(left: &Path, right: &Path) -> bool {
         left.to_string_lossy().to_lowercase() == right.to_string_lossy().to_lowercase()
     } else {
         left == right
+    }
+}
+
+impl<F: Fn(&str) -> Option<PathBuf>> PathLookup for F {
+    fn locate(&self, text: &str) -> Option<PathBuf> {
+        self(text)
+    }
+
+    fn same_folder(&self, stored: &Path, wanted: &Path) -> bool {
+        same_path(stored, wanted)
     }
 }
 
@@ -30,11 +40,7 @@ impl ProjectRecord {
 }
 
 impl Registry {
-    pub fn find(
-        &self,
-        identifier: &str,
-        resolve: impl Fn(&str) -> Option<PathBuf>,
-    ) -> Option<usize> {
+    pub fn find(&self, identifier: &str, lookup: &impl PathLookup) -> Option<usize> {
         if identifier.is_empty() {
             return None;
         }
@@ -44,9 +50,9 @@ impl Registry {
         self.projects.iter().position(|record| {
             record.names_match(&lowered)
                 || resolved
-                    .get_or_insert_with(|| resolve(stripped))
+                    .get_or_insert_with(|| lookup.locate(stripped))
                     .as_deref()
-                    .is_some_and(|path| same_path(path, &record.path))
+                    .is_some_and(|path| lookup.same_folder(&record.path, path))
         })
     }
 
@@ -62,12 +68,8 @@ impl Registry {
             .join(", ")
     }
 
-    fn require(
-        &self,
-        identifier: &str,
-        resolve: impl Fn(&str) -> Option<PathBuf>,
-    ) -> Result<usize, RegistryError> {
-        self.find(identifier, resolve)
+    fn require(&self, identifier: &str, lookup: &impl PathLookup) -> Result<usize, RegistryError> {
+        self.find(identifier, lookup)
             .ok_or_else(|| RegistryError::NotFound(identifier.to_owned()))
     }
 
@@ -120,13 +122,13 @@ impl Registry {
         resolved: PathBuf,
         alias: Option<&str>,
         now: &str,
-        matches: impl Fn(&Path) -> bool,
+        lookup: &impl PathLookup,
     ) -> Result<(RegisterResult, &ProjectRecord), RegistryError> {
         let shown = resolved.to_string_lossy().into_owned();
         if let Some(index) = self
             .projects
             .iter()
-            .position(|record| matches(&record.path))
+            .position(|record| lookup.same_folder(&record.path, &resolved))
         {
             let current = self
                 .projects
@@ -173,9 +175,9 @@ impl Registry {
         identifier: &str,
         alias: &str,
         now: &str,
-        resolve: impl Fn(&str) -> Option<PathBuf>,
+        lookup: &impl PathLookup,
     ) -> Result<&ProjectRecord, RegistryError> {
-        let index = self.require(identifier, resolve)?;
+        let index = self.require(identifier, lookup)?;
         self.realias(index, identifier, alias, now)
     }
 
@@ -184,9 +186,9 @@ impl Registry {
         identifier: &str,
         tag: &str,
         now: &str,
-        resolve: impl Fn(&str) -> Option<PathBuf>,
+        lookup: &impl PathLookup,
     ) -> Result<(&ProjectRecord, bool), RegistryError> {
-        let index = self.require(identifier, resolve)?;
+        let index = self.require(identifier, lookup)?;
         let slug = slugify(tag);
         let missing = || RegistryError::NotFound(identifier.to_owned());
         if self
@@ -209,9 +211,9 @@ impl Registry {
         identifier: &str,
         tag: &str,
         now: &str,
-        resolve: impl Fn(&str) -> Option<PathBuf>,
+        lookup: &impl PathLookup,
     ) -> Result<&ProjectRecord, RegistryError> {
-        let index = self.require(identifier, resolve)?;
+        let index = self.require(identifier, lookup)?;
         let slug = slugify(tag);
         let record = self.touched(index, identifier, now)?;
         record.tags.retain(|existing| *existing != slug);
@@ -221,14 +223,14 @@ impl Registry {
     pub fn set_active(
         &mut self,
         identifier: Option<&str>,
-        resolve: impl Fn(&str) -> Option<PathBuf>,
+        lookup: &impl PathLookup,
     ) -> Result<Option<&ProjectRecord>, RegistryError> {
         let Some(identifier) = identifier else {
             self.active_project = None;
             return Ok(None);
         };
         let index =
-            self.find(identifier, resolve)
+            self.find(identifier, lookup)
                 .ok_or_else(|| RegistryError::NotFoundListing {
                     identifier: identifier.to_owned(),
                     known: self.known_names(),
@@ -244,9 +246,9 @@ impl Registry {
     pub fn unregister(
         &mut self,
         identifier: &str,
-        resolve: impl Fn(&str) -> Option<PathBuf>,
+        lookup: &impl PathLookup,
     ) -> Result<ProjectRecord, RegistryError> {
-        let index = self.require(identifier, resolve)?;
+        let index = self.require(identifier, lookup)?;
         let id = self
             .projects
             .get(index)

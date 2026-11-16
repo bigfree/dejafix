@@ -3,9 +3,9 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use super::hooks::{configured_snippets, install};
-use super::registry::{load_registry, now_text, same_folder};
-use super::types::InitHooks;
+use super::registry::{load_registry, now_text};
 use super::types::{BridgeOutcome, InitOptions, InitReport, Settings, WiringError};
+use super::types::{FsProbe, InitHooks};
 use crate::adapters::fs::{
     MemoryDir, RegistryFiles, StoreError, detect_stack, manifest_info, project_name,
     read_optional_text, read_text_within, resolve_path, write_text,
@@ -63,7 +63,7 @@ fn register_quietly(root: &Path, settings: &Settings, home: Option<&Path>) -> Op
     let mut registry = files.load(&now).ok()?;
     if let Some(resolved) = resolve_path(&root.to_string_lossy(), home, root)
         && let Ok((RegisterResult::Added | RegisterResult::Realiased, _)) =
-            registry.register(resolved.clone(), None, &now, same_folder(&resolved))
+            registry.register(resolved, None, &now, &FsProbe { cwd: root, home })
         && files.save(&registry).is_err()
     {
         return files.load(&now).ok();
@@ -117,9 +117,7 @@ fn bridge_name(root: &Path, registry: Option<&Registry>, home: Option<&Path>) ->
         return folder;
     };
     registry
-        .find(&root.to_string_lossy(), |path| {
-            resolve_path(path, home, root)
-        })
+        .find(&root.to_string_lossy(), &FsProbe { cwd: root, home })
         .and_then(|index| registry.projects.get(index))
         .map_or_else(|| slugify(&folder), |record| record.name().to_owned())
 }

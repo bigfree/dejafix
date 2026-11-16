@@ -614,9 +614,12 @@ fn register_spelled(settings: &Settings, stored: &Path) {
     let files = RegistryFiles::new(&settings.dejafix_home);
     let mut registry = files.load("2026-01-01T00:00:00Z").unwrap();
     registry
-        .register(stored.to_path_buf(), None, "2026-01-01T00:00:00Z", |_| {
-            false
-        })
+        .register(
+            stored.to_path_buf(),
+            None,
+            "2026-01-01T00:00:00Z",
+            &|_: &str| -> Option<std::path::PathBuf> { None },
+        )
         .unwrap();
     files.save(&registry).unwrap();
 }
@@ -643,6 +646,31 @@ fn registering_a_folder_stored_through_a_symlink_finds_its_record() {
     let record = register_project(&settings, &alpha.root, None, ".", None).unwrap();
     assert_eq!(record.path, link);
     assert_eq!(registered_paths(&settings), [link]);
+}
+
+#[cfg(unix)]
+#[test]
+fn a_record_stored_through_a_symlink_names_the_bridge_and_is_found_by_path() {
+    let alpha = initialised("alpha");
+    let settings = settings(&alpha.home);
+    fs::create_dir_all(alpha.root.join(".dejafix")).unwrap();
+    let link = alpha.root.with_file_name("alpha-link");
+    std::os::unix::fs::symlink(&alpha.root, &link).unwrap();
+    register_spelled(&settings, &link);
+    init_project(&alpha.root, None, &settings, &options()).unwrap();
+    assert!(read(alpha.root.join("CLAUDE.md")).contains("**alpha-link**"));
+    assert_eq!(registered_paths(&settings), [link]);
+    let reply = registry_op(
+        &settings,
+        &alpha.root,
+        None,
+        RegistryOp::Use(Some(alpha.root.to_string_lossy().into_owned())),
+    )
+    .unwrap();
+    assert!(
+        matches!(reply, RegistryReply::Activated(Some(ref record)) if record.id == "alpha-link"),
+        "{reply:?}"
+    );
 }
 
 #[test]

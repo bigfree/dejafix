@@ -1,4 +1,9 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+
+pub trait PathLookup {
+    fn locate(&self, text: &str) -> Option<PathBuf>;
+    fn same_folder(&self, stored: &Path, wanted: &Path) -> bool;
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProjectRecord {
