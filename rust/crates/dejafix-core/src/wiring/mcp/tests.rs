@@ -1023,3 +1023,79 @@ fn start_session_and_writes_append_the_unreadable_notice() {
         text(&state, note("the cache needs a warm-up"), None).ends_with(&format!("\n{notice}"))
     );
 }
+
+fn linked_world(world: &World) -> PathBuf {
+    let portal = world.project("portal");
+    fs::write(
+        portal.join(".dejafix/config.toml"),
+        "boundary = [\"src/api/**\"]\n\n[[links]]\nproject = \"inventory\"\nrelation = \"reads device ports\"\n",
+    )
+    .unwrap();
+    let inventory = world.project("inventory");
+    fs::create_dir_all(inventory.join(".git")).unwrap();
+    fs::write(
+        inventory.join(".git/config"),
+        "[remote \"origin\"]\n\turl = https://github.com/org/inventory\n",
+    )
+    .unwrap();
+    fs::write(
+        inventory.join(".dejafix/config.toml"),
+        "boundary = [\"src/Api/**\"]\n",
+    )
+    .unwrap();
+    fs::write(
+        inventory.join(".dejafix/events.jsonl"),
+        "{\"type\": \"issue\", \"issue_id\": \"0001\", \"summary\": \"port allocation races with the nightly sync\", \"location\": \"src/Api/Ports.php\"}\n",
+    )
+    .unwrap();
+    world.register(&portal);
+    world.register(&inventory);
+    portal
+}
+
+#[test]
+fn start_session_lists_linked_projects() {
+    let world = World::new();
+    let portal = linked_world(&world);
+    let state = world.state(Some(&portal), &world.base);
+    let section = "Linked projects (read their memory with project=\"<name>\"):\n  - inventory (github.com/org/inventory), links here: \"reads device ports\". 1 open issue(s) on its boundary.";
+    assert!(text(&state, ToolCall::StartSession, None).contains(section));
+    fs::write(portal.join(".dejafix/events.jsonl"), "{broken\n").unwrap();
+    let reply = text(&state, ToolCall::StartSession, None);
+    assert!(
+        reply.contains(&format!(
+            "{section}\ndejafix: 1 line(s) of events.jsonl could not be read; run djf doctor"
+        )),
+        "{reply}"
+    );
+}
+
+#[test]
+fn precheck_file_adds_the_linked_block_on_the_boundary() {
+    let world = World::new();
+    let portal = linked_world(&world);
+    let state = world.state(Some(&portal), &world.base);
+    let reply = text(
+        &state,
+        ToolCall::PrecheckFile("src/api/backend/ports.ts".into()),
+        None,
+    );
+    assert!(
+        reply.contains("dejafix lessons from linked projects for src/api/backend/ports.ts:"),
+        "{reply}"
+    );
+    let absolute = portal.join("src/api/ports.ts").display().to_string();
+    let both = text(
+        &state,
+        ToolCall::PrecheckFiles(vec![absolute, "src/ui/x.ts".into()]),
+        None,
+    );
+    assert!(
+        both.contains("linked projects for src/api/ports.ts:"),
+        "{both}"
+    );
+    assert!(
+        !text(&state, ToolCall::PrecheckFile("src/ui/x.ts".into()), None)
+            .contains("linked projects")
+    );
+}
