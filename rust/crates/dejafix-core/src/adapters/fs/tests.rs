@@ -940,6 +940,23 @@ fn an_import_merges_aliases_and_keeps_existing_mappings_on_conflict() {
 }
 
 #[test]
+fn an_import_into_a_fresh_home_without_gotchas_writes_preferences() {
+    let home = tempfile::tempdir().unwrap();
+    let store = super::GlobalStore::new(home.path());
+    for data in [
+        serde_json::json!({"patterns": [{"id": "pat_1"}], "preferences": "use uv\n"}),
+        serde_json::json!({"preferences": "keep\n"}),
+    ] {
+        store.import(data.as_object().unwrap()).unwrap();
+    }
+    assert_eq!(
+        fs::read_to_string(store.path("stack_preferences.md")).unwrap(),
+        "use uv\n"
+    );
+    assert!(!store.path("patterns.jsonl").exists());
+}
+
+#[test]
 fn an_import_without_libraries_leaves_libraries_json_alone() {
     let home = tempfile::tempdir().unwrap();
     let store = super::GlobalStore::new(home.path());

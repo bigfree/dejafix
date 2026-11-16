@@ -391,6 +391,7 @@ impl GlobalStore {
     }
 
     pub fn import(&self, data: &Map<String, Value>) -> Result<(usize, usize), StoreError> {
+        self.ensure()?;
         let gotchas = match data.get("gotchas") {
             Some(Value::Array(items)) => self.import_gotchas(items)?,
             _ => 0,
