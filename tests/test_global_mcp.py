@@ -838,3 +838,11 @@ def test_doctor_ignores_configs_that_never_mention_dejafix(tmp_path, monkeypatch
 
     doctor._reverted_configs([])
     assert str(cfg) not in doctor._load_state()
+
+
+def test_the_suite_talks_to_a_global_mode_server():
+    """A checkout with its own .dejafix/ must not pin the server under test."""
+    import dejafix.mcp_server as server
+
+    assert server._PROJECT_ROOT is None
+    assert server.GLOBAL_MODE
