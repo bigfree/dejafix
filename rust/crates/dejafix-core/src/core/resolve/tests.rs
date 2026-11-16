@@ -52,11 +52,10 @@ impl Probe for Fake {
 fn registry(names: &[&str], active: Option<&str>) -> Registry {
     let mut registry = Registry::default();
     for name in names {
-        let _ = registry.register(
-            PathBuf::from(format!("/work/{name}")),
-            None,
-            "2026-01-01T00:00:00Z",
-        );
+        let path = PathBuf::from(format!("/work/{name}"));
+        let _ = registry.register(path.clone(), None, "2026-01-01T00:00:00Z", |stored| {
+            stored == path.as_path()
+        });
     }
     registry.active_project = active.map(str::to_owned);
     registry

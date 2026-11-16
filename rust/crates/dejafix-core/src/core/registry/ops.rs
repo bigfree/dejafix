@@ -120,12 +120,13 @@ impl Registry {
         resolved: PathBuf,
         alias: Option<&str>,
         now: &str,
+        matches: impl Fn(&Path) -> bool,
     ) -> Result<(RegisterResult, &ProjectRecord), RegistryError> {
         let shown = resolved.to_string_lossy().into_owned();
         if let Some(index) = self
             .projects
             .iter()
-            .position(|record| same_path(&record.path, &resolved))
+            .position(|record| matches(&record.path))
         {
             let current = self
                 .projects

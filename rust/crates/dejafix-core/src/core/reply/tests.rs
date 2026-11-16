@@ -65,11 +65,10 @@ fn precheck_names_a_memory_file_instead_of_clearing_it() {
 fn registry(active: Option<&str>) -> Registry {
     let mut registry = Registry::default();
     for name in ["alpha", "beta", "gamma"] {
-        let _ = registry.register(
-            PathBuf::from(format!("/work/{name}")),
-            None,
-            "2026-01-01T00:00:00Z",
-        );
+        let path = PathBuf::from(format!("/work/{name}"));
+        let _ = registry.register(path.clone(), None, "2026-01-01T00:00:00Z", |stored| {
+            stored == path.as_path()
+        });
     }
     if let Some(record) = registry.projects.get_mut(2) {
         record.alias = Some("g".to_owned());

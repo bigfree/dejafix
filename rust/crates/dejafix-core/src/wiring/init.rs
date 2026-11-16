@@ -3,7 +3,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use super::hooks::{configured_snippets, install};
-use super::registry::{load_registry, now_text};
+use super::registry::{load_registry, now_text, same_folder};
 use super::types::InitHooks;
 use super::types::{BridgeOutcome, InitOptions, InitReport, Settings, WiringError};
 use crate::adapters::fs::{
@@ -63,7 +63,7 @@ fn register_quietly(root: &Path, settings: &Settings, home: Option<&Path>) -> Op
     let mut registry = files.load(&now).ok()?;
     if let Some(resolved) = resolve_path(&root.to_string_lossy(), home, root)
         && let Ok((RegisterResult::Added | RegisterResult::Realiased, _)) =
-            registry.register(resolved, None, &now)
+            registry.register(resolved.clone(), None, &now, same_folder(&resolved))
         && files.save(&registry).is_err()
     {
         return files.load(&now).ok();

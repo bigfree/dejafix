@@ -6,8 +6,8 @@ use super::init::MEMORY_DIR;
 use super::types::{
     ListedProject, RegistryOp, RegistryReply, Settings, UpgradeNotice, WiringError,
 };
-use crate::adapters::fs::{RegistryFiles, StoreError, resolve_path};
-use crate::core::registry::{ProjectRecord, RegisterResult, Registry, RegistryError};
+use crate::adapters::fs::{RegistryFiles, StoreError, identity, resolve_path};
+use crate::core::registry::{ProjectRecord, RegisterResult, Registry, RegistryError, same_path};
 use crate::core::time::Timestamp;
 
 pub(super) fn now_text(settings: &Settings) -> String {
@@ -20,6 +20,16 @@ pub(super) fn load_registry(settings: &Settings) -> Result<Registry, StoreError>
 
 pub(super) fn has_memory(path: &Path) -> bool {
     path.join(MEMORY_DIR).is_dir()
+}
+
+pub(super) fn same_folder(root: &Path) -> impl Fn(&Path) -> bool + '_ {
+    let wanted = identity(root);
+    move |stored| {
+        same_path(stored, root)
+            || wanted
+                .as_ref()
+                .is_some_and(|wanted| identity(stored).as_ref() == Some(wanted))
+    }
 }
 
 pub fn register_project(
@@ -37,7 +47,7 @@ pub fn register_project(
         return Err(RegistryError::NoMemory { root }.into());
     }
     let mut registry = files.load(&now)?;
-    let (result, record) = registry.register(root, alias, &now)?;
+    let (result, record) = registry.register(root.clone(), alias, &now, same_folder(&root))?;
     let record = record.clone();
     if result != RegisterResult::Existing {
         files.save(&registry)?;

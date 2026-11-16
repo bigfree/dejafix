@@ -3,8 +3,8 @@ use std::path::{Path, PathBuf};
 use serde_json::{Map, Value, json};
 
 use super::{
-    Loaded, ProjectRecord, RegisterResult, Registry, RegistryError, is_slug, list_payload, load,
-    meta_payload, normalize_path, slugify, unique_id,
+    Loaded, RegisterResult, Registry, RegistryError, is_slug, list_payload, load, meta_payload,
+    normalize_path, same_path, slugify, unique_id,
 };
 
 const NOW: &str = "2027-01-15T08:00:00Z";
@@ -179,37 +179,65 @@ fn registry_of(paths: &[&str]) -> Registry {
     loaded(&payload, None).into_registry()
 }
 
+fn register_text(
+    registry: &mut Registry,
+    path: &str,
+    alias: Option<&str>,
+    now: &str,
+) -> Result<(RegisterResult, String), RegistryError> {
+    let path = PathBuf::from(p(path));
+    registry
+        .register(path.clone(), alias, now, |stored| same_path(stored, &path))
+        .map(|(result, record)| (result, record.id.clone()))
+}
+
+#[test]
+fn registering_uses_the_caller_s_matching_rule() {
+    let mut registry = registry_of(&["/code/alpha"]);
+    let other = PathBuf::from(p("/elsewhere/link"));
+    let (result, record) = registry
+        .register(other.clone(), None, LATER, |_| true)
+        .unwrap();
+    assert_eq!(
+        (result, record.id.as_str()),
+        (RegisterResult::Existing, "alpha")
+    );
+    assert_eq!(registry.projects[0].path, PathBuf::from(p("/code/alpha")));
+    let (result, _) = registry
+        .register(other, Some("a"), LATER, |_| true)
+        .unwrap();
+    assert_eq!(result, RegisterResult::Realiased);
+    assert_eq!(ids(&registry), ["alpha"]);
+}
+
 #[test]
 fn registering_is_idempotent_by_path() {
     let mut registry = registry_of(&["/code/alpha"]);
-    let result = |outcome: Result<(RegisterResult, &ProjectRecord), RegistryError>| {
-        outcome.map(|(result, record)| (result, record.id.clone()))
-    };
     assert_eq!(
-        result(registry.register(PathBuf::from(p("/code/alpha")), None, LATER)),
+        register_text(&mut registry, "/code/alpha", None, LATER),
         Ok((RegisterResult::Existing, "alpha".to_owned()))
     );
     assert_eq!(
-        result(registry.register(PathBuf::from(p("/other/alpha")), None, LATER)),
+        register_text(&mut registry, "/other/alpha", None, LATER),
         Ok((RegisterResult::Added, "alpha-2".to_owned()))
     );
     assert_eq!(ids(&registry), ["alpha", "alpha-2"]);
     assert_eq!(registry.projects[1].created_at, LATER);
     assert_eq!(
-        result(registry.register(PathBuf::from(p("/code/alpha")), Some("a"), LATER)),
+        register_text(&mut registry, "/code/alpha", Some("a"), LATER),
         Ok((RegisterResult::Realiased, "alpha".to_owned()))
     );
     assert_eq!(registry.projects[0].updated_at, LATER);
     assert_eq!(
-        result(registry.register(PathBuf::from(p("/code/alpha")), Some("a"), NOW)),
+        register_text(&mut registry, "/code/alpha", Some("a"), NOW),
         Ok((RegisterResult::Existing, "alpha".to_owned()))
     );
     assert_eq!(
-        result(registry.register(PathBuf::from(p("/x/new")), Some(""), NOW)),
+        register_text(&mut registry, "/x/new", Some(""), NOW),
         Err(RegistryError::BadAlias(String::new()))
     );
     assert_eq!(
-        result(registry.register(PathBuf::from(p("/x/new")), Some("alpha-2"), NOW)),
+        register_text(&mut registry, "/x/new", Some("alpha-2"), NOW),
         Err(RegistryError::AliasTaken {
             alias: "alpha-2".to_owned(),
             path: PathBuf::from(p("/other/alpha"))
