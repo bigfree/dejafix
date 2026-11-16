@@ -28,6 +28,10 @@
 # * the Linux gnu builds run in manylinux_2_28 containers (dist-workspace.toml),
 #   dist is installed for the container's musl host there, and
 #   `build-local-artifacts` fails if a binary needs glibc newer than 2.28;
+# * both macOS targets build on `macos-15-intel` (dist-workspace.toml and the
+#   `build-wheels` matrix); the arm64 one is cross-compiled there, and the
+#   release's macOS tests run there too (test.yml), because GitHub's arm64 macOS
+#   runners were unavailable to releases for whole days;
 # * `build-wheels` builds the maturin wheels (manylinux and musllinux_1_2),
 #   `host` waits for them;
 # * `publish-pypi` uploads them through PyPI trusted publishing. It must stay a
@@ -127,7 +131,7 @@ jobs:
       matrix:
         include:
           - target: aarch64-apple-darwin
-            runner: macos-26
+            runner: macos-15-intel
             manylinux: auto
           - target: x86_64-apple-darwin
             runner: macos-15-intel
