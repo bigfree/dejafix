@@ -610,7 +610,6 @@ fn the_upgrade_notice_fires_once_and_never_on_a_first_run() {
     assert!(upgrade_notice(&settings, "1.0.1").is_some());
 }
 
-#[cfg(unix)]
 fn register_spelled(settings: &Settings, stored: &Path) {
     let files = RegistryFiles::new(&settings.dejafix_home);
     let mut registry = files.load("2026-01-01T00:00:00Z").unwrap();
@@ -661,6 +660,7 @@ fn registering_a_folder_stored_in_other_letter_case_finds_its_record() {
     assert_eq!(registered_paths(&settings), [upper]);
 }
 
+#[cfg(unix)]
 #[test]
 fn an_unsaved_registration_does_not_name_the_bridge() {
     use std::os::unix::fs::PermissionsExt;
