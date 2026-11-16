@@ -31,7 +31,9 @@
 # * both macOS targets build on `macos-15-intel` (dist-workspace.toml and the
 #   `build-wheels` matrix); the arm64 one is cross-compiled there, and the
 #   release's macOS tests run there too (test.yml), because GitHub's arm64 macOS
-#   runners were unavailable to releases for whole days;
+#   runners were unavailable to releases for whole days. dist adds the arm64
+#   target to the default toolchain only, so `build-local-artifacts` adds it to
+#   the toolchain pinned in rust/rust-toolchain.toml before building;
 # * `build-wheels` builds the maturin wheels (manylinux and musllinux_1_2),
 #   `host` waits for them;
 # * `publish-pypi` uploads them through PyPI trusted publishing. It must stay a
@@ -227,6 +229,10 @@ jobs:
       - name: Install dependencies
         run: |
           ${{ matrix.packages_install }}
+      - name: Add the macOS arm64 target to the pinned toolchain
+        if: ${{ contains(join(matrix.targets, ' '), 'aarch64-apple-darwin') }}
+        working-directory: rust
+        run: rustup target add aarch64-apple-darwin
       - name: Build artifacts
         env:
           TAG_FLAG: ${{ needs.plan.outputs.tag-flag }}
