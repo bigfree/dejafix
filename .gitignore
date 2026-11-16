@@ -1,16 +1,10 @@
 # ── dejafix ────────────────────────────────────────────────────
 # dejafix tracks its own development, but this repository is public, so the
 # whole project memory stays local, and so does AGENTS.md, which holds only
-# the dejafix bridge block. The entries below are the defaults `djf init`
-# adds; keeping them stops it from appending them again.
+# the dejafix bridge block. `.djf-*` are the temporary files of atomic writes.
 .dejafix/
 /AGENTS.md
 .djf-*
-.dejafix/events.jsonl
-.dejafix/watch.pid
-.dejafix/watch.log
-.dejafix/structure.json
-.dejafix/AI_INSTRUCTIONS.md.bak
 
 # Rust build output
 /rust/target/
