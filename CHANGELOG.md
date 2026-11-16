@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 1.0.0-rc.4
+
+**Fourth release candidate of the Rust rewrite.** Projects that depend on each other can now share lessons where they meet: an agent editing one side of a declared boundary sees the relevant open issues, failed attempts and decisions of the other side. Cross-project patterns, which no agent ever saw, are removed. The README now opens with what dejafix does for you and what it costs.
 
 ### Added
 
@@ -31,6 +33,11 @@
 - **`djf migrate` also updates `.git/info/exclude`**, rewriting `.projectmem` entries to `.dejafix`, so a checkout that was private before the rename stays private.
 - **`djf doctor` on Windows looks only at fixed drives.** Without `--path` it skips network, removable and optical drives, so an offline network drive no longer stalls it. This is what Python 0.4.x did.
 - **Cross-project patterns are gone.** No agent ever saw them: `brief`, `global_query` and the MCP tools read only library gotchas, and `AI_INSTRUCTIONS.md` no longer copies global memory. `djf global add` is now another name for `djf global add-gotcha`. `status`, `list`, `export`, `prune`, `remove` and `detect` work with gotchas only. Library gotchas carry no confidence, so `djf global prune --confidence` now matches nothing. `djf global import` skips the patterns in an older export and says how many it skipped. An existing `~/.dejafix/global/patterns.jsonl` is neither read nor deleted; `djf doctor` points it out so you can remove it. This departs from Python 0.4.x, which still keeps patterns.
+
+### Upgrading
+
+- Nothing needs to change in existing projects. To use linked projects, add `boundary` and `[[links]]` to `.dejafix/config.toml` as described in the README, and make sure the linked project is registered on your machine (`djf project register`).
+- If `djf doctor` reports `~/.dejafix/global/patterns.jsonl`, you can remove the file; dejafix no longer reads it.
 
 ## 1.0.0-rc.3
 

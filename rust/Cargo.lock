@@ -452,7 +452,7 @@ dependencies = [
 
 [[package]]
 name = "dejafix"
-version = "1.0.0-rc.3"
+version = "1.0.0-rc.4"
 dependencies = [
  "assert_cmd",
  "clap",
@@ -471,7 +471,7 @@ dependencies = [
 
 [[package]]
 name = "dejafix-core"
-version = "1.0.0-rc.3"
+version = "1.0.0-rc.4"
 dependencies = [
  "criterion",
  "dejafix-win",
@@ -492,7 +492,7 @@ dependencies = [
 
 [[package]]
 name = "dejafix-win"
-version = "1.0.0-rc.3"
+version = "1.0.0-rc.4"
 dependencies = [
  "windows-sys 0.61.2",
 ]
