@@ -1,15 +1,79 @@
 <!-- mcp-name: io.github.bigfree/dejafix -->
 # dejafix
 
-**Local-first memory and judgment for AI coding agents.** dejafix records
-issues, fix attempts, decisions and notes as typed events in plain text. It
-serves them to agents through one MCP server for all your projects, and warns
-before an approach that already failed is tried again, at edit time and at
-commit time. Lessons that hold beyond one project go into a global memory that
-agents query before they use a library.
+**Your coding agent forgets what already failed. dejafix does not.**
 
-dejafix ships as native executables with no runtime dependencies. Everything
-stays on your machine.
+dejafix is local-first memory and judgment for AI coding agents. It records
+issues, fix attempts, decisions and notes as typed events in plain text, and
+puts the relevant ones in front of the agent at the moment they matter: when a
+session starts, right before a file is edited, and before a commit. One MCP
+server covers all your projects, and lessons about a library travel with you
+from one project to the next.
+
+It ships as native executables with no runtime dependencies, works with Claude
+Code, Codex, Cursor, Claude Desktop and any other MCP client, and keeps
+everything on your machine.
+
+## Why
+
+Agents start every session from zero. The dead end you spent an afternoon on
+last month looks like a fresh idea to them today. Telling them to check first
+does not work well either: on one real project, agents looked up a file's
+history before only **11 % of 8,355 edits**, even though their instructions
+asked for it every time
+([measurements](https://github.com/riponcm/projectmem/issues/37)).
+
+dejafix does not rely on the agent remembering to ask. The edit hook shows a
+file's lessons right before the agent changes it, and stays silent when there
+is nothing to say:
+
+```
+dejafix lessons for src/auth/refresh.ts:
+  Open issues on this file:
+    - #0042 token refresh races under parallel requests
+  Earlier attempts (1 failed, 1 partial), newest first:
+    ~ retry halves the failures (#0042, 2026-10-30)
+    x wrapped refresh in a lock (#0042, 2026-09-28)
+  Decisions on this file:
+    - refresh tokens rotate per user, never shared (2026-09-12)
+```
+
+## Highlights
+
+- **Lessons at edit time.** Failed and partial attempts, open issues and
+  decisions for the file being edited, once per session, in Claude Code and
+  Codex. A failed attempt is linked to its issue's file even when the agent
+  did not name the file.
+- **One call to start a session.** `start_session` returns the rules, the
+  memory summary and the current plan together.
+- **Linked projects.** A backend and the portal that calls its API, or two
+  systems sharing a database, can declare the link. An agent editing one side
+  of the boundary sees the relevant lessons from the other side.
+- **Global library gotchas.** Lessons about a library, checked before they are
+  stored and queried by relevance before the agent uses that library again.
+- **Ranked search.** `search_events`, `djf search` and `global_query` rank by
+  relevance (BM25F), so a question finds the lesson even when it is worded
+  differently.
+- **Built for teams and for privacy.** The distilled memory is plain Markdown
+  you can commit, so teammates' agents inherit it. The raw log stays local,
+  secrets are redacted, and there is no cloud service or telemetry.
+
+## By the numbers
+
+| | |
+|---|---|
+| Edit hook, whole process, 3,000-event log | 5.7 ms |
+| Edit on a boundary, two linked logs of 3,000 events | 11.3 ms |
+| `djf search`, whole process, 3,000 events | 12.3 ms |
+| `precheck_file` on a warm MCP server | 0.2 ms |
+| Earlier failures shown before an edit, on 51 real cases | 72.5 %, up from 33.3 % |
+| Context added in one week of real use (879 edits) | about 2,600 tokens |
+
+Timings are medians from the repository's benchmarks (`just bench`) on a
+laptop; the edit hook of the earlier Python version took 47 ms. The recall and
+context figures come from public measurements on real projects
+([recall](https://github.com/riponcm/projectmem/issues/32),
+[context](https://github.com/riponcm/projectmem/issues/37)).
 
 ## Install
 
@@ -44,7 +108,8 @@ djf init
 3. Writes a short bridge block into `CLAUDE.md` and `AGENTS.md`.
 4. Prints the MCP configuration with the path of `djf-mcp` filled in.
 
-Run it again after an upgrade to refresh the instructions.
+Then configure the MCP server and the edit hook once (below), and start a
+session. Run `djf init` again after an upgrade to refresh the instructions.
 
 ## MCP server
 
@@ -84,31 +149,36 @@ unregistered projects, stale entries and configs pinned to one repository.
 | Global memory | `global_query`, `get_global_gotchas`, `add_global_gotcha` |
 | Writing | `log_issue`, `record_attempt`, `record_fix`, `add_decision` (with `supersedes` to retire an older decision), `add_note` |
 
-`search_events` and `djf search` rank results by relevance (BM25F with an
-English analyzer). Memory is kept in English. Agents read it in English and
-answer you in your language.
+Memory is kept in English. Agents read it in English and answer you in your
+language.
 
-## Global memory
+## Edit hook (Claude Code and Codex)
 
-Global memory holds library gotchas that apply in any project, for example how
-a library behaves in a given version. It lives in `~/.dejafix/global/`.
+`djf-edit-hook` shows a file's lessons right before the agent edits that file:
+failed and partial attempts, open issues, and decisions that name it. Each
+lesson is shown once per session and again after the context is compacted. A
+file without lessons costs nothing: the hook prints nothing.
 
-- **Written on purpose.** An agent calls `add_global_gotcha` with a library, a
-  few keywords and the lesson. `djf global add-gotcha` does the same from the
-  command line.
-- **Checked before it is stored.** dejafix refuses a lesson that:
-  - is not in English;
-  - has no package name as its library;
-  - duplicates an existing lesson;
-  - carries project details such as paths, ticket ids or internal hosts.
+Claude Code (`~/.claude/settings.json`):
 
-  Secrets are redacted.
-- **Read by query.** `global_query` returns the best matching lessons within a
-  token budget. The command-line equivalent is `djf global query`.
-- **Maintained by hand.** `djf global list`, `edit`, `remove`, `prune`,
-  `export` and `import` manage the store. `djf global upgrade` converts lessons
-  written by older versions: it exports a draft, which an agent fills and you
-  review before applying it.
+```json
+"hooks": {
+  "PreToolUse": [
+    { "matcher": "Edit|Write|MultiEdit",
+      "hooks": [{ "type": "command", "command": "/absolute/path/to/djf-edit-hook", "timeout": 10 }] }
+  ],
+  "SessionStart": [
+    { "matcher": "compact",
+      "hooks": [{ "type": "command", "command": "/absolute/path/to/djf-edit-hook", "timeout": 10 }] }
+  ]
+}
+```
+
+Codex (`~/.codex/hooks.json`): use the same command on `PreToolUse` with the
+matcher `apply_patch`, and on `PostCompact`.
+
+Clients without hooks get the same lessons from `precheck_file`. To log every
+hook call, set `DJF_EDIT_HOOK_LOG=/path/to/calls.jsonl`.
 
 ## Linked projects
 
@@ -145,36 +215,42 @@ What the agent sees:
 - **Before editing a file on its own boundary**, the edit hook and
   `precheck_file` show the linked projects' open issues, failed or partial
   attempts and decisions on their boundary that match the edited file, at most
-  three per project. An unrelated edit shows nothing.
+  three per project:
+
+  ```
+  dejafix lessons from linked projects for src/api/backend/ports.ts:
+    inventory ("shares the database; creates device ports this project reads"):
+      - open #0042 port allocation races with the nightly sync [src/Api/Ports.php]
+      x wrapped allocation in a lock (#0042, 2026-10-30)
+      - decision: released ports are never reused (2026-09-12)
+  ```
+
+  An unrelated edit shows nothing.
 
 `djf links` shows how this project's links resolve, and `djf doctor` names
 links to projects this machine does not have.
 
-## Edit hook (Claude Code and Codex)
+## Global memory
 
-`djf-edit-hook` shows a file's lessons right before the agent edits that file:
-failed and partial attempts, open issues, and decisions that name it. Each
-lesson is shown once per session and again after the context is compacted.
+Global memory holds library gotchas that apply in any project, for example how
+a library behaves in a given version. It lives in `~/.dejafix/global/`.
 
-Claude Code (`~/.claude/settings.json`):
+- **Written on purpose.** An agent calls `add_global_gotcha` with a library, a
+  few keywords and the lesson. `djf global add-gotcha` does the same from the
+  command line.
+- **Checked before it is stored.** dejafix refuses a lesson that:
+  - is not in English;
+  - has no package name as its library;
+  - duplicates an existing lesson;
+  - carries project details such as paths, ticket ids or internal hosts.
 
-```json
-"hooks": {
-  "PreToolUse": [
-    { "matcher": "Edit|Write|MultiEdit",
-      "hooks": [{ "type": "command", "command": "/absolute/path/to/djf-edit-hook", "timeout": 10 }] }
-  ],
-  "SessionStart": [
-    { "matcher": "compact",
-      "hooks": [{ "type": "command", "command": "/absolute/path/to/djf-edit-hook", "timeout": 10 }] }
-  ]
-}
-```
-
-Codex (`~/.codex/hooks.json`): use the same command on `PreToolUse` with the
-matcher `apply_patch`, and on `PostCompact`.
-
-To log every hook call, set `DJF_EDIT_HOOK_LOG=/path/to/calls.jsonl`.
+  Secrets are redacted.
+- **Read by query.** `global_query` returns the best matching lessons within a
+  token budget. The command-line equivalent is `djf global query`.
+- **Maintained by hand.** `djf global list`, `edit`, `remove`, `prune`,
+  `export` and `import` manage the store. `djf global upgrade` converts lessons
+  written by older versions: it exports a draft, which an agent fills and you
+  review before applying it.
 
 ## CLI
 
