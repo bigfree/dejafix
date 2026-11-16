@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use crate::adapters::git::UnmanagedReason;
 use crate::core::event::EventKind;
 use crate::core::hooks::HookKind;
 use crate::core::precheck::{SnoozeError, Warning};
@@ -18,18 +19,24 @@ pub struct HooksReport {
     pub refreshed: Vec<HookKind>,
     pub skipped: Vec<HookKind>,
     pub unreadable: Vec<HookKind>,
+    pub outside: Vec<HookKind>,
     pub folder: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum HooksOutcome {
     NoHooksDir,
-    Configured {
+    Unmanaged {
         path: PathBuf,
+        reason: UnmanagedReason,
         snippets: Vec<(HookKind, String)>,
     },
     Installed(HooksReport),
-    Removed(Vec<HookKind>),
+    Removed {
+        removed: Vec<HookKind>,
+        outside: Vec<HookKind>,
+        folder: Option<PathBuf>,
+    },
     Unknown(String),
 }
 

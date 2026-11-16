@@ -1,10 +1,10 @@
 use std::io::{self, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use dejafix_core::{
     CaptureOutcome, EventKind, HookKind, HooksAction, HooksOutcome, HooksReport, OsIds,
-    PrecheckOutcome, PrecheckRequest, Settings, auto_capture, hooks_action, precheck,
-    render_warnings, resolve_djf_binary,
+    PrecheckOutcome, PrecheckRequest, Settings, UnmanagedReason, auto_capture, hooks_action,
+    precheck, render_warnings, resolve_djf_binary,
 };
 
 use super::USER_ERROR;
@@ -30,15 +30,19 @@ fn names(kinds: &[HookKind]) -> String {
         .join(", ")
 }
 
+fn shown(folder: Option<&PathBuf>) -> String {
+    folder.map_or_else(
+        || ".git/hooks".to_owned(),
+        |path| path.display().to_string(),
+    )
+}
+
 pub fn print_report(
     report: &HooksReport,
     out: &mut impl Write,
     err: &mut impl Write,
 ) -> io::Result<()> {
-    let folder = report.folder.as_ref().map_or_else(
-        || ".git/hooks".to_owned(),
-        |path| path.display().to_string(),
-    );
+    let folder = shown(report.folder.as_ref());
     for kind in &report.skipped {
         writeln!(
             err,
@@ -50,6 +54,13 @@ pub fn print_report(
         writeln!(
             err,
             "Warning: {folder}/{} could not be read as text, so it was left alone.",
+            kind.file_name()
+        )?;
+    }
+    for kind in &report.outside {
+        writeln!(
+            err,
+            "Warning: {folder}/{} links outside the repository, so it was left alone.",
             kind.file_name()
         )?;
     }
@@ -71,6 +82,7 @@ pub fn print_report(
         && report.refreshed.is_empty()
         && report.skipped.is_empty()
         && report.unreadable.is_empty()
+        && report.outside.is_empty()
     {
         writeln!(out, "dejafix git hooks already installed.")?;
     }
@@ -80,26 +92,40 @@ pub fn print_report(
     Ok(())
 }
 
-pub fn print_configured(
+pub fn print_unmanaged(
     path: &Path,
+    reason: UnmanagedReason,
     snippets: &[(HookKind, String)],
     out: &mut impl Write,
 ) -> io::Result<()> {
-    writeln!(
-        out,
-        "core.hooksPath points git at {}; dejafix writes no hooks there.",
-        path.display()
-    )?;
+    match reason {
+        UnmanagedReason::HooksPath => writeln!(
+            out,
+            "core.hooksPath points git at {}; dejafix writes no hooks there.",
+            path.display()
+        )?,
+        UnmanagedReason::OutsideGitDir => writeln!(
+            out,
+            "{} leads outside this repository's git folder; dejafix writes no hooks there.",
+            path.display()
+        )?,
+    }
     if snippets.is_empty() {
         return writeln!(
             out,
             "Remove the dejafix blocks from the hooks there by hand."
         );
     }
-    writeln!(
-        out,
-        "Add these lines to the matching hooks of your hook manager:"
-    )?;
+    match reason {
+        UnmanagedReason::HooksPath => writeln!(
+            out,
+            "Add these lines to the matching hooks of your hook manager:"
+        )?,
+        UnmanagedReason::OutsideGitDir => writeln!(
+            out,
+            "If you trust that folder, add these lines to the matching hooks there yourself:"
+        )?,
+    }
     for (kind, snippet) in snippets {
         writeln!(out, "\n{}:\n{}", kind.file_name(), snippet.trim_end())?;
     }
@@ -124,15 +150,32 @@ pub fn run_hooks(
             err,
             "Error: .git/hooks directory not found. Is this a git repository?"
         )?,
-        Ok(HooksOutcome::Configured { path, snippets }) => {
-            print_configured(&path, &snippets, out)?;
+        Ok(HooksOutcome::Unmanaged {
+            path,
+            reason,
+            snippets,
+        }) => {
+            print_unmanaged(&path, reason, &snippets, out)?;
         }
         Ok(HooksOutcome::Installed(report)) => print_report(&report, out, err)?,
-        Ok(HooksOutcome::Removed(removed)) if removed.is_empty() => {
-            writeln!(out, "No dejafix hooks found to remove.")?;
-        }
-        Ok(HooksOutcome::Removed(removed)) => {
-            writeln!(out, "dejafix hooks removed from: {}", names(&removed))?;
+        Ok(HooksOutcome::Removed {
+            removed,
+            outside,
+            folder,
+        }) => {
+            let folder = shown(folder.as_ref());
+            for kind in &outside {
+                writeln!(
+                    err,
+                    "Warning: {folder}/{} links outside the repository, so it was left alone. Remove the dejafix block from its target by hand.",
+                    kind.file_name()
+                )?;
+            }
+            if removed.is_empty() {
+                writeln!(out, "No dejafix hooks found to remove.")?;
+            } else {
+                writeln!(out, "dejafix hooks removed from: {}", names(&removed))?;
+            }
         }
         Ok(HooksOutcome::Unknown(action)) => writeln!(out, "Unknown action: {action}")?,
         Err(error) => return Ok(Outcome::Failed(error.into())),

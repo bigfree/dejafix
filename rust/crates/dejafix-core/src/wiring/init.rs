@@ -186,8 +186,9 @@ pub fn init_project(
     let hooks = match &options.hooks {
         None => None,
         Some(djf) => Some(match hooks_location(root) {
-            HooksLocation::Configured(path) => InitHooks::Configured {
+            HooksLocation::Unmanaged { path, reason } => InitHooks::Unmanaged {
                 path,
+                reason,
                 snippets: configured_snippets(djf),
             },
             HooksLocation::Folder(directory) if directory.exists() => {

@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use super::hooks::HooksReport;
 use crate::adapters::fs::{ClientConfig, MemoryDir, StoreError};
+use crate::adapters::git::UnmanagedReason;
 use crate::core::doctor::Reverted;
 use crate::core::hooks::HookKind;
 use crate::core::log::Skipped;
@@ -82,8 +83,9 @@ pub struct InitOptions {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum InitHooks {
     Installed(HooksReport),
-    Configured {
+    Unmanaged {
         path: PathBuf,
+        reason: UnmanagedReason,
         snippets: Vec<(HookKind, String)>,
     },
     NoGit,

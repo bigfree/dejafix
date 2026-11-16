@@ -10,6 +10,7 @@ use super::{
     update_status,
 };
 use crate::adapters::fs::ClientPaths;
+use crate::adapters::git::UnmanagedReason;
 use crate::core::migrate::MigrateStep;
 use crate::testing::fixed_clock;
 use crate::wiring::types::{Settings, WiringError};
@@ -763,8 +764,27 @@ fn hooks_under_core_hooks_path_are_reported_not_written() {
     )));
     assert!(events.iter().any(|event| matches!(
         event,
-        MigrateEvent::HooksConfigured { path, snippets }
+        MigrateEvent::HooksUnmanaged { path, reason: UnmanagedReason::HooksPath, snippets }
             if *path == machine.root.join(".husky/_") && snippets.len() == 3
+    )));
+}
+
+#[cfg(unix)]
+#[test]
+fn hooks_in_a_folder_linked_out_of_the_repository_are_neither_read_nor_written() {
+    let machine = legacy();
+    fs::remove_dir_all(machine.root.join(".git")).unwrap();
+    git_in(&machine.root, &["init", "-q"]);
+    let elsewhere = machine.root.with_file_name("elsewhere-hooks");
+    write(&elsewhere.join("pre-commit"), OLD_HOOK);
+    let hooks = machine.root.join(".git/hooks");
+    fs::remove_dir_all(&hooks).unwrap();
+    std::os::unix::fs::symlink(&elsewhere, &hooks).unwrap();
+    let events = machine.apply();
+    assert_eq!(read(&elsewhere.join("pre-commit")), OLD_HOOK);
+    assert!(!events.iter().any(|event| matches!(
+        event,
+        MigrateEvent::Hooks(_) | MigrateEvent::HooksUnmanaged { .. }
     )));
 }
 

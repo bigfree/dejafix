@@ -4,18 +4,23 @@ use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
 use super::git;
-use super::types::HooksLocation;
-use crate::adapters::fs::{StoreError, identity, read_optional_text};
+use super::types::{HooksLocation, UnmanagedReason};
+use crate::adapters::fs::{StoreError, identity, points_outside, read_optional_text};
 use crate::core::hooks::shell_path;
 
 pub(crate) fn same_file(left: &Path, right: &Path) -> bool {
     matches!((identity(left), identity(right)), (Some(left), Some(right)) if left == right)
 }
 
+#[must_use]
+pub fn hook_leads_outside(path: &Path, root: &Path, folder: &Path) -> bool {
+    points_outside(path, root) && points_outside(path, folder)
+}
+
 fn owns_git_dir(root: &Path, git_dir: &Path, common: &Path) -> bool {
     let dot_git = root.join(".git");
     if same_file(git_dir, &dot_git) {
-        return true;
+        return same_file(common, &dot_git) && !points_outside(&dot_git, root);
     }
     let linked = git_dir
         .parent()
@@ -30,9 +35,25 @@ fn owns_git_dir(root: &Path, git_dir: &Path, common: &Path) -> bool {
             })
 }
 
+fn outside_git_dir(path: PathBuf) -> HooksLocation {
+    HooksLocation::Unmanaged {
+        path,
+        reason: UnmanagedReason::OutsideGitDir,
+    }
+}
+
+fn fallback(root: &Path) -> HooksLocation {
+    let dot_git = root.join(".git");
+    let hooks = dot_git.join("hooks");
+    if dot_git.is_dir() && (points_outside(&dot_git, root) || points_outside(&hooks, &dot_git)) {
+        outside_git_dir(hooks)
+    } else {
+        HooksLocation::Folder(hooks)
+    }
+}
+
 #[must_use]
 pub fn hooks_location(root: &Path) -> HooksLocation {
-    let fallback = HooksLocation::Folder(root.join(".git").join("hooks"));
     let Some(output) = git(
         root,
         &[
@@ -44,26 +65,31 @@ pub fn hooks_location(root: &Path) -> HooksLocation {
             "hooks",
         ],
     ) else {
-        return fallback;
+        return fallback(root);
     };
     let Ok(text) = String::from_utf8(output) else {
-        return fallback;
+        return fallback(root);
     };
     let mut lines = text.lines().map(str::trim);
     let (Some(top), Some(git_dir), Some(common), Some(hooks)) =
         (lines.next(), lines.next(), lines.next(), lines.next())
     else {
-        return fallback;
+        return fallback(root);
     };
     let common = root.join(common);
     if !same_file(Path::new(top), root) || !owns_git_dir(root, Path::new(git_dir), &common) {
-        return fallback;
+        return fallback(root);
     }
     let hooks = root.join(hooks);
-    if hooks == common.join("hooks") {
-        HooksLocation::Folder(hooks)
+    if hooks != common.join("hooks") {
+        HooksLocation::Unmanaged {
+            path: hooks,
+            reason: UnmanagedReason::HooksPath,
+        }
+    } else if points_outside(&hooks, &common) {
+        outside_git_dir(hooks)
     } else {
-        HooksLocation::Configured(hooks)
+        HooksLocation::Folder(hooks)
     }
 }
 

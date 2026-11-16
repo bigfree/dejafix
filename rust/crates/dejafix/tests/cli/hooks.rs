@@ -144,15 +144,38 @@ fn hooks_install_refresh_and_uninstall() -> TestResult {
 
 #[cfg(unix)]
 #[test]
-fn a_symlinked_hook_is_written_through() -> TestResult {
+fn a_hook_linked_out_of_the_repository_is_left_alone() -> TestResult {
     let repo = Repo::new()?;
     let shared = repo.home.join("shared-pre-commit");
     fs::write(&shared, "#!/bin/sh\necho shared\n")?;
     let link = repo.root.join(".git/hooks/pre-commit");
     std::os::unix::fs::symlink(&shared, &link)?;
+    repo.djf(&["hooks", "install"]).assert().success().stderr(
+        "Warning: .git/hooks/pre-commit links outside the repository, so it was left alone.\n",
+    );
+    assert_eq!(fs::read_to_string(&shared)?, "#!/bin/sh\necho shared\n");
+    assert!(fs::symlink_metadata(&link)?.file_type().is_symlink());
+    assert!(hook(&repo, "post-commit").contains("# >>> dejafix"));
+    fs::write(&shared, "#!/bin/sh\n# >>> dejafix\nx\n# <<< dejafix\n")?;
+    repo.djf(&["hooks", "uninstall"]).assert().success().stderr(
+        "Warning: .git/hooks/pre-commit links outside the repository, so it was left alone. Remove the dejafix block from its target by hand.\n",
+    );
+    assert!(fs::read_to_string(&shared)?.contains("# >>> dejafix"));
+    Ok(())
+}
+
+#[cfg(unix)]
+#[test]
+fn a_hook_linked_inside_the_project_is_written_through() -> TestResult {
+    let repo = Repo::new()?;
+    let script = repo.root.join("scripts/pre-commit");
+    fs::create_dir_all(script.parent().ok_or("no parent")?)?;
+    fs::write(&script, "#!/bin/sh\necho mine\n")?;
+    let link = repo.root.join(".git/hooks/pre-commit");
+    std::os::unix::fs::symlink(&script, &link)?;
     repo.djf(&["hooks", "install"]).assert().success();
     assert!(fs::symlink_metadata(&link)?.file_type().is_symlink());
-    assert!(fs::read_to_string(&shared)?.contains("precheck --level warn"));
+    assert!(fs::read_to_string(&script)?.contains("precheck --level warn"));
     Ok(())
 }
 
@@ -415,5 +438,26 @@ fn with_core_hooks_path_init_prints_the_lines_and_unknown_actions_are_named() ->
         repo.stdout(&["hooks", "instal"])?,
         "Unknown action: instal\n"
     );
+    Ok(())
+}
+
+#[cfg(unix)]
+#[test]
+fn install_into_a_hooks_folder_linked_out_of_the_repository_writes_nothing() -> TestResult {
+    let repo = Repo::new()?;
+    let elsewhere = repo.home.join("elsewhere-hooks");
+    fs::create_dir_all(&elsewhere)?;
+    let hooks = repo.root.join(".git/hooks");
+    fs::remove_dir_all(&hooks)?;
+    std::os::unix::fs::symlink(&elsewhere, &hooks)?;
+    let stdout = repo.stdout(&["hooks", "install"])?;
+    assert!(
+        stdout.contains(
+            "leads outside this repository's git folder; dejafix writes no hooks there.\nIf you trust that folder, add these lines to the matching hooks there yourself:\n"
+        ),
+        "{stdout}"
+    );
+    assert!(stdout.contains("\npre-commit:\n"));
+    assert_eq!(fs::read_dir(&elsewhere)?.count(), 0);
     Ok(())
 }
