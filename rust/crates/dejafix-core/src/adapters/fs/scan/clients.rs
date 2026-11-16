@@ -3,11 +3,11 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use super::types::{ClientConfig, ClientPaths, ConfigState};
+use crate::core::doctor::{is_pinned_config, mentions_dejafix};
 
 const CLAUDE_DESKTOP: &str = "Claude Desktop";
 const DESKTOP_CONFIG: &str = "Claude/claude_desktop_config.json";
 const STORE_PREFIX: &str = "Claude_";
-const PIN_MARKERS: [&str; 4] = ["--root", "\"cwd\"", "cwd =", "DEJAFIX_ROOT"];
 
 fn nested(base: &Path, relative: &str) -> PathBuf {
     relative
@@ -94,10 +94,10 @@ fn state(path: &Path) -> Option<ConfigState> {
     let Ok(text) = String::from_utf8(bytes) else {
         return Some(ConfigState::Unreadable);
     };
-    if !text.contains("dejafix") {
+    if !mentions_dejafix(&text) {
         return None;
     }
-    if PIN_MARKERS.iter().any(|marker| text.contains(marker)) {
+    if is_pinned_config(&text) {
         Some(ConfigState::Pinned)
     } else {
         Some(ConfigState::Clean)

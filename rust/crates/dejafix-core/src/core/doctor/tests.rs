@@ -208,3 +208,84 @@ fn an_unreadable_version_is_never_newer_and_nothing_is_newer_than_it() {
         assert!(!is_newer("9.0.0", unreadable), "{unreadable}");
     }
 }
+
+mod pin {
+    use super::super::is_pinned_config;
+
+    #[test]
+    fn another_servers_cwd_does_not_pin_dejafix_in_codex() {
+        let text = "[mcp_servers.computer-use]\ncommand = \"x\"\ncwd = \".\"\n\n[mcp_servers.dejafix]\ncommand = \"/opt/homebrew/bin/djf-mcp\"\nargs = []\n";
+        assert!(!is_pinned_config(text));
+    }
+
+    #[test]
+    fn every_pin_on_the_codex_entry_counts() {
+        for entry in [
+            "args = [\"--root\", \"/x\"]\n",
+            "args = [\"--root=/x\"]\n",
+            "cwd = \"/x\"\n",
+            "[mcp_servers.dejafix.env]\nDEJAFIX_ROOT = \"/x\"\n",
+        ] {
+            let text = format!("[mcp_servers.dejafix]\ncommand = \"djf-mcp\"\n{entry}");
+            assert!(is_pinned_config(&text), "{entry}");
+        }
+    }
+
+    #[test]
+    fn json_configs_look_only_at_the_dejafix_entries() {
+        let clean = r#"{"mcpServers": {"other": {"command": "x", "cwd": ".", "args": ["--root", "/y"]}, "dejafix": {"command": "djf-mcp", "args": []}}}"#;
+        assert!(!is_pinned_config(clean));
+        let project = r#"{"projects": {"/work/a": {"mcpServers": {"memory": {"command": "/opt/homebrew/bin/djf-mcp", "env": {"DEJAFIX_ROOT": "/work/a"}}}}}, "mcpServers": {}}"#;
+        assert!(is_pinned_config(project));
+        let inline = r#"{"mcpServers": {"dejafix": {"command": "djf-mcp --root /x"}}}"#;
+        assert!(is_pinned_config(inline));
+    }
+
+    #[test]
+    fn an_unparsable_config_is_checked_as_text() {
+        assert!(is_pinned_config("dejafix --root /x {"));
+        assert!(!is_pinned_config("dejafix { broken"));
+    }
+
+    #[test]
+    fn a_parsed_config_without_a_dejafix_server_is_clean() {
+        let history = r#"{"allowedTools": ["mcp__dejafix__precheck_file"], "mcpServers": {"other": {"command": "x", "cwd": "."}}, "env": {"DEJAFIX_ROOT": "/x"}}"#;
+        assert!(!is_pinned_config(history));
+    }
+
+    #[test]
+    fn a_root_set_through_an_env_wrapper_pins() {
+        let args = "[mcp_servers.dejafix]\ncommand = \"/usr/bin/env\"\nargs = [\"DEJAFIX_ROOT=/work/a\", \"/opt/homebrew/bin/djf-mcp\"]\n";
+        assert!(is_pinned_config(args));
+        let inline = r#"{"mcpServers": {"memory": {"command": "/usr/bin/env DEJAFIX_ROOT=/work/a /opt/homebrew/bin/djf-mcp"}}}"#;
+        assert!(is_pinned_config(inline));
+    }
+
+    #[test]
+    fn a_foreign_server_pointed_at_a_dejafix_path_is_not_dejafix() {
+        let text = r#"{"mcpServers": {"files": {"command": "npx", "args": ["server-filesystem", "/Users/x/dejafix"], "cwd": "."}, "dejafix": {"command": "djf-mcp", "args": []}}}"#;
+        assert!(!is_pinned_config(text));
+        for program in [
+            "uvx dejafix@1.0",
+            "python -m dejafix.mcp_server --root /x",
+            "C:\\tools\\djf-mcp.exe --root /x",
+        ] {
+            let entry = format!(r#"{{"mcpServers": {{"memory": {{"command": "{program}"}}}}}}"#);
+            assert_eq!(
+                is_pinned_config(&entry),
+                program.contains("--root"),
+                "{program}"
+            );
+        }
+    }
+
+    #[test]
+    fn an_empty_dejafix_root_does_not_pin() {
+        let env =
+            r#"{"mcpServers": {"dejafix": {"command": "djf-mcp", "env": {"DEJAFIX_ROOT": " "}}}}"#;
+        assert!(!is_pinned_config(env));
+        let wrapper =
+            r#"{"mcpServers": {"dejafix": {"command": "/usr/bin/env DEJAFIX_ROOT= djf-mcp"}}}"#;
+        assert!(!is_pinned_config(wrapper));
+    }
+}

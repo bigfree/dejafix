@@ -187,7 +187,7 @@ fn every_pin_mechanism_counts_and_unrelated_configs_are_ignored() {
     );
     write(
         &paths.home.join(".claude.json"),
-        r#"{"env": {"DEJAFIX_ROOT": "/x"}, "dejafix": 1}"#,
+        r#"{"mcpServers": {"dejafix": {"command": "djf-mcp", "env": {"DEJAFIX_ROOT": "/x"}}}}"#,
     );
     write(
         &paths.home.join(".gemini/antigravity/mcp_config.json"),
@@ -383,4 +383,32 @@ fn a_symlinked_root_is_walked_under_its_resolved_path() {
         find_projects(&base.join("alias"), 4),
         [base.join("real/api")]
     );
+}
+
+#[test]
+fn another_servers_cwd_in_codex_does_not_flag_dejafix() {
+    let env = windows();
+    write(
+        &env.paths.home.join(".codex/config.toml"),
+        "[mcp_servers.computer-use]\ncommand = \"./client\"\nargs = [\"mcp\"]\ncwd = \".\"\n\n[mcp_servers.dejafix]\ncommand = \"/opt/homebrew/bin/djf-mcp\"\nargs = []\n",
+    );
+    let states: Vec<(&str, ConfigState)> = scan_client_configs(&env.paths, None)
+        .iter()
+        .map(|config| (config.client, config.state))
+        .collect();
+    assert_eq!(states, [("Codex", ConfigState::Clean)]);
+}
+
+#[test]
+fn a_djf_mcp_server_under_another_name_is_checked() {
+    let env = windows();
+    write(
+        &env.paths.home.join(".cursor/mcp.json"),
+        r#"{"mcpServers":{"memory":{"command":"/opt/homebrew/bin/djf-mcp","args":["--root","/x"]}}}"#,
+    );
+    let clients: Vec<&str> = pinned_client_configs(&env.paths, None)
+        .iter()
+        .map(|config| config.client)
+        .collect();
+    assert_eq!(clients, ["Cursor"]);
 }

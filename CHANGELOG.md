@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- **`djf doctor` no longer reports a config as pinned because of another server.** It used to look for `--root`, `cwd` or `DEJAFIX_ROOT` anywhere in a client config that mentions dejafix, so a `cwd = "."` on an unrelated MCP server in `~/.codex/config.toml` made it say the dejafix entry was pinned to one repository. It now reads JSON and TOML configs and checks only the dejafix server entries: an entry whose name contains dejafix, or one that runs a `djf-mcp` binary or the `dejafix` package, wherever it sits, including project-level entries in `~/.claude.json`. Such an entry is pinned by a `--root` argument, a `cwd`, or a non-empty `DEJAFIX_ROOT` in its `env` or set through an `env` wrapper command. A config that parses but has no dejafix entry is not reported; one that does not parse is still checked as text. Configs that run `djf-mcp` without mentioning dejafix by name are now checked too. This departs from Python 0.4.x, which checks the whole file.
+
 ## 1.0.0-rc.4
 
 **Fourth release candidate of the Rust rewrite.** Projects that depend on each other can now share lessons where they meet: an agent editing one side of a declared boundary sees the relevant open issues, failed attempts and decisions of the other side. Cross-project patterns, which no agent ever saw, are removed. The README now opens with what dejafix does for you and what it costs.
