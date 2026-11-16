@@ -12,12 +12,6 @@ pub struct Stack {
 
 pub type Entry = Map<String, Value>;
 
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct Relevant<'e> {
-    pub patterns: Vec<&'e Entry>,
-    pub gotchas: Vec<&'e Entry>,
-}
-
 #[derive(Debug, Clone, Copy)]
 pub(super) struct Palette {
     pub(super) bold: &'static str,
@@ -56,10 +50,6 @@ pub enum GlobalAction {
         library: Option<String>,
         json: bool,
     },
-    Add {
-        text: Option<String>,
-        tag: Option<String>,
-    },
     AddGotcha {
         library: Option<String>,
         text: Option<String>,
@@ -97,7 +87,6 @@ pub enum GlobalAction {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Usage {
-    Add,
     AddGotcha,
     Edit,
     Upgrade,
@@ -109,22 +98,16 @@ pub enum Usage {
 pub enum GlobalOutcome {
     Status {
         location: String,
-        patterns: Vec<Entry>,
         gotchas: Vec<Entry>,
         preferences: bool,
     },
     List {
-        patterns: Vec<Entry>,
         gotchas: Vec<Entry>,
         tag: Option<String>,
         library: Option<String>,
         json: bool,
     },
     Usage(Usage),
-    PatternAdded {
-        id: String,
-        text: String,
-    },
     GotchaAdded {
         id: String,
         library: String,
@@ -158,8 +141,8 @@ pub enum GlobalOutcome {
     NotFound(String),
     Exported(Value),
     Imported {
-        patterns: usize,
         gotchas: usize,
+        skipped_patterns: usize,
     },
     FileNotFound(String),
     InvalidJson(String),
@@ -170,7 +153,6 @@ pub enum GlobalOutcome {
     Detected {
         name: String,
         stack: Stack,
-        inherited_patterns: usize,
         inherited_gotchas: usize,
         json: bool,
     },

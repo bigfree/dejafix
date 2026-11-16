@@ -32,9 +32,9 @@ pub use crate::core::event::{
 pub use crate::core::global::{
     AddOutcome, CheckFailure, CheckReport, CheckWarning, DEFAULT_BUDGET, Draft, DraftError, Entry,
     GLOBAL_FIELDS, GlobalAction, GlobalDoc, GlobalHint, GlobalIndex, GlobalOutcome, GotchaInput,
-    GotchaV2, Libraries, Relevant, Stack, StoredGotcha, UpgradeOutcome, Usage, add_reply,
-    check_gotcha, filtered, global_hint, global_reply, global_report, hint_candidate, is_prunable,
-    is_upgraded, line, normalize_input, parse_store, relevant_entries,
+    GotchaV2, Libraries, Stack, StoredGotcha, UpgradeOutcome, Usage, add_reply, check_gotcha,
+    filtered, global_hint, global_reply, global_report, hint_candidate, is_prunable, is_upgraded,
+    line, normalize_input, parse_store, relevant_entries,
 };
 pub use crate::core::hooks::{
     HOOK_MARKER_END, HOOK_MARKER_START, HOOK_SHEBANG, HookChange, HookKind, Removal,

@@ -453,11 +453,6 @@ fn with_global_gotcha(home: &Path) {
         "{\"gotcha\": \"strict mode mounts twice\", \"library\": \"react\", \"source_project\": \"web\"}\n",
     )
     .unwrap();
-    fs::write(
-        home.join("global/patterns.jsonl"),
-        "{\"pattern\": \"python only\", \"tags\": [\"python\"]}\n",
-    )
-    .unwrap();
 }
 
 #[test]

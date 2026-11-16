@@ -24,21 +24,10 @@ pub fn action_of(args: GlobalArgs) -> GlobalAction {
         alias,
     } = args;
     let json = format == "json";
-    let action = match action.as_str() {
-        "add"
-            if library
-                .as_deref()
-                .is_some_and(|library| !library.is_empty()) =>
-        {
-            "add-gotcha"
-        }
-        other => other,
-    };
-    match action {
+    match action.as_str() {
         "status" => GlobalAction::Status,
         "list" => GlobalAction::List { tag, library, json },
-        "add" => GlobalAction::Add { text, tag },
-        "add-gotcha" => GlobalAction::AddGotcha {
+        "add" | "add-gotcha" => GlobalAction::AddGotcha {
             library,
             text,
             keywords: keyword,

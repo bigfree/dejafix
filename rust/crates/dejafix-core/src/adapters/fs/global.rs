@@ -13,11 +13,11 @@ use crate::core::global::{Entry, Libraries, StoredGotcha, is_prunable, stored_li
 use crate::core::json::{write_canonical, write_python_json_indented};
 use crate::core::text::{platform_newlines, python_lines, python_strip, universal_newlines};
 
-const PATTERNS_FILE: &str = "patterns.jsonl";
 const GOTCHAS_FILE: &str = "library_gotchas.jsonl";
 const PREFERENCES_FILE: &str = "stack_preferences.md";
 const LIBRARIES_FILE: &str = "libraries.json";
 const BACKUP_FILE: &str = "library_gotchas.v1.jsonl";
+const RETIRED_PATTERNS_FILE: &str = "patterns.jsonl";
 const LOCK_SUFFIX: &str = ".lock";
 
 fn write_error(path: &Path) -> impl Fn(std::io::Error) -> StoreError + '_ {
@@ -118,11 +118,6 @@ impl GlobalStore {
         self.entries(GOTCHAS_FILE)
     }
 
-    #[must_use]
-    pub fn patterns(&self) -> Option<Vec<Entry>> {
-        self.entries(PATTERNS_FILE)
-    }
-
     fn entries(&self, name: &str) -> Option<Vec<Entry>> {
         match self.read(name, false) {
             Ok(Some(text)) => parse_entries(&text),
@@ -147,12 +142,14 @@ impl GlobalStore {
         }
     }
 
-    pub fn load_patterns(&self) -> Result<Vec<Entry>, StoreError> {
-        self.load(PATTERNS_FILE)
-    }
-
     pub fn load_gotchas(&self) -> Result<Vec<Entry>, StoreError> {
         self.load(GOTCHAS_FILE)
+    }
+
+    #[must_use]
+    pub fn retired_patterns(&self) -> Option<PathBuf> {
+        let path = self.path(RETIRED_PATTERNS_FILE);
+        path.is_file().then_some(path)
     }
 
     #[must_use]
@@ -172,14 +169,6 @@ impl GlobalStore {
 
     fn split_lines(text: &str) -> Vec<String> {
         text.lines().map(str::to_owned).collect()
-    }
-
-    pub fn append_pattern(&self, entry: &Entry) -> Result<(), StoreError> {
-        let lines = Self::split_lines(&Self::canonical_lines(&self.path(PATTERNS_FILE), &[entry])?);
-        self.change_locked(PATTERNS_FILE, true, |_| {
-            (GotchaWrite::Append(lines.clone()), ())
-        })
-        .map(drop)
     }
 
     fn change_locked<T>(
@@ -221,37 +210,21 @@ impl GlobalStore {
         Ok(Some(value))
     }
 
-    fn retain_locked(
-        &self,
-        name: &str,
-        mut keep: impl FnMut(&Entry) -> bool,
-    ) -> Result<usize, StoreError> {
-        let path = self.path(name);
-        let mut failure = None;
-        let removed = self.change_locked(name, false, |entries| {
+    fn retain_gotchas(&self, mut keep: impl FnMut(&Entry) -> bool) -> Result<usize, StoreError> {
+        let removed = self.change_locked(GOTCHAS_FILE, false, |entries| {
             let total = entries.len();
             let kept: Vec<Entry> = entries.into_iter().filter(|entry| keep(entry)).collect();
             let removed = total - kept.len();
             if removed == 0 {
                 return (GotchaWrite::Keep, 0);
             }
-            if name == GOTCHAS_FILE {
-                let lines = kept
-                    .into_iter()
-                    .map(|entry| stored_line(&StoredGotcha::from_entry(entry)))
-                    .collect();
-                return (GotchaWrite::Replace(lines), removed);
-            }
-            let kept: Vec<&Entry> = kept.iter().collect();
-            match Self::canonical_lines(&path, &kept) {
-                Ok(text) => (GotchaWrite::Replace(Self::split_lines(&text)), removed),
-                Err(error) => {
-                    failure = Some(error);
-                    (GotchaWrite::Keep, 0)
-                }
-            }
+            let lines = kept
+                .into_iter()
+                .map(|entry| stored_line(&StoredGotcha::from_entry(entry)))
+                .collect();
+            (GotchaWrite::Replace(lines), removed)
         })?;
-        failure.map_or(Ok(removed.unwrap_or(0)), Err)
+        Ok(removed.unwrap_or(0))
     }
 
     pub fn edit_gotchas<T>(
@@ -332,15 +305,9 @@ impl GlobalStore {
     }
 
     pub fn remove(&self, id: &str) -> Result<bool, StoreError> {
-        for name in [PATTERNS_FILE, GOTCHAS_FILE] {
-            let removed = self.retain_locked(name, |entry| {
-                entry.get("id").and_then(Value::as_str) != Some(id)
-            })?;
-            if removed > 0 {
-                return Ok(true);
-            }
-        }
-        Ok(false)
+        let removed =
+            self.retain_gotchas(|entry| entry.get("id").and_then(Value::as_str) != Some(id))?;
+        Ok(removed > 0)
     }
 
     pub fn prune(
@@ -350,13 +317,7 @@ impl GlobalStore {
         older_than: i64,
         confidence: Option<&str>,
     ) -> Result<usize, StoreError> {
-        let mut removed = 0;
-        for name in [PATTERNS_FILE, GOTCHAS_FILE] {
-            removed += self.retain_locked(name, |entry| {
-                !is_prunable(entry, now, zone, older_than, confidence)
-            })?;
-        }
-        Ok(removed)
+        self.retain_gotchas(|entry| !is_prunable(entry, now, zone, older_than, confidence))
     }
 
     pub fn export(&self, exported_at: &str) -> Result<Value, StoreError> {
@@ -370,7 +331,6 @@ impl GlobalStore {
         let mut export = serde_json::json!({
             "version": "1.0",
             "exported_at": exported_at,
-            "patterns": self.load_patterns()?,
             "gotchas": self.load_gotchas()?,
             "preferences": preferences,
         });
@@ -398,10 +358,10 @@ impl GlobalStore {
         failure.map_or(Ok(()), Err)
     }
 
-    fn import_entries(&self, name: &str, items: &[Value]) -> Result<usize, StoreError> {
-        let path = self.path(name);
+    fn import_gotchas(&self, items: &[Value]) -> Result<usize, StoreError> {
+        let path = self.path(GOTCHAS_FILE);
         let mut failure = None;
-        let added = self.change_locked(name, true, |existing| {
+        let added = self.change_locked(GOTCHAS_FILE, true, |existing| {
             let known: HashSet<String> = existing
                 .iter()
                 .filter_map(|entry| entry.get("id"))
@@ -431,15 +391,15 @@ impl GlobalStore {
     }
 
     pub fn import(&self, data: &Map<String, Value>) -> Result<(usize, usize), StoreError> {
-        let mut added = [0_usize; 2];
-        for (slot, (key, name)) in added
-            .iter_mut()
-            .zip([("patterns", PATTERNS_FILE), ("gotchas", GOTCHAS_FILE)])
-        {
-            if let Some(Value::Array(items)) = data.get(key) {
-                *slot = self.import_entries(name, items)?;
-            }
-        }
+        self.ensure()?;
+        let gotchas = match data.get("gotchas") {
+            Some(Value::Array(items)) => self.import_gotchas(items)?,
+            _ => 0,
+        };
+        let skipped = match data.get("patterns") {
+            Some(Value::Array(items)) => items.iter().filter(|item| item.is_object()).count(),
+            _ => 0,
+        };
         if let Some(Value::String(preferences)) = data.get("preferences")
             && !preferences.is_empty()
             && !self.has_preferences()
@@ -449,7 +409,6 @@ impl GlobalStore {
         if let Some(imported) = data.get("libraries").and_then(Libraries::from_value) {
             self.merge_libraries(&imported)?;
         }
-        let [patterns, gotchas] = added;
-        Ok((patterns, gotchas))
+        Ok((gotchas, skipped))
     }
 }

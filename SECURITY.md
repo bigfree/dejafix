@@ -21,7 +21,7 @@ dejafix is open source and we'd rather be transparent about the trade-offs than 
 | `.dejafix/events.jsonl` | Raw event log (failures, fixes, decisions) | Gitignored by default |
 | `.dejafix/summary.md` | Distilled briefing for AI agents | Committed to git |
 | `.dejafix/PROJECT_MAP.md` | Architecture map | Committed to git |
-| `~/.dejafix/global/` | Cross-project patterns and gotchas | Local only, shared across all your projects |
+| `~/.dejafix/global/` | Library gotchas and stack preferences | Local only, shared across all your projects |
 | `.dejafix/watch.pid` · `watch.log` | Watcher state and runtime log | Gitignored, local only |
 
 ### Honest trade-offs

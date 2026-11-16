@@ -286,3 +286,27 @@ fn the_daily_check_can_be_turned_on_and_off() -> TestResult {
     assert_eq!(meta["update_check"], false);
     Ok(())
 }
+
+#[test]
+fn doctor_says_a_patterns_file_is_no_longer_used() -> TestResult {
+    let repo = Repo::new()?;
+    let empty = repo.home.join("nothing").display().to_string();
+    let clean = repo.stdout(&["doctor", "-p", &empty])?;
+    assert!(!clean.contains("patterns.jsonl"));
+    let global = repo.registry().join("global");
+    fs::create_dir_all(&global)?;
+    let patterns = global.join("patterns.jsonl");
+    fs::write(&patterns, "{\"id\": \"pat_1\", \"pattern\": \"keep\"}\n")?;
+    let out = repo.stdout(&["doctor", "-p", &empty])?;
+    let notice = format!(
+        "\n  ⚠ {} is no longer used\n      dejafix stopped keeping cross-project patterns; remove the file when you no longer need it.\n",
+        patterns.display()
+    );
+    assert!(out.contains(&notice));
+    assert_eq!(out.replace(&notice, ""), clean);
+    assert_eq!(
+        fs::read_to_string(&patterns)?,
+        "{\"id\": \"pat_1\", \"pattern\": \"keep\"}\n"
+    );
+    Ok(())
+}

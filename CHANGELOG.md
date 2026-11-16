@@ -29,6 +29,7 @@
 - **`djf init` leaves `.gitignore` alone when git already ignores `.dejafix/`**, for example through `.git/info/exclude` or your global excludes file. In that case `.gitignore` is neither changed nor created, so dejafix can stay private to one clone. The instructions refresh in `djf migrate` follows the same rule.
 - **`djf migrate` also updates `.git/info/exclude`**, rewriting `.projectmem` entries to `.dejafix`, so a checkout that was private before the rename stays private.
 - **`djf doctor` on Windows looks only at fixed drives.** Without `--path` it skips network, removable and optical drives, so an offline network drive no longer stalls it. This is what Python 0.4.x did.
+- **Cross-project patterns are gone.** No agent ever saw them: `brief`, `global_query` and the MCP tools read only library gotchas, and `AI_INSTRUCTIONS.md` no longer copies global memory. `djf global add` is now another name for `djf global add-gotcha`. `status`, `list`, `export`, `prune`, `remove` and `detect` work with gotchas only. Library gotchas carry no confidence, so `djf global prune --confidence` now matches nothing. `djf global import` skips the patterns in an older export and says how many it skipped. An existing `~/.dejafix/global/patterns.jsonl` is neither read nor deleted; `djf doctor` points it out so you can remove it. This departs from Python 0.4.x, which still keeps patterns.
 
 ## 1.0.0-rc.3
 

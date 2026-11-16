@@ -1,6 +1,6 @@
 ---
 source: crates/dejafix-core/src/core/global/tests.rs
-expression: "global_report(&detected(stack(), 2, 1, false), false)"
+expression: "global_report(&detected(stack(), 1, false), false)"
 ---
 
 Detected Stack: demo
@@ -12,4 +12,4 @@ Detected Stack: demo
   Manifests:  pyproject.toml, Dockerfile
 
   Would inherit:
-    2 patterns, 1 library gotchas
+    1 library gotchas

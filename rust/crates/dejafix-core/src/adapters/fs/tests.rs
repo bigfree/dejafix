@@ -892,7 +892,6 @@ fn an_export_carries_libraries_and_an_import_into_a_fresh_home_restores_them() {
         [
             "version",
             "exported_at",
-            "patterns",
             "gotchas",
             "preferences",
             "libraries"
@@ -941,17 +940,35 @@ fn an_import_merges_aliases_and_keeps_existing_mappings_on_conflict() {
 }
 
 #[test]
+fn an_import_into_a_fresh_home_without_gotchas_writes_preferences() {
+    let home = tempfile::tempdir().unwrap();
+    let store = super::GlobalStore::new(home.path());
+    for data in [
+        serde_json::json!({"patterns": [{"id": "pat_1"}], "preferences": "use uv\n"}),
+        serde_json::json!({"preferences": "keep\n"}),
+    ] {
+        store.import(data.as_object().unwrap()).unwrap();
+    }
+    assert_eq!(
+        fs::read_to_string(store.path("stack_preferences.md")).unwrap(),
+        "use uv\n"
+    );
+    assert!(!store.path("patterns.jsonl").exists());
+}
+
+#[test]
 fn an_import_without_libraries_leaves_libraries_json_alone() {
     let home = tempfile::tempdir().unwrap();
     let store = super::GlobalStore::new(home.path());
     let legacy = serde_json::json!({
         "version": "1.0",
-        "patterns": [],
+        "patterns": [{"id": "pat_legacy000001", "pattern": "legacy"}, null],
         "gotchas": [{"id": "got_legacy000001", "library": "zod", "gotcha": "legacy"}],
         "preferences": ""
     });
-    assert_eq!(store.import(legacy.as_object().unwrap()).unwrap(), (0, 1));
+    assert_eq!(store.import(legacy.as_object().unwrap()).unwrap(), (1, 1));
     assert!(!store.path("libraries.json").exists());
+    assert!(!store.path("patterns.jsonl").exists());
     store
         .save_libraries(&libraries_of(&serde_json::json!({"next": ["nextjs"]})))
         .unwrap();

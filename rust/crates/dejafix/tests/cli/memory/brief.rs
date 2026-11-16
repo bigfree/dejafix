@@ -306,6 +306,16 @@ fn brief_matches_python_on_a_busy_project() -> TestResult {
 }
 
 #[test]
+fn brief_ignores_a_leftover_patterns_file() -> TestResult {
+    let repo = busy_repo()?;
+    let patterns = repo.registry().join("global/patterns.jsonl");
+    fs::write(&patterns, "{not json\n")?;
+    assert_eq!(repo.stdout(&["brief"])?, PYTHON_BRIEF);
+    assert_eq!(fs::read_to_string(&patterns)?, "{not json\n");
+    Ok(())
+}
+
+#[test]
 fn brief_outside_a_project_fails() -> TestResult {
     let repo = Repo::bare()?;
     let assert = repo.djf(&["brief"]).assert().code(1);

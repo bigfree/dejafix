@@ -29,15 +29,6 @@ const GOTCHAS: &str = concat!(
 );
 
 const LIST: &str = "
-Patterns (3)
-────────────────────────────────────────────────────────────
-  pat_000000000001  old high pattern
-    tags: python · from: alpha · confidence: high
-  pat_000000000002  old medium pattern
-    confidence: medium
-  pat_000000000003  fresh unicode pattern ščř
-    tags: rust, web · from: beta · confidence: medium
-
 Library Gotchas (5)
 ────────────────────────────────────────────────────────────
   got_000000000001 (not upgraded)  [sqlalchemy] always close async sessions
@@ -57,17 +48,16 @@ const STATUS: &str = "
   ================================================
   Location: <GLOBAL>
 
-    Patterns:           3
     Library gotchas:     5
     Stack preferences:   yes
-    Unique tags:         3
+    Unique tags:         2
     Libraries tracked:   4
-    Source projects:     3
+    Source projects:     1
     Not upgraded:        5
 
-  Tags: python, rust, web
+  Tags: python, web
   Libraries: fastapi, gin, pydantic, sqlalchemy
-  Projects: alpha, beta, other
+  Projects: other
   ================================================
 
 ";
@@ -81,9 +71,13 @@ Detected Stack: repo
   Manifests:  pyproject.toml
 
   Would inherit:
-    2 patterns, 4 library gotchas
+    4 library gotchas
 
 ";
+
+const NO_ENTRIES_HINT: &str = "  Add gotchas:   djf global add-gotcha \"gotcha text\" --library <library> --keyword <phrase> --keyword <phrase>\n";
+
+const SKIPPED: &str = "cross-project pattern(s); dejafix no longer keeps them.\n";
 
 const DETECT_JSON: &str = r#"{
   "name": "repo",
@@ -161,9 +155,10 @@ fn status_counts_version_one_records_and_creates_the_directory() -> TestResult {
     assert!(!global_dir(&fresh).exists());
     let out = run(&fresh, &["status"])?;
     assert!(global_dir(&fresh).is_dir());
-    assert!(out.contains("Patterns:           0\n"));
+    assert!(out.contains("Library gotchas:     0\n"));
     assert!(out.contains("Stack preferences:   not set\n"));
     assert!(!out.contains("Tags:"));
+    assert_eq!(read(&repo, "patterns.jsonl")?, PATTERNS);
     Ok(())
 }
 
@@ -172,23 +167,18 @@ fn list_marks_version_one_records_and_filters() -> TestResult {
     let repo = seeded()?;
     assert_eq!(run(&repo, &["list"])?, LIST);
     let by_library = run(&repo, &["list", "--library", "sql"])?;
-    assert!(by_library.contains("Patterns (3)"));
     assert!(by_library.contains("Library Gotchas (2)"));
     assert!(by_library.contains("[sqlalchemy] with text key"));
     assert!(!by_library.contains("[gin]"));
     let by_tag = run(&repo, &["list", "--tag", "PYTHON"])?;
-    assert!(by_tag.contains("Patterns (1)"));
     assert!(by_tag.contains("Library Gotchas (3)"));
     let none = run(&repo, &["list", "--tag", "zzz", "--library", "qqq"])?;
     assert_eq!(
         none,
-        "No entries found. (filter: tag=zzz, library=qqq)\n  Add patterns:  djf global add \"your pattern here\"\n  Add gotchas:   djf global add-gotcha \"gotcha text\" --library <library> --keyword <phrase> --keyword <phrase>\n"
+        format!("No entries found. (filter: tag=zzz, library=qqq)\n{NO_ENTRIES_HINT}")
     );
     let empty = run(&Repo::new()?, &["list"])?;
-    assert_eq!(
-        empty,
-        "No entries found.\n  Add patterns:  djf global add \"your pattern here\"\n  Add gotchas:   djf global add-gotcha \"gotcha text\" --library <library> --keyword <phrase> --keyword <phrase>\n"
-    );
+    assert_eq!(empty, format!("No entries found.\n{NO_ENTRIES_HINT}"));
     Ok(())
 }
 
@@ -217,11 +207,13 @@ fn list_json_keeps_python_layout() -> TestResult {
     let repo = seeded()?;
     let out = run(&repo, &["list", "--tag", "python", "-f", "json"])?;
     let value: Value = serde_json::from_str(&out)?;
-    assert_eq!(value["patterns"].as_array().map(Vec::len), Some(1));
+    assert!(value.get("patterns").is_none());
     assert_eq!(value["gotchas"].as_array().map(Vec::len), Some(3));
-    assert!(out.starts_with("{\n  \"patterns\": [\n    {\n      \"confidence\": \"high\","));
+    assert!(out.starts_with(
+        "{\n  \"gotchas\": [\n    {\n      \"discovered\": \"2099-01-01T00:00:00Z\","
+    ));
     assert!(out.contains(
-        "      \"source_project\": \"alpha\",\n      \"tags\": [\n        \"python\"\n      ],\n"
+        "      \"source_project\": \"other\",\n      \"tags\": [\n        \"python\"\n      ],\n"
     ));
     assert!(out.contains("      \"version_range\": null\n"));
     assert!(out.ends_with("    }\n  ]\n}\n"));
@@ -229,38 +221,22 @@ fn list_json_keeps_python_layout() -> TestResult {
         out,
         run(&repo, &["list", "--tag", "python", "--format", "json"])?
     );
-    let unicode = run(&repo, &["list", "--format", "json"])?;
-    assert!(unicode.contains("fresh unicode pattern \\u0161\\u010d\\u0159"));
     assert_eq!(
         run(&Repo::new()?, &["list", "-f", "json"])?,
-        "{\n  \"patterns\": [],\n  \"gotchas\": []\n}\n"
+        "{\n  \"gotchas\": []\n}\n"
     );
     Ok(())
 }
 
 #[test]
-fn add_writes_a_sorted_key_line_and_prints_its_id() -> TestResult {
+fn add_without_a_library_asks_for_a_gotcha() -> TestResult {
     let repo = Repo::new()?;
-    let out = run(&repo, &["add", "prefer small PRs", "--tag", "process"])?;
+    let gotcha = "Usage: djf global add-gotcha \"<text>\" --library <name> --keyword <phrase> --keyword <phrase> [--versions <range>]\nWrite one lesson in English, 30 to 600 characters, without project details; give 2 to 8 keywords.\n";
     assert_eq!(
-        ids(&out),
-        "[global] Pattern added: pat_X\n  prefer small PRs\n"
+        refused(&repo, &["add", "prefer small PRs", "--tag", "process"])?,
+        gotcha
     );
-    let line = read(&repo, "patterns.jsonl")?;
-    let shape = Regex::new(
-        r#"^\{"confidence": "medium", "created": "\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d{6})?Z", "id": "pat_[0-9a-f]{12}", "pattern": "prefer small PRs", "source_project": "repo", "tags": \["process"\], "times_encountered": 1\}\n$"#,
-    )?;
-    assert!(shape.is_match(&line), "{line}");
-    let again = run(&repo, &["add", "second"])?;
-    assert!(again.contains("Pattern added: pat_"));
-    let lines = read(&repo, "patterns.jsonl")?;
-    assert_eq!(lines.lines().count(), 2);
-    assert!(
-        lines
-            .lines()
-            .nth(1)
-            .is_some_and(|line| line.contains(r#""tags": []"#))
-    );
+    assert!(!global_dir(&repo).join("patterns.jsonl").exists());
     Ok(())
 }
 
@@ -371,15 +347,9 @@ fn a_refused_gotcha_lists_every_failure_and_writes_nothing() -> TestResult {
 #[test]
 fn usage_lines_when_arguments_are_missing() -> TestResult {
     let repo = Repo::new()?;
-    assert_eq!(
-        run(&repo, &["add"])?,
-        "Usage: djf global add \"your pattern here\" [--tag python]\n"
-    );
-    assert_eq!(
-        run(&repo, &["add", ""])?,
-        "Usage: djf global add \"your pattern here\" [--tag python]\n"
-    );
     let gotcha = "Usage: djf global add-gotcha \"<text>\" --library <name> --keyword <phrase> --keyword <phrase> [--versions <range>]\nWrite one lesson in English, 30 to 600 characters, without project details; give 2 to 8 keywords.\n";
+    assert_eq!(refused(&repo, &["add"])?, gotcha);
+    assert_eq!(refused(&repo, &["add", ""])?, gotcha);
     assert_eq!(refused(&repo, &["add-gotcha"])?, gotcha);
     assert_eq!(refused(&repo, &["add-gotcha", "only text"])?, gotcha);
     assert_eq!(refused(&repo, &["add-gotcha", "--library", "x"])?, gotcha);
@@ -401,13 +371,13 @@ fn usage_lines_when_arguments_are_missing() -> TestResult {
 }
 
 #[test]
-fn remove_deletes_a_pattern_or_a_gotcha_and_rewrites_sorted() -> TestResult {
+fn remove_deletes_a_gotcha_and_leaves_patterns_alone() -> TestResult {
     let repo = seeded()?;
-    let out = run(&repo, &["remove", "pat_000000000002"])?;
-    assert_eq!(out, "[global] Removed: pat_000000000002\n");
-    let mut expected: Vec<&str> = PATTERNS.lines().collect();
-    expected.remove(1);
-    assert_eq!(read(&repo, "patterns.jsonl")?, expected.join("\n") + "\n");
+    assert_eq!(
+        run(&repo, &["remove", "pat_000000000002"])?,
+        "Entry not found: pat_000000000002\n"
+    );
+    assert_eq!(read(&repo, "patterns.jsonl")?, PATTERNS);
     let out = run(&repo, &["remove", "got_000000000003"])?;
     assert_eq!(out, "[global] Removed: got_000000000003\n");
     let kept = read(&repo, "library_gotchas.jsonl")?;
@@ -420,16 +390,6 @@ fn remove_deletes_a_pattern_or_a_gotcha_and_rewrites_sorted() -> TestResult {
 #[test]
 fn add_then_remove_round_trips() -> TestResult {
     let repo = Repo::new()?;
-    let added = run(&repo, &["add", "temporary"])?;
-    let id = Regex::new("pat_[0-9a-f]{12}")?
-        .find(&added)
-        .map(|found| found.as_str().to_owned())
-        .ok_or("no id printed")?;
-    assert_eq!(
-        run(&repo, &["remove", &id])?,
-        format!("[global] Removed: {id}\n")
-    );
-    assert_eq!(read(&repo, "patterns.jsonl")?, "");
     let added = run(
         &repo,
         &[
@@ -456,29 +416,22 @@ fn add_then_remove_round_trips() -> TestResult {
 }
 
 #[test]
-fn prune_by_confidence_then_by_age() -> TestResult {
+fn prune_ignores_confidence_for_gotchas_then_prunes_by_age() -> TestResult {
     let repo = seeded()?;
-    assert_eq!(
-        run(
-            &repo,
-            &["prune", "--older-than", "365", "--confidence", "low"]
-        )?,
-        "No entries to prune.\n"
-    );
     assert_eq!(
         run(
             &repo,
             &["prune", "--older-than", "365", "--confidence", "high"]
         )?,
-        "[global] Pruned 1 entries (older than 365 days)\n"
+        "No entries to prune.\n"
     );
-    assert!(!read(&repo, "patterns.jsonl")?.contains("pat_000000000001"));
     assert_eq!(
         run(&repo, &["prune"])?,
-        "[global] Pruned 2 entries (older than 365 days)\n"
+        "[global] Pruned 1 entries (older than 365 days)\n"
     );
-    assert_eq!(read(&repo, "patterns.jsonl")?.lines().count(), 1);
     assert_eq!(read(&repo, "library_gotchas.jsonl")?.lines().count(), 4);
+    assert!(!read(&repo, "library_gotchas.jsonl")?.contains("got_000000000002"));
+    assert_eq!(read(&repo, "patterns.jsonl")?, PATTERNS);
     assert_eq!(run(&repo, &["prune"])?, "No entries to prune.\n");
     Ok(())
 }
@@ -489,8 +442,8 @@ fn prune_treats_a_missing_date_as_ancient() -> TestResult {
     let dir = global_dir(&repo);
     fs::create_dir_all(&dir)?;
     fs::write(
-        dir.join("patterns.jsonl"),
-        "{\"id\": \"pat_a\", \"pattern\": \"undated\"}\n{\"created\": \"junk\", \"id\": \"pat_b\", \"pattern\": \"junk\"}\n",
+        dir.join("library_gotchas.jsonl"),
+        "{\"gotcha\": \"undated\", \"id\": \"got_a\", \"library\": \"x\"}\n{\"discovered\": \"junk\", \"gotcha\": \"junk\", \"id\": \"got_b\", \"library\": \"x\"}\n",
     )?;
     assert_eq!(
         run(&repo, &["prune", "--older-than", "3650"])?,
@@ -506,7 +459,7 @@ fn export_matches_python() -> TestResult {
     let value: Value = serde_json::from_str(&out)?;
     assert_eq!(value["version"], "1.0");
     assert_eq!(value["preferences"], "# prefs\nuse uv\n");
-    assert_eq!(value["patterns"].as_array().map(Vec::len), Some(3));
+    assert!(value.get("patterns").is_none());
     assert_eq!(value["gotchas"].as_array().map(Vec::len), Some(5));
     let stamp = Regex::new(r#"^  "exported_at": "\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d{6})?Z",$"#)?;
     assert!(
@@ -515,12 +468,9 @@ fn export_matches_python() -> TestResult {
     );
     let head = "{\n  \"version\": \"1.0\",\n";
     assert!(out.starts_with(head));
-    assert!(out.contains("      \"pattern\": \"fresh unicode pattern \\u0161\\u010d\\u0159\",\n"));
     assert!(out.ends_with("  \"preferences\": \"# prefs\\nuse uv\\n\"\n}\n"));
     let empty = run(&Repo::new()?, &["export"])?;
-    assert!(
-        empty.contains("  \"patterns\": [],\n  \"gotchas\": [],\n  \"preferences\": \"\"\n}\n")
-    );
+    assert!(empty.contains("  \"gotchas\": [],\n  \"preferences\": \"\"\n}\n"));
     Ok(())
 }
 
@@ -535,23 +485,19 @@ fn import_merges_by_id_and_keeps_existing_preferences() -> TestResult {
     write_json(
         &repo,
         "imp.json",
-        r#"{"version": "1.0", "patterns": [{"id": "pat_000000000003", "pattern": "dup"}, {"id": "pat_imported0001", "pattern": "imported ščř", "tags": ["x"], "created": "2099-01-01T00:00:00Z"}], "gotchas": [{"id": "got_imported0001", "library": "zlib", "gotcha": "imp", "discovered": "2099-01-01T00:00:00Z"}], "preferences": "new prefs"}"#.as_bytes(),
+        r#"{"version": "1.0", "patterns": [{"id": "pat_000000000003", "pattern": "dup"}, {"id": "pat_imported0001", "pattern": "imported ščř", "tags": ["x"], "created": "2099-01-01T00:00:00Z"}], "gotchas": [{"id": "got_imported0001", "library": "zlib", "gotcha": "imp ščř", "discovered": "2099-01-01T00:00:00Z"}], "preferences": "new prefs"}"#.as_bytes(),
     )?;
     assert_eq!(
         run(&repo, &["import", "imp.json"])?,
-        "[global] Imported: 1 patterns, 1 gotchas\n"
+        format!("[global] Imported: 1 gotchas\n  Skipped 2 {SKIPPED}")
     );
-    let patterns = read(&repo, "patterns.jsonl")?;
-    assert_eq!(patterns.lines().count(), 4);
-    assert!(patterns.ends_with("{\"created\": \"2099-01-01T00:00:00Z\", \"id\": \"pat_imported0001\", \"pattern\": \"imported \\u0161\\u010d\\u0159\", \"tags\": [\"x\"]}\n"));
-    assert!(!patterns.contains("\"dup\""));
-    assert!(read(&repo, "library_gotchas.jsonl")?.ends_with("{\"discovered\": \"2099-01-01T00:00:00Z\", \"gotcha\": \"imp\", \"id\": \"got_imported0001\", \"library\": \"zlib\"}\n"));
+    assert_eq!(read(&repo, "patterns.jsonl")?, PATTERNS);
+    assert!(read(&repo, "library_gotchas.jsonl")?.ends_with("{\"discovered\": \"2099-01-01T00:00:00Z\", \"gotcha\": \"imp \\u0161\\u010d\\u0159\", \"id\": \"got_imported0001\", \"library\": \"zlib\"}\n"));
     assert_eq!(read(&repo, "stack_preferences.md")?, "# prefs\nuse uv\n");
     assert_eq!(
         run(&repo, &["import", "imp.json"])?,
-        "[global] Imported: 0 patterns, 0 gotchas\n"
+        format!("[global] Imported: 0 gotchas\n  Skipped 2 {SKIPPED}")
     );
-    assert_eq!(read(&repo, "patterns.jsonl")?, patterns);
     Ok(())
 }
 
@@ -565,13 +511,10 @@ fn import_writes_preferences_when_none_exist_and_reads_a_bom() -> TestResult {
     write_json(&repo, "bom.json", &bom)?;
     assert_eq!(
         run(&repo, &["import", "bom.json"])?,
-        "[global] Imported: 1 patterns, 0 gotchas\n"
+        format!("[global] Imported: 0 gotchas\n  Skipped 1 {SKIPPED}")
     );
     assert_eq!(read(&repo, "stack_preferences.md")?, "use uv\n");
-    assert_eq!(
-        read(&repo, "patterns.jsonl")?,
-        "{\"id\": \"pat_bom\", \"pattern\": \"from bom\"}\n"
-    );
+    assert!(!global_dir(&repo).join("patterns.jsonl").exists());
     Ok(())
 }
 
@@ -604,9 +547,9 @@ fn export_then_import_into_a_fresh_home_restores_everything() -> TestResult {
     write_json(&target, "all.json", exported.as_bytes())?;
     assert_eq!(
         run(&target, &["import", "all.json"])?,
-        "[global] Imported: 3 patterns, 5 gotchas\n"
+        "[global] Imported: 5 gotchas\n"
     );
-    assert_eq!(read(&target, "patterns.jsonl")?, PATTERNS);
+    assert!(!global_dir(&target).join("patterns.jsonl").exists());
     assert_eq!(read(&target, "library_gotchas.jsonl")?, GOTCHAS);
     assert_eq!(read(&target, "stack_preferences.md")?, "# prefs\nuse uv\n");
     Ok(())
@@ -630,7 +573,7 @@ fn export_then_import_restores_library_aliases() -> TestResult {
     write_json(&target, "all.json", exported.as_bytes())?;
     assert_eq!(
         run(&target, &["import", "all.json"])?,
-        "[global] Imported: 3 patterns, 5 gotchas\n"
+        "[global] Imported: 5 gotchas\n"
     );
     assert_eq!(
         read(&target, "libraries.json")?,
@@ -682,12 +625,12 @@ fn a_corrupt_store_is_an_error_not_a_silent_loss() -> TestResult {
     let repo = Repo::new()?;
     let dir = global_dir(&repo);
     fs::create_dir_all(&dir)?;
-    fs::write(dir.join("patterns.jsonl"), "{not json\n")?;
+    fs::write(dir.join("library_gotchas.jsonl"), "{not json\n")?;
     let assert = repo.djf(&["global", "remove", "x"]).assert().code(3);
     let err = String::from_utf8(assert.get_output().stderr.clone())?;
     assert!(err.starts_with("Error: cannot read "), "{err}");
     assert_eq!(
-        fs::read_to_string(dir.join("patterns.jsonl"))?,
+        fs::read_to_string(dir.join("library_gotchas.jsonl"))?,
         "{not json\n"
     );
     Ok(())
@@ -699,7 +642,7 @@ fn colour_is_not_written_to_a_pipe() -> TestResult {
     for args in [
         &["status"][..],
         &["list"],
-        &["add", "x"],
+        &["remove", "got_000000000001"],
         &["remove", "pat_000000000001"],
         &["prune"],
     ] {

@@ -238,22 +238,7 @@ fn global_matches_python() -> TestResult {
     )?;
     let actions = vec![
         djf(INIT),
-        djf(&["global"]),
-        djf(&["global", "list"]),
-        djf(&["global", "add"]),
-        djf(&[
-            "global",
-            "add",
-            "prefer small modules",
-            "--tag",
-            "javascript",
-        ]),
-        djf(&["global", "status"]),
-        djf(&["global", "list", "--tag", "javascript"]),
-        djf(&["global", "list", "--library", "react", "-f", "json"]),
-        djf(&["global", "detect"]),
         djf(&["global", "detect", "--format", "json"]),
-        djf(&["global", "remove", "pat_000000000000"]),
         djf(&[
             "global",
             "prune",

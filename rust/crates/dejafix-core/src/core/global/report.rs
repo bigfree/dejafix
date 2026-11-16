@@ -46,20 +46,13 @@ fn truthy_text(entry: &Entry, key: &str) -> Option<String> {
 }
 
 #[must_use]
-pub fn filtered(
-    patterns: Vec<Entry>,
-    gotchas: Vec<Entry>,
-    tag: Option<&str>,
-    library: Option<&str>,
-) -> (Vec<Entry>, Vec<Entry>) {
+pub fn filtered(gotchas: Vec<Entry>, tag: Option<&str>, library: Option<&str>) -> Vec<Entry> {
     let tag = tag.filter(|tag| !tag.is_empty());
     let library = library
         .filter(|library| !library.is_empty())
         .map(str::to_lowercase);
-    let mut patterns = patterns;
     let mut gotchas = gotchas;
     if let Some(tag) = tag {
-        patterns.retain(|entry| has_tag(entry, tag));
         gotchas.retain(|entry| has_tag(entry, tag));
     }
     if let Some(library) = library {
@@ -69,7 +62,7 @@ pub fn filtered(
                 .contains(&library)
         });
     }
-    (patterns, gotchas)
+    gotchas
 }
 
 fn json_text(value: &Value) -> String {
@@ -78,24 +71,16 @@ fn json_text(value: &Value) -> String {
     format!("{}\n", String::from_utf8_lossy(&out))
 }
 
-fn status(
-    location: &str,
-    patterns: &[Entry],
-    gotchas: &[Entry],
-    preferences: bool,
-    palette: Palette,
-) -> String {
+fn status(location: &str, gotchas: &[Entry], preferences: bool, palette: Palette) -> String {
     let Palette {
         bold, dim, reset, ..
     } = palette;
     let mut tags: BTreeSet<String> = BTreeSet::new();
     let mut libraries: BTreeSet<String> = BTreeSet::new();
     let mut projects: BTreeSet<String> = BTreeSet::new();
-    for entry in patterns.iter().chain(gotchas) {
+    for entry in gotchas {
         tags.extend(items(entry, "tags"));
         projects.extend(truthy_text(entry, "source_project"));
-    }
-    for entry in gotchas {
         libraries.insert(text_of(entry, "library", ""));
     }
     libraries.remove("");
@@ -105,8 +90,7 @@ fn status(
     );
     let _ = write!(
         out,
-        "    Patterns:           {bold}{}{reset}\n    Library gotchas:     {bold}{}{reset}\n    Stack preferences:   {bold}{}{reset}\n    Unique tags:         {bold}{}{reset}\n    Libraries tracked:   {bold}{}{reset}\n    Source projects:     {bold}{}{reset}\n",
-        patterns.len(),
+        "    Library gotchas:     {bold}{}{reset}\n    Stack preferences:   {bold}{}{reset}\n    Unique tags:         {bold}{}{reset}\n    Libraries tracked:   {bold}{}{reset}\n    Source projects:     {bold}{}{reset}\n",
         gotchas.len(),
         if preferences { "yes" } else { "not set" },
         tags.len(),
@@ -149,7 +133,6 @@ fn meta(out: &mut String, parts: &[String], palette: Palette) {
 }
 
 fn list_text(
-    patterns: &[Entry],
     gotchas: &[Entry],
     tag: Option<&str>,
     library: Option<&str>,
@@ -158,13 +141,12 @@ fn list_text(
     let Palette {
         bold,
         dim,
-        cyan,
         yellow,
         reset,
         ..
     } = palette;
     let mut out = String::new();
-    if patterns.is_empty() && gotchas.is_empty() {
+    if gotchas.is_empty() {
         out.push_str("No entries found.");
         if tag.is_some_and(|tag| !tag.is_empty())
             || library.is_some_and(|library| !library.is_empty())
@@ -177,81 +159,49 @@ fn list_text(
             );
         }
         out.push_str(
-            "\n  Add patterns:  djf global add \"your pattern here\"\n  Add gotchas:   djf global add-gotcha \"gotcha text\" --library <library> --keyword <phrase> --keyword <phrase>\n",
+            "\n  Add gotchas:   djf global add-gotcha \"gotcha text\" --library <library> --keyword <phrase> --keyword <phrase>\n",
         );
         return out;
     }
     let rule = RULE.repeat(LIST_RULE_WIDTH);
-    if !patterns.is_empty() {
-        let _ = write!(
+    let _ = write!(
+        out,
+        "\n{bold}Library Gotchas ({}){reset}\n{dim}{rule}{reset}\n",
+        gotchas.len()
+    );
+    for entry in gotchas {
+        let upgraded = is_upgraded(entry);
+        let _ = writeln!(
             out,
-            "\n{bold}Patterns ({}){reset}\n{dim}{rule}{reset}\n",
-            patterns.len()
+            "  {yellow}{}{reset}{}  [{bold}{}{reset}] {}",
+            text_of(entry, "id", "?"),
+            if upgraded { "" } else { " (not upgraded)" },
+            text_of(entry, "library", "unknown"),
+            text_of(entry, "gotcha", "")
         );
-        for entry in patterns {
-            let _ = writeln!(
-                out,
-                "  {cyan}{}{reset}  {}",
-                text_of(entry, "id", "?"),
-                text_of(entry, "pattern", "")
-            );
-            let mut parts = Vec::new();
-            let tags = items(entry, "tags").join(", ");
-            if !tags.is_empty() {
-                parts.push(format!("tags: {tags}"));
+        let mut parts = Vec::new();
+        if upgraded {
+            let keywords = items(entry, "keywords").join(", ");
+            if !keywords.is_empty() {
+                parts.push(format!("keywords: {keywords}"));
             }
-            if let Some(source) = truthy_text(entry, "source_project") {
-                parts.push(format!("from: {source}"));
-            }
-            if let Some(confidence) = truthy_text(entry, "confidence") {
-                parts.push(format!("confidence: {confidence}"));
-            }
-            meta(&mut out, &parts, palette);
         }
-    }
-    if !gotchas.is_empty() {
-        let _ = write!(
-            out,
-            "\n{bold}Library Gotchas ({}){reset}\n{dim}{rule}{reset}\n",
-            gotchas.len()
-        );
-        for entry in gotchas {
-            let upgraded = is_upgraded(entry);
-            let _ = writeln!(
-                out,
-                "  {yellow}{}{reset}{}  [{bold}{}{reset}] {}",
-                text_of(entry, "id", "?"),
-                if upgraded { "" } else { " (not upgraded)" },
-                text_of(entry, "library", "unknown"),
-                text_of(entry, "gotcha", "")
-            );
-            let mut parts = Vec::new();
-            if upgraded {
-                let keywords = items(entry, "keywords").join(", ");
-                if !keywords.is_empty() {
-                    parts.push(format!("keywords: {keywords}"));
-                }
-            }
-            let version =
-                truthy_text(entry, "versions").or_else(|| truthy_text(entry, "version_range"));
-            if let Some(version) = version {
-                parts.push(format!("version: {version}"));
-            }
-            if let Some(source) = truthy_text(entry, "source_project") {
-                parts.push(format!("from: {source}"));
-            }
-            meta(&mut out, &parts, palette);
+        let version =
+            truthy_text(entry, "versions").or_else(|| truthy_text(entry, "version_range"));
+        if let Some(version) = version {
+            parts.push(format!("version: {version}"));
         }
+        if let Some(source) = truthy_text(entry, "source_project") {
+            parts.push(format!("from: {source}"));
+        }
+        meta(&mut out, &parts, palette);
     }
     out.push('\n');
     out
 }
 
-fn list_json(patterns: &[Entry], gotchas: &[Entry]) -> String {
-    json_text(&json!({
-        "patterns": patterns,
-        "gotchas": gotchas,
-    }))
+fn list_json(gotchas: &[Entry]) -> String {
+    json_text(&json!({ "gotchas": gotchas }))
 }
 
 fn detect_json(name: &str, stack: &Stack) -> String {
@@ -264,7 +214,7 @@ fn detect_json(name: &str, stack: &Stack) -> String {
     json_text(&Value::Object(map))
 }
 
-fn detect_text(name: &str, stack: &Stack, inherited: (usize, usize), palette: Palette) -> String {
+fn detect_text(name: &str, stack: &Stack, inherited: usize, palette: Palette) -> String {
     let Palette {
         bold,
         dim,
@@ -305,11 +255,10 @@ fn detect_text(name: &str, stack: &Stack, inherited: (usize, usize), palette: Pa
         );
     }
     let _ = writeln!(out, "  Manifests:  {}", stack.manifest_files.join(", "));
-    if inherited.0 > 0 || inherited.1 > 0 {
+    if inherited > 0 {
         let _ = write!(
             out,
-            "\n  {bold}Would inherit:{reset}\n    {} patterns, {} library gotchas\n",
-            inherited.0, inherited.1
+            "\n  {bold}Would inherit:{reset}\n    {inherited} library gotchas\n"
         );
     } else {
         let _ = write!(
@@ -323,7 +272,6 @@ fn detect_text(name: &str, stack: &Stack, inherited: (usize, usize), palette: Pa
 
 fn usage_text(usage: Usage) -> &'static str {
     match usage {
-        Usage::Add => "Usage: djf global add \"your pattern here\" [--tag python]\n",
         Usage::AddGotcha => {
             "Usage: djf global add-gotcha \"<text>\" --library <name> --keyword <phrase> --keyword <phrase> [--versions <range>]\nWrite one lesson in English, 30 to 600 characters, without project details; give 2 to 8 keywords.\n"
         }
@@ -346,13 +294,7 @@ fn gotcha_added(tag: &str, id: &str, library: &str, text: &str, warnings: &[Stri
     out
 }
 
-fn detected(
-    name: &str,
-    stack: &Stack,
-    inherited: (usize, usize),
-    json: bool,
-    palette: Palette,
-) -> String {
+fn detected(name: &str, stack: &Stack, inherited: usize, json: bool, palette: Palette) -> String {
     if json {
         detect_json(name, stack)
     } else {
@@ -395,33 +337,22 @@ pub fn global_report(outcome: &GlobalOutcome, color: bool) -> String {
     match outcome {
         GlobalOutcome::Status {
             location,
-            patterns,
             gotchas,
             preferences,
-        } => status(location, patterns, gotchas, *preferences, palette),
+        } => status(location, gotchas, *preferences, palette),
         GlobalOutcome::List {
-            patterns,
             gotchas,
             tag,
             library,
             json,
         } => {
             if *json {
-                list_json(patterns, gotchas)
+                list_json(gotchas)
             } else {
-                list_text(
-                    patterns,
-                    gotchas,
-                    tag.as_deref(),
-                    library.as_deref(),
-                    palette,
-                )
+                list_text(gotchas, tag.as_deref(), library.as_deref(), palette)
             }
         }
         GlobalOutcome::Usage(usage) => usage_text(*usage).to_owned(),
-        GlobalOutcome::PatternAdded { id, text } => {
-            format!("{tag} Pattern added: {id}\n  {text}\n")
-        }
         GlobalOutcome::GotchaAdded {
             id,
             library,
@@ -454,9 +385,16 @@ pub fn global_report(outcome: &GlobalOutcome, color: bool) -> String {
         GlobalOutcome::Removed(id) => format!("{tag} Removed: {id}\n"),
         GlobalOutcome::NotFound(id) => format!("Entry not found: {id}\n"),
         GlobalOutcome::Exported(value) => json_text(value),
-        GlobalOutcome::Imported { patterns, gotchas } => {
-            format!("{tag} Imported: {patterns} patterns, {gotchas} gotchas\n")
-        }
+        GlobalOutcome::Imported {
+            gotchas,
+            skipped_patterns: 0,
+        } => format!("{tag} Imported: {gotchas} gotchas\n"),
+        GlobalOutcome::Imported {
+            gotchas,
+            skipped_patterns,
+        } => format!(
+            "{tag} Imported: {gotchas} gotchas\n  Skipped {skipped_patterns} cross-project pattern(s); dejafix no longer keeps them.\n"
+        ),
         GlobalOutcome::FileNotFound(path) => format!("File not found: {path}\n"),
         GlobalOutcome::InvalidJson(message) => format!("Invalid JSON: {message}\n"),
         GlobalOutcome::Pruned { removed: 0, .. } => "No entries to prune.\n".to_owned(),
@@ -469,16 +407,9 @@ pub fn global_report(outcome: &GlobalOutcome, color: bool) -> String {
         GlobalOutcome::Detected {
             name,
             stack,
-            inherited_patterns,
             inherited_gotchas,
             json,
-        } => detected(
-            name,
-            stack,
-            (*inherited_patterns, *inherited_gotchas),
-            *json,
-            palette,
-        ),
+        } => detected(name, stack, *inherited_gotchas, *json, palette),
         GlobalOutcome::Unknown(action) => {
             format!("Unknown action: {action}\nAvailable: {AVAILABLE}\n")
         }
