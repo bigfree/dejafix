@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/dejafix-core", "crates/dejafix"]
+members = ["crates/dejafix-core", "crates/dejafix", "crates/dejafix-win"]
 
 [workspace.package]
 version = "1.0.0-rc.3"
@@ -16,6 +16,7 @@ assert_cmd = "=2.2.2"
 clap = { version = "=4.6.7", features = ["derive"] }
 criterion = "=0.8.2"
 dejafix-core = { path = "crates/dejafix-core" }
+dejafix-win = { path = "crates/dejafix-win" }
 getrandom = "=0.4.3"
 insta = "=1.49.0"
 jiff = "=0.2.43"
@@ -28,8 +29,9 @@ serde_json = { version = "=1.0.154", features = ["float_roundtrip", "preserve_or
 sha1 = "=0.11.0"
 tempfile = "=3.27.0"
 thiserror = "=2.0.21"
-ureq = { version = "=3.5.2", default-features = false, features = ["rustls", "platform-verifier"] }
 tokio = { version = "=1.54.1", features = ["rt", "macros", "io-std"] }
+ureq = { version = "=3.5.2", default-features = false, features = ["rustls", "platform-verifier"] }
+windows-sys = "=0.61.2"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

@@ -65,6 +65,7 @@ const CLOUD_PATTERNS: [&str; 17] = [
     "Yandex.Disk*",
 ];
 
+#[cfg(windows)]
 const DRIVE_LETTERS: std::ops::RangeInclusive<char> = 'D'..='Z';
 
 fn is_dir_following_links(entry: &DirEntry, kind: FileType) -> bool {
@@ -195,10 +196,16 @@ fn glob(home: &Path, pattern: &str) -> Vec<PathBuf> {
     matches
 }
 
+#[cfg(windows)]
 fn fixed_drives() -> impl Iterator<Item = PathBuf> {
     DRIVE_LETTERS
+        .filter(|letter| dejafix_win::is_fixed_drive(*letter))
         .map(|letter| PathBuf::from(format!("{letter}:\\")))
-        .filter(|drive| cfg!(windows) && drive.try_exists().unwrap_or(false))
+}
+
+#[cfg(not(windows))]
+fn fixed_drives() -> impl Iterator<Item = PathBuf> {
+    std::iter::empty()
 }
 
 #[must_use]
