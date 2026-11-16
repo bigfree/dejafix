@@ -26,7 +26,7 @@ pub enum LessonKind {
 pub struct Lesson<'r, 'a> {
     pub kind: LessonKind,
     pub record: &'r Record<'a>,
-    pub file: String,
+    pub files: Vec<String>,
 }
 
 #[derive(Debug)]

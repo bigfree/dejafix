@@ -416,7 +416,7 @@ fn boundary_lessons_exclude_fixed_issues_and_files_off_the_boundary() {
         .iter()
         .find(|lesson| lesson.record.kind == "attempt")
         .unwrap();
-    assert_eq!(attempt.file, "src/Api/Ports.php");
+    assert_eq!(attempt.files, ["src/Api/Ports.php"]);
 }
 
 #[test]
@@ -565,6 +565,34 @@ fn an_unlinked_duplicate_is_not_reported() {
         }],
     );
     assert_eq!(alone.duplicates, Vec::<String>::new());
+}
+
+#[test]
+fn a_lesson_on_several_boundary_files_is_found_through_each() {
+    let text = concat!(
+        r#"{"type": "decision", "id": "d1", "summary": "requests must be serialized", "files": ["src/Api/Accounts.php", "src/Api/Ports.php", "docs/notes.md"], "timestamp": "2026-09-12T10:00:00"}"#,
+        "\n",
+    );
+    let found = records(text);
+    let memory = Memory::new(&found, "/work/inventory", &Never);
+    let link = inventory_link();
+    let globs = boundary_globs(&link.boundary);
+    let lessons = memory.lessons_where(|file| matching(&globs, file).is_some());
+    assert_eq!(
+        lessons[0].files,
+        ["src/Api/Accounts.php", "src/Api/Ports.php"]
+    );
+    let own = boundary_globs(&["src/api/**".to_owned()]);
+    for edited in ["src/api/ports.ts", "src/api/accounts.ts"] {
+        let query = path_query(edited, matching(&own, edited));
+        let block = linked_blocks(&link, &lessons, &globs, &[&query])
+            .pop()
+            .flatten();
+        assert!(
+            block.is_some_and(|block| block.lines.len() == 1),
+            "{edited}"
+        );
+    }
 }
 
 #[test]

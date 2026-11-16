@@ -67,16 +67,20 @@ impl<'r, 'a> Memory<'r, 'a> {
         self.candidates
             .iter()
             .filter_map(|candidate| {
-                let file = candidate
+                let mut files: Vec<String> = candidate
                     .files
                     .iter()
                     .filter(|file| keep(file))
-                    .min()?
-                    .clone();
+                    .cloned()
+                    .collect();
+                if files.is_empty() {
+                    return None;
+                }
+                files.sort_unstable();
                 Some(Lesson {
                     kind: candidate.kind,
                     record: candidate.record,
-                    file,
+                    files,
                 })
             })
             .collect()

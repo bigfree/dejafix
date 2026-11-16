@@ -31,7 +31,7 @@ impl Document for LessonDoc<'_> {
     fn texts<'d>(&'d self, field: usize, visit: &mut dyn FnMut(&'d str)) {
         match field {
             0 => visit(self.summary),
-            1 => visit(&self.file),
+            1 => self.files.iter().for_each(|file| visit(file)),
             _ => {}
         }
     }
@@ -50,7 +50,11 @@ pub fn linked_blocks(
         .map(|(number, lesson)| LessonDoc {
             id: format!("{number:08}"),
             summary: lesson.record.summary.as_ref(),
-            file: path_query(&lesson.file, matching(globs, &lesson.file)),
+            files: lesson
+                .files
+                .iter()
+                .map(|file| path_query(file, matching(globs, file)))
+                .collect(),
         })
         .collect();
     let index = Index::build(FIELDS, &docs);

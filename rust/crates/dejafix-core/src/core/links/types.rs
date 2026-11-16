@@ -79,5 +79,5 @@ pub struct LinkedBlock {
 pub(super) struct LessonDoc<'l> {
     pub(super) id: String,
     pub(super) summary: &'l str,
-    pub(super) file: String,
+    pub(super) files: Vec<String>,
 }

@@ -13,7 +13,7 @@ pub fn lesson_line(lesson: &Lesson<'_, '_>) -> String {
         LessonKind::Issue => format!(
             "- open {}{summary} [{}]",
             issue_label(record),
-            clip(&lesson.file)
+            clip(lesson.files.first().map_or("", String::as_str))
         ),
         LessonKind::Attempt => {
             let mark = if record.outcome == "failed" { "x" } else { "~" };
